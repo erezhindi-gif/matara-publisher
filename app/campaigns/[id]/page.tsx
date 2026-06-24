@@ -13,8 +13,15 @@ type Campaign = {
   emailLink: string | null;
   scheduledAt: string | null;
   createdAt: string;
-  business: { name: string; type: string };
+  business: { id: string; name: string; type: string };
   posts: { id: string; groupName: string; status: string; publishedAt: string | null }[];
+};
+
+type Template = {
+  id: string;
+  name: string;
+  businessId: string;
+  groups: { id: string }[];
 };
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -26,23 +33,134 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   paused: { label: "מושהה", color: "text-red-600" },
 };
 
+const DAY_NAMES = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי"];
+
+function toLocalDatetime(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export default function CampaignDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState<"view" | "edit" | "duplicate">("view");
   const [rejectNote, setRejectNote] = useState("");
   const [showReject, setShowReject] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Edit form state
+  const [editContent, setEditContent] = useState("");
+  const [editScheduledAt, setEditScheduledAt] = useState("");
+  const [editRecurring, setEditRecurring] = useState(false);
+  const [editDays, setEditDays] = useState<number[]>([]);
+  const [editTime, setEditTime] = useState("10:00");
+  const [editWeeks, setEditWeeks] = useState(4);
+
+  // Duplicate state
+  const [dupTemplates, setDupTemplates] = useState<string[]>([]);
+
   useEffect(() => {
+    fetchCampaign();
+    fetch("/api/templates").then((r) => r.json()).then(setTemplates);
+  }, [id]);
+
+  function fetchCampaign() {
     fetch(`/api/campaigns/${id}`)
       .then((r) => r.json())
       .then((data) => {
         setCampaign(data);
         setLoading(false);
+        setEditContent(data.content || "");
+        setEditScheduledAt(data.scheduledAt ? toLocalDatetime(data.scheduledAt) : "");
       });
-  }, [id]);
+  }
+
+  function startEdit() {
+    if (!campaign) return;
+    setEditContent(campaign.content || "");
+    setEditScheduledAt(campaign.scheduledAt ? toLocalDatetime(campaign.scheduledAt) : "");
+    setEditRecurring(false);
+    setEditDays([]);
+    setEditTime("10:00");
+    setEditWeeks(4);
+    setMode("edit");
+  }
+
+  async function saveEdit() {
+    setSaving(true);
+    const body: Record<string, unknown> = {
+      content: editContent,
+    };
+    if (editScheduledAt) {
+      body.scheduledAt = new Date(editScheduledAt).toISOString();
+    }
+    await fetch(`/api/campaigns/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    // If recurring - create additional campaigns
+    if (editRecurring && editDays.length > 0 && campaign) {
+      const startDate = editScheduledAt ? new Date(editScheduledAt) : new Date();
+      for (let week = 1; week < editWeeks; week++) {
+        for (const day of editDays) {
+          const d = new Date(startDate);
+          d.setDate(d.getDate() + week * 7 + ((day - startDate.getDay() + 7) % 7));
+          const [h, m] = editTime.split(":").map(Number);
+          d.setHours(h, m, 0, 0);
+          await fetch("/api/campaigns", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              businessId: campaign.business.id,
+              title: campaign.title,
+              content: editContent,
+              whatsappLink: campaign.whatsappLink,
+              emailLink: campaign.emailLink,
+              scheduledAt: d.toISOString(),
+              templateIds: [],
+            }),
+          });
+        }
+      }
+    }
+
+    setSaving(false);
+    setMode("view");
+    fetchCampaign();
+  }
+
+  async function duplicateCampaign() {
+    if (!campaign || dupTemplates.length === 0) return;
+    setSaving(true);
+    await fetch("/api/campaigns", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        businessId: campaign.business.id,
+        title: campaign.title,
+        content: campaign.content,
+        whatsappLink: campaign.whatsappLink,
+        emailLink: campaign.emailLink,
+        scheduledAt: campaign.scheduledAt,
+        templateIds: dupTemplates,
+      }),
+    });
+    setSaving(false);
+    setMode("view");
+    alert("הקמפיין שוכפל לתבניות הנבחרות");
+  }
+
+  async function deleteCampaign() {
+    if (!confirm("למחוק את הקמפיין לצמיתות?")) return;
+    await fetch(`/api/campaigns/${id}`, { method: "DELETE" });
+    router.push("/campaigns");
+  }
 
   async function updateStatus(status: string, note?: string) {
     setSaving(true);
@@ -52,120 +170,236 @@ export default function CampaignDetailPage() {
       body: JSON.stringify({ status, ...(note ? { rejectNote: note } : {}) }),
     });
     setSaving(false);
-    router.refresh();
-    const updated = await fetch(`/api/campaigns/${id}`).then((r) => r.json());
-    setCampaign(updated);
+    fetchCampaign();
     setShowReject(false);
     setRejectNote("");
   }
 
-  if (loading) return <div className="min-h-screen bg-gray-50 text-gray-900 flex items-center justify-center">טוען...</div>;
-  if (!campaign) return <div className="min-h-screen bg-gray-50 text-gray-900 flex items-center justify-center">לא נמצא</div>;
+  if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center">טוען...</div>;
+  if (!campaign) return <div className="min-h-screen bg-gray-50 flex items-center justify-center">לא נמצא</div>;
 
   const statusInfo = STATUS_LABELS[campaign.status] || { label: campaign.status, color: "text-gray-500" };
+  const businessTemplates = templates.filter((t) => t.businessId === campaign.business.id);
 
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900 p-8" dir="rtl">
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center gap-4 mb-8">
           <Link href="/campaigns" className="text-gray-500 hover:text-gray-900">← קמפיינים</Link>
-          <h1 className="text-2xl font-bold">{campaign.title}</h1>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-5 flex items-center justify-between">
-          <div>
-            <span className="text-sm text-gray-500">סטטוס: </span>
-            <span className={`font-semibold ${statusInfo.color}`}>{statusInfo.label}</span>
-          </div>
-          <div className="text-sm text-gray-500">{campaign.business.name}</div>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-5">
-          <div className="text-sm text-gray-500 mb-3">תוכן הפוסט</div>
-          <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">{campaign.content}</pre>
-
-          {(campaign.whatsappLink || campaign.emailLink) && (
-            <div className="mt-4 pt-4 border-t border-gray-200 space-y-1">
-              {campaign.whatsappLink && (
-                <div className="text-xs text-gray-500">
-                  וואטסאפ: <span className="text-green-600">{campaign.whatsappLink}</span>
-                </div>
-              )}
-              {campaign.emailLink && (
-                <div className="text-xs text-gray-500">
-                  מייל: <span className="text-blue-600">{campaign.emailLink}</span>
-                </div>
-              )}
+          <h1 className="text-2xl font-bold flex-1">{campaign.title}</h1>
+          {mode === "view" && (
+            <div className="flex gap-2">
+              <button onClick={startEdit} className="text-sm bg-white border border-gray-300 hover:border-gray-400 rounded-xl px-4 py-2 transition-colors">✏️ ערוך</button>
+              <button onClick={() => setMode("duplicate")} className="text-sm bg-white border border-gray-300 hover:border-gray-400 rounded-xl px-4 py-2 transition-colors">📋 שכפל</button>
+              <button onClick={deleteCampaign} className="text-sm bg-white border border-red-300 hover:bg-red-50 text-red-600 rounded-xl px-4 py-2 transition-colors">🗑️</button>
             </div>
           )}
         </div>
 
-        {campaign.scheduledAt && (
-          <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-5 text-sm">
-            <span className="text-gray-500">מתוזמן ל: </span>
-            <span>{new Date(campaign.scheduledAt).toLocaleString("he-IL")}</span>
-          </div>
-        )}
-
-        {campaign.status === "pending_approval" && (
-          <div className="space-y-3 mb-5">
-            {showReject ? (
-              <div className="bg-white border border-red-300 rounded-2xl p-5 space-y-3">
-                <div className="text-sm text-gray-500">הערה לדחייה (אופציונלי)</div>
-                <textarea
-                  className="w-full bg-gray-100 border border-gray-300 rounded-xl p-3 text-gray-900 text-sm min-h-[80px]"
-                  placeholder="למה דחית? מה לשנות?"
-                  value={rejectNote}
-                  onChange={(e) => setRejectNote(e.target.value)}
-                />
-                <div className="flex gap-3">
-                  <button onClick={() => setShowReject(false)} className="flex-1 bg-gray-100 hover:bg-gray-200 rounded-xl p-3 transition-colors">
-                    ביטול
-                  </button>
-                  <button onClick={() => updateStatus("draft", rejectNote)} disabled={saving} className="flex-1 bg-red-600 hover:bg-red-700 text-white rounded-xl p-3 font-semibold transition-colors">
-                    {saving ? "שומר..." : "דחה קמפיין"}
-                  </button>
-                </div>
+        {/* VIEW MODE */}
+        {mode === "view" && (
+          <>
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-5 flex items-center justify-between">
+              <div>
+                <span className="text-sm text-gray-500">סטטוס: </span>
+                <span className={`font-semibold ${statusInfo.color}`}>{statusInfo.label}</span>
               </div>
-            ) : (
-              <div className="flex gap-3">
-                <button onClick={() => setShowReject(true)} className="flex-1 bg-white hover:bg-gray-100 border border-red-300 rounded-xl p-4 font-semibold transition-colors text-red-600">
-                  ✗ דחה
-                </button>
-                <button onClick={() => updateStatus("approved")} disabled={saving} className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-xl p-4 font-semibold transition-colors">
-                  {saving ? "שומר..." : "✓ אשר ופרסם"}
-                </button>
+              <div className="text-sm text-gray-500">{campaign.business.name}</div>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-5">
+              <div className="text-sm text-gray-500 mb-3">תוכן הפוסט</div>
+              <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">{campaign.content}</pre>
+              {(campaign.whatsappLink || campaign.emailLink) && (
+                <div className="mt-4 pt-4 border-t border-gray-200 space-y-1">
+                  {campaign.whatsappLink && <div className="text-xs text-gray-500">וואטסאפ: <span className="text-green-600">{campaign.whatsappLink}</span></div>}
+                  {campaign.emailLink && <div className="text-xs text-gray-500">מייל: <span className="text-blue-600">{campaign.emailLink}</span></div>}
+                </div>
+              )}
+            </div>
+
+            {campaign.scheduledAt && (
+              <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-5 text-sm">
+                <span className="text-gray-500">מתוזמן ל: </span>
+                <span>{new Date(campaign.scheduledAt).toLocaleString("he-IL")}</span>
               </div>
             )}
+
+            {campaign.status === "pending_approval" && (
+              <div className="space-y-3 mb-5">
+                {showReject ? (
+                  <div className="bg-white border border-red-300 rounded-2xl p-5 space-y-3">
+                    <div className="text-sm text-gray-500">הערה לדחייה (אופציונלי)</div>
+                    <textarea
+                      className="w-full bg-gray-100 border border-gray-300 rounded-xl p-3 text-gray-900 text-sm min-h-[80px]"
+                      placeholder="למה דחית? מה לשנות?"
+                      value={rejectNote}
+                      onChange={(e) => setRejectNote(e.target.value)}
+                    />
+                    <div className="flex gap-3">
+                      <button onClick={() => setShowReject(false)} className="flex-1 bg-gray-100 hover:bg-gray-200 rounded-xl p-3 transition-colors">ביטול</button>
+                      <button onClick={() => updateStatus("draft", rejectNote)} disabled={saving} className="flex-1 bg-red-600 hover:bg-red-700 text-white rounded-xl p-3 font-semibold transition-colors">
+                        {saving ? "שומר..." : "דחה קמפיין"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-3">
+                    <button onClick={() => setShowReject(true)} className="flex-1 bg-white hover:bg-gray-100 border border-red-300 rounded-xl p-4 font-semibold transition-colors text-red-600">✗ דחה</button>
+                    <button onClick={() => updateStatus("approved")} disabled={saving} className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-xl p-4 font-semibold transition-colors">
+                      {saving ? "שומר..." : "✓ אשר ופרסם"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {(campaign.status === "approved" || campaign.status === "publishing") && (
+              <button onClick={() => updateStatus("paused")} className="w-full bg-white hover:bg-gray-100 border border-yellow-400 text-yellow-600 rounded-xl p-4 font-semibold transition-colors mb-5">
+                ⏸ השהה קמפיין
+              </button>
+            )}
+
+            {campaign.status === "paused" && (
+              <button onClick={() => updateStatus("approved")} className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl p-4 font-semibold transition-colors mb-5">
+                ▶ המשך פרסום
+              </button>
+            )}
+
+            {campaign.posts.length > 0 && (
+              <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                <div className="text-sm text-gray-500 mb-3">
+                  {campaign.posts.filter(p => p.status === "published").length}/{campaign.posts.length} קבוצות פורסמו
+                </div>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {campaign.posts.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between text-sm">
+                      <span className="text-gray-700">{p.groupName}</span>
+                      <span className={p.status === "published" ? "text-green-600" : p.status === "failed" ? "text-red-600" : "text-gray-400"}>
+                        {p.status === "published" ? "✓ פורסם" : p.status === "failed" ? "✗ נכשל" : "ממתין"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* EDIT MODE */}
+        {mode === "edit" && (
+          <div className="space-y-5">
+            <div className="bg-white border border-gray-200 rounded-2xl p-5">
+              <label className="block text-sm text-gray-500 mb-2">תוכן הפוסט</label>
+              <textarea
+                className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900 text-sm min-h-[200px]"
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+              />
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-2xl p-5">
+              <label className="block text-sm text-gray-500 mb-2">תאריך ושעה</label>
+              <input
+                type="datetime-local"
+                className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900"
+                value={editScheduledAt}
+                onChange={(e) => setEditScheduledAt(e.target.value)}
+              />
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-2xl p-5">
+              <label className="flex items-center gap-3 cursor-pointer mb-4">
+                <input type="checkbox" checked={editRecurring} onChange={(e) => setEditRecurring(e.target.checked)} className="w-4 h-4" />
+                <span className="text-sm font-medium">תזמון חוזר (שבועי)</span>
+              </label>
+              {editRecurring && (
+                <div className="space-y-4 pt-2 border-t border-gray-200">
+                  <div>
+                    <div className="text-sm text-gray-500 mb-2">ימים בשבוע</div>
+                    <div className="flex flex-wrap gap-2">
+                      {DAY_NAMES.map((name, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setEditDays(d => d.includes(i) ? d.filter(x => x !== i) : [...d, i])}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${editDays.includes(i) ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                        >
+                          {name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-gray-500 mb-1">שעה</label>
+                      <input
+                        type="time"
+                        className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2 text-gray-900"
+                        value={editTime}
+                        onChange={(e) => setEditTime(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-500 mb-1">מספר שבועות</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={12}
+                        className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2 text-gray-900"
+                        value={editWeeks}
+                        onChange={(e) => setEditWeeks(Number(e.target.value))}
+                      />
+                    </div>
+                  </div>
+                  {editDays.length > 0 && (
+                    <div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-2">
+                      יוצר {editDays.length * (editWeeks - 1)} קמפיינים נוספים
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => setMode("view")} className="flex-1 bg-gray-100 hover:bg-gray-200 rounded-xl p-3 transition-colors">ביטול</button>
+              <button onClick={saveEdit} disabled={saving} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl p-3 font-semibold transition-colors">
+                {saving ? "שומר..." : "שמור שינויים"}
+              </button>
+            </div>
           </div>
         )}
 
-        {(campaign.status === "approved" || campaign.status === "publishing") && (
-          <button onClick={() => updateStatus("paused")} className="w-full bg-white hover:bg-gray-100 border border-yellow-400 text-yellow-600 rounded-xl p-4 font-semibold transition-colors mb-5">
-            ⏸ השהה קמפיין
-          </button>
-        )}
-
-        {campaign.status === "paused" && (
-          <button onClick={() => updateStatus("approved")} className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl p-4 font-semibold transition-colors mb-5">
-            ▶ המשך פרסום
-          </button>
-        )}
-
-        {campaign.posts.length > 0 && (
-          <div className="bg-white border border-gray-200 rounded-2xl p-5">
-            <div className="text-sm text-gray-500 mb-3">
-              {campaign.posts.filter(p => p.status === "published").length}/{campaign.posts.length} קבוצות פורסמו
-            </div>
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {campaign.posts.map((p) => (
-                <div key={p.id} className="flex items-center justify-between text-sm">
-                  <span className="text-gray-700">{p.groupName}</span>
-                  <span className={p.status === "published" ? "text-green-600" : p.status === "failed" ? "text-red-600" : "text-gray-400"}>
-                    {p.status === "published" ? "✓ פורסם" : p.status === "failed" ? "✗ נכשל" : "ממתין"}
-                  </span>
+        {/* DUPLICATE MODE */}
+        {mode === "duplicate" && (
+          <div className="space-y-5">
+            <div className="bg-white border border-gray-200 rounded-2xl p-5">
+              <div className="text-sm font-medium mb-3">בחר תבניות לשכפול</div>
+              {businessTemplates.length === 0 ? (
+                <div className="text-sm text-gray-500">אין תבניות לעסק זה</div>
+              ) : (
+                <div className="space-y-2">
+                  {businessTemplates.map((t) => (
+                    <label key={t.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100">
+                      <input
+                        type="checkbox"
+                        checked={dupTemplates.includes(t.id)}
+                        onChange={(e) => setDupTemplates(d => e.target.checked ? [...d, t.id] : d.filter(x => x !== t.id))}
+                        className="w-4 h-4"
+                      />
+                      <div>
+                        <div className="text-sm font-medium">{t.name}</div>
+                        <div className="text-xs text-gray-500">{t.groups.length} קבוצות</div>
+                      </div>
+                    </label>
+                  ))}
                 </div>
-              ))}
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setMode("view")} className="flex-1 bg-gray-100 hover:bg-gray-200 rounded-xl p-3 transition-colors">ביטול</button>
+              <button onClick={duplicateCampaign} disabled={saving || dupTemplates.length === 0} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-xl p-3 font-semibold transition-colors">
+                {saving ? "משכפל..." : `שכפל ל-${dupTemplates.length} תבניות`}
+              </button>
             </div>
           </div>
         )}
