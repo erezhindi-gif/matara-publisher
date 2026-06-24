@@ -3,6 +3,15 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+type Profile = {
+  id: string;
+  name: string;
+  fbUsername: string;
+  businessId: string;
+  isActive: boolean;
+  business: { name: string; type: string };
+};
+
 type Campaign = {
   id: string;
   title: string;
@@ -17,22 +26,25 @@ const DAYS = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
 
 export default function AnalyticsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterBusiness, setFilterBusiness] = useState<string>("all");
+  const [filterProfileId, setFilterProfileId] = useState<string>("all");
 
   useEffect(() => {
-    fetch("/api/campaigns")
-      .then((r) => r.json())
-      .then((data) => { setCampaigns(Array.isArray(data) ? data : []); setLoading(false); });
+    Promise.all([
+      fetch("/api/campaigns").then((r) => r.json()),
+      fetch("/api/profiles").then((r) => r.json()),
+    ]).then(([camp, prof]) => {
+      setCampaigns(Array.isArray(camp) ? camp : []);
+      setProfiles(Array.isArray(prof) ? prof : []);
+      setLoading(false);
+    });
   }, []);
 
-  const filtered = filterBusiness === "all" ? campaigns : campaigns.filter((c) => c.business.type === filterBusiness);
-
-  // unique businesses
-  const businesses = Array.from(new Set(campaigns.map((c) => c.business.type))).map((type) => ({
-    type,
-    name: campaigns.find((c) => c.business.type === type)?.business.name || type,
-  }));
+  const selectedProfile = profiles.find((p) => p.id === filterProfileId);
+  const filtered = filterProfileId === "all"
+    ? campaigns
+    : campaigns.filter((c) => c.business.type === selectedProfile?.business.type);
 
   const totalCampaigns = filtered.length;
   const totalPublished = filtered.filter((c) => c.status === "done").length;
@@ -88,17 +100,21 @@ export default function AnalyticsPage() {
       </div>
 
       <div className="max-w-5xl mx-auto px-8 py-6">
-        {/* Business filter */}
-        {!loading && businesses.length > 1 && (
-          <div className="flex gap-2 mb-6">
-            <button onClick={() => setFilterBusiness("all")} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${filterBusiness === "all" ? "bg-blue-600 text-white" : "bg-white border border-gray-300 hover:border-gray-400"}`}>
-              הכל
+        {/* Profile filter */}
+        {!loading && (
+          <div className="flex flex-wrap gap-2 mb-6">
+            <button onClick={() => setFilterProfileId("all")} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${filterProfileId === "all" ? "bg-blue-600 text-white" : "bg-white border border-gray-300 hover:border-gray-400"}`}>
+              כל הפרופילים
             </button>
-            {businesses.map((b) => (
-              <button key={b.type} onClick={() => setFilterBusiness(b.type)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${filterBusiness === b.type ? "bg-blue-600 text-white" : "bg-white border border-gray-300 hover:border-gray-400"}`}>
-                {b.name}
+            {profiles.map((p) => (
+              <button key={p.id} onClick={() => setFilterProfileId(p.id)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${filterProfileId === p.id ? "bg-blue-600 text-white" : "bg-white border border-gray-300 hover:border-gray-400"}`}>
+                <span className={`inline-block w-2 h-2 rounded-full ml-1.5 ${p.isActive ? "bg-green-500" : "bg-gray-400"}`} />
+                {p.name}
               </button>
             ))}
+            {profiles.length === 0 && (
+              <span className="text-sm text-gray-400">אין פרופילים - <a href="/profiles" className="text-blue-500 underline">הוסף פרופיל</a></span>
+            )}
           </div>
         )}
 
