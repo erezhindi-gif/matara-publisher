@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { getBusinessFilter } from "@/lib/businessFilter";
 
 type Campaign = {
   id: string;
@@ -71,6 +72,14 @@ export default function SchedulePage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
+  const [businessFilter, setBusinessFilterState] = useState("all");
+
+  useEffect(() => {
+    setBusinessFilterState(getBusinessFilter());
+    const handler = () => setBusinessFilterState(getBusinessFilter());
+    window.addEventListener("businessFilterChange", handler);
+    return () => window.removeEventListener("businessFilterChange", handler);
+  }, []);
   const [view, setView] = useState<"week" | "list">("week");
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -119,8 +128,12 @@ export default function SchedulePage() {
   today.setHours(0,0,0,0);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
+  const filteredCampaigns = campaigns.filter((c) =>
+    businessFilter === "all" || c.business.type === businessFilter
+  );
+
   function campaignsForDay(day: Date) {
-    return campaigns.filter((c) => {
+    return filteredCampaigns.filter((c) => {
       if (!c.scheduledAt) return false;
       const d = new Date(c.scheduledAt);
       d.setHours(0,0,0,0);
@@ -128,7 +141,7 @@ export default function SchedulePage() {
     }).sort((a, b) => new Date(a.scheduledAt!).getTime() - new Date(b.scheduledAt!).getTime());
   }
 
-  const pendingApproval = campaigns.filter((c) => c.status === "pending_approval").length;
+  const pendingApproval = filteredCampaigns.filter((c) => c.status === "pending_approval").length;
   const totalToday = campaignsForDay(today).length;
   const totalWeek = weekDays.reduce((sum, d) => sum + campaignsForDay(d).length, 0);
 

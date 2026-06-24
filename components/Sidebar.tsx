@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { getBusinessFilter, setBusinessFilter, BUSINESSES } from "@/lib/businessFilter";
 
 const NAV = [
   { href: "/campaigns",  icon: "⊞", label: "ניהול קמפיינים" },
@@ -15,17 +17,54 @@ const NAV = [
 
 export default function Sidebar() {
   const path = usePathname();
+  const router = useRouter();
+  const [business, setBusiness] = useState("all");
+
+  useEffect(() => {
+    setBusiness(getBusinessFilter());
+    const handler = () => setBusiness(getBusinessFilter());
+    window.addEventListener("businessFilterChange", handler);
+    return () => window.removeEventListener("businessFilterChange", handler);
+  }, []);
+
+  function handleBusinessChange(id: string) {
+    setBusinessFilter(id);
+    setBusiness(id);
+    router.refresh();
+  }
+
+  const selected = BUSINESSES.find((b) => b.id === business) || BUSINESSES[0];
 
   return (
     <aside className="w-56 min-h-screen bg-gray-900 text-white flex flex-col flex-shrink-0" dir="ltr">
       {/* Logo */}
-      <div className="px-5 py-6 border-b border-gray-700">
+      <div className="px-5 py-5 border-b border-gray-700">
         <div className="text-lg font-bold text-white tracking-wide">Matara</div>
         <div className="text-xs text-gray-400 mt-0.5">Publisher</div>
       </div>
 
+      {/* Business selector */}
+      <div className="px-3 py-3 border-b border-gray-700">
+        <div className="text-xs text-gray-500 mb-2 px-1">עסק פעיל</div>
+        <div className="space-y-1">
+          {BUSINESSES.map((b) => (
+            <button
+              key={b.id}
+              onClick={() => handleBusinessChange(b.id)}
+              className={`w-full text-right px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                business === b.id
+                  ? "bg-blue-600 text-white"
+                  : "text-gray-400 hover:text-white hover:bg-gray-800"
+              }`}
+            >
+              {b.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Nav */}
-      <nav className="flex-1 py-4 space-y-1 px-3">
+      <nav className="flex-1 py-3 space-y-1 px-3">
         {NAV.map((item) => {
           const active = path === item.href || path.startsWith(item.href + "/");
           return (
@@ -46,7 +85,7 @@ export default function Sidebar() {
       </nav>
 
       {/* New campaign button */}
-      <div className="px-3 pb-4">
+      <div className="px-3 pb-3">
         <Link
           href="/campaigns/new"
           className="flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors"

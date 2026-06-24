@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { getBusinessFilter } from "@/lib/businessFilter";
 
 type Profile = {
   id: string;
@@ -29,6 +30,14 @@ export default function AnalyticsPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterProfileId, setFilterProfileId] = useState<string>("all");
+  const [businessFilter, setBusinessFilterState] = useState("all");
+
+  useEffect(() => {
+    setBusinessFilterState(getBusinessFilter());
+    const handler = () => setBusinessFilterState(getBusinessFilter());
+    window.addEventListener("businessFilterChange", handler);
+    return () => window.removeEventListener("businessFilterChange", handler);
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -41,10 +50,17 @@ export default function AnalyticsPage() {
     });
   }, []);
 
-  const selectedProfile = profiles.find((p) => p.id === filterProfileId);
-  const filtered = filterProfileId === "all"
-    ? campaigns
-    : campaigns.filter((c) => c.business.type === selectedProfile?.business.type);
+  // Profiles filtered by current business selection
+  const visibleProfiles = businessFilter === "all"
+    ? profiles
+    : profiles.filter((p) => p.business.type === businessFilter);
+
+  const selectedProfile = visibleProfiles.find((p) => p.id === filterProfileId);
+  const filtered = campaigns.filter((c) => {
+    const matchBusiness = businessFilter === "all" || c.business.type === businessFilter;
+    const matchProfile = filterProfileId === "all" || c.business.type === selectedProfile?.business.type;
+    return matchBusiness && matchProfile;
+  });
 
   const totalCampaigns = filtered.length;
   const totalPublished = filtered.filter((c) => c.status === "done").length;
@@ -106,13 +122,13 @@ export default function AnalyticsPage() {
             <button onClick={() => setFilterProfileId("all")} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${filterProfileId === "all" ? "bg-blue-600 text-white" : "bg-white border border-gray-300 hover:border-gray-400"}`}>
               כל הפרופילים
             </button>
-            {profiles.map((p) => (
+            {visibleProfiles.map((p) => (
               <button key={p.id} onClick={() => setFilterProfileId(p.id)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${filterProfileId === p.id ? "bg-blue-600 text-white" : "bg-white border border-gray-300 hover:border-gray-400"}`}>
                 <span className={`inline-block w-2 h-2 rounded-full ml-1.5 ${p.isActive ? "bg-green-500" : "bg-gray-400"}`} />
                 {p.name}
               </button>
             ))}
-            {profiles.length === 0 && (
+            {visibleProfiles.length === 0 && (
               <span className="text-sm text-gray-400">אין פרופילים - <a href="/profiles" className="text-blue-500 underline">הוסף פרופיל</a></span>
             )}
           </div>

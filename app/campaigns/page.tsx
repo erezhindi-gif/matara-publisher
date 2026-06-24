@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { getBusinessFilter } from "@/lib/businessFilter";
 
 type Campaign = {
   id: string;
@@ -31,6 +32,14 @@ export default function CampaignsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [businessFilter, setBusinessFilterState] = useState("all");
+
+  useEffect(() => {
+    setBusinessFilterState(getBusinessFilter());
+    const handler = () => setBusinessFilterState(getBusinessFilter());
+    window.addEventListener("businessFilterChange", handler);
+    return () => window.removeEventListener("businessFilterChange", handler);
+  }, []);
 
   useEffect(() => {
     fetch("/api/campaigns")
@@ -41,7 +50,8 @@ export default function CampaignsPage() {
   const filtered = campaigns.filter((c) => {
     const matchSearch = !search || c.title.includes(search) || c.content.includes(search);
     const matchStatus = filterStatus === "all" || c.status === filterStatus;
-    return matchSearch && matchStatus;
+    const matchBusiness = businessFilter === "all" || c.business.type === businessFilter;
+    return matchSearch && matchStatus && matchBusiness;
   });
 
   return (
