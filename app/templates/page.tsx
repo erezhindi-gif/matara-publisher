@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { getBusinessFilter } from "@/lib/businessFilter";
 
 type Template = {
   id: string;
@@ -22,6 +23,14 @@ export default function TemplatesPage() {
   const [newName, setNewName] = useState("");
   const [newBusiness, setNewBusiness] = useState("recruitment");
   const [saving, setSaving] = useState(false);
+  const [businessFilter, setBusinessFilterState] = useState("all");
+
+  useEffect(() => {
+    setBusinessFilterState(getBusinessFilter());
+    const handler = () => setBusinessFilterState(getBusinessFilter());
+    window.addEventListener("businessFilterChange", handler);
+    return () => window.removeEventListener("businessFilterChange", handler);
+  }, []);
 
   useEffect(() => { fetchTemplates(); }, []);
 
@@ -99,17 +108,17 @@ export default function TemplatesPage() {
 
         {loading && <div className="text-center text-gray-500 py-20">טוען...</div>}
 
-        {!loading && templates.length === 0 && (
-          <div className="text-center text-gray-500 py-20">
-            <div className="text-5xl mb-4">📁</div>
-            <p>אין תבניות עדיין</p>
-            <p className="text-sm mt-2">צור תבנית לפי אזור או תחום מקצועי</p>
-          </div>
-        )}
-
-        {!loading && templates.length > 0 && (
+        {!loading && (() => {
+          const filtered = businessFilter === "all" ? templates : templates.filter((t) => t.business.type === businessFilter);
+          return filtered.length === 0 ? (
+            <div className="text-center text-gray-500 py-20">
+              <div className="text-5xl mb-4">📁</div>
+              <p>אין תבניות עדיין</p>
+              <p className="text-sm mt-2">צור תבנית לפי אזור או תחום מקצועי</p>
+            </div>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {templates.map((t) => (
+            {filtered.map((t) => (
               <Link key={t.id} href={`/templates/${t.id}`} className="block bg-gray-100 border border-gray-200 rounded-2xl p-5 hover:border-gray-600 transition-all">
                 <div className="flex items-start justify-between mb-2">
                   <h2 className="font-semibold text-lg">{t.name}</h2>
@@ -134,7 +143,8 @@ export default function TemplatesPage() {
               </Link>
             ))}
           </div>
-        )}
+          );
+        })()}
       </div>
     </main>
   );

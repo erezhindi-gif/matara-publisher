@@ -1,15 +1,38 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { getBusinessFilter } from "@/lib/businessFilter";
 
 const LOCAL_SERVER = "http://localhost:3333";
+
+type Business = { id: string; name: string; type: string };
 
 export default function SyncPage() {
   const [status, setStatus] = useState<"idle" | "checking" | "syncing" | "done" | "error">("idle");
   const [message, setMessage] = useState("");
   const [serverOnline, setServerOnline] = useState<boolean | null>(null);
-  const [businessId, setBusinessId] = useState("carpentry");
+  const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [businessId, setBusinessId] = useState("");
+  const [businessFilter, setBusinessFilterState] = useState("all");
+
+  useEffect(() => {
+    setBusinessFilterState(getBusinessFilter());
+    const handler = () => setBusinessFilterState(getBusinessFilter());
+    window.addEventListener("businessFilterChange", handler);
+    return () => window.removeEventListener("businessFilterChange", handler);
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/businesses").then((r) => r.json()).then((data) => {
+      if (Array.isArray(data)) {
+        setBusinesses(data);
+        // auto-select based on sidebar filter
+        const match = businessFilter !== "all" ? data.find((b: Business) => b.type === businessFilter) : data[0];
+        if (match) setBusinessId(match.id);
+      }
+    });
+  }, [businessFilter]);
 
   async function checkServer() {
     setStatus("checking");
@@ -91,12 +114,13 @@ export default function SyncPage() {
         <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-4">
           <label className="block text-sm text-gray-700 mb-2">סנכרן קבוצות עבור:</label>
           <select
-            className="w-full bg-gray-200 border border-gray-300 rounded-xl p-3 text-gray-900"
+            className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900"
             value={businessId}
             onChange={(e) => setBusinessId(e.target.value)}
           >
-            <option value="carpentry">נויה מטבחים</option>
-            <option value="recruitment">מטרה - גיוס והשמה</option>
+            {(businessFilter === "all" ? businesses : businesses.filter((b) => b.type === businessFilter)).map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
           </select>
         </div>
 

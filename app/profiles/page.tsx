@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { getBusinessFilter } from "@/lib/businessFilter";
 
 type Profile = {
   id: string;
@@ -32,6 +33,14 @@ export default function ProfilesPage() {
   const [showNew, setShowNew] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", fbUsername: "", edgeProfile: "Default", businessId: "recruitment", dailyLimit: 150 });
+  const [businessFilter, setBusinessFilterState] = useState("all");
+
+  useEffect(() => {
+    setBusinessFilterState(getBusinessFilter());
+    const handler = () => setBusinessFilterState(getBusinessFilter());
+    window.addEventListener("businessFilterChange", handler);
+    return () => window.removeEventListener("businessFilterChange", handler);
+  }, []);
 
   useEffect(() => { fetchProfiles(); }, []);
 
@@ -71,8 +80,9 @@ export default function ProfilesPage() {
     fetchProfiles();
   }
 
-  const active = profiles.filter((p) => p.isActive).length;
-  const todayTotal = profiles.reduce((sum, p) => sum + (p.postsToday || 0), 0);
+  const filtered = businessFilter === "all" ? profiles : profiles.filter((p) => p.business.type === businessFilter);
+  const active = filtered.filter((p) => p.isActive).length;
+  const todayTotal = filtered.reduce((sum, p) => sum + (p.postsToday || 0), 0);
 
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900" dir="rtl">
@@ -92,7 +102,7 @@ export default function ProfilesPage() {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="bg-white border border-gray-200 rounded-2xl p-4 text-center">
-            <div className="text-2xl font-bold text-blue-600">{profiles.length}</div>
+            <div className="text-2xl font-bold text-blue-600">{filtered.length}</div>
             <div className="text-xs text-gray-500 mt-1">פרופילים</div>
           </div>
           <div className="bg-white border border-gray-200 rounded-2xl p-4 text-center">
@@ -154,7 +164,7 @@ export default function ProfilesPage() {
 
         {loading && <div className="text-center text-gray-400 py-20">טוען...</div>}
 
-        {!loading && profiles.length === 0 && (
+        {!loading && filtered.length === 0 && (
           <div className="text-center text-gray-400 py-20">
             <div className="text-5xl mb-4">👤</div>
             <p className="font-medium">אין פרופילים עדיין</p>
@@ -163,7 +173,7 @@ export default function ProfilesPage() {
         )}
 
         <div className="space-y-3">
-          {profiles.map((p) => (
+          {filtered.map((p) => (
             <div key={p.id} className="bg-white border border-gray-200 rounded-2xl p-5">
               <div className="flex items-start justify-between mb-3">
                 <div>
