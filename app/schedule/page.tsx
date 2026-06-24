@@ -62,7 +62,7 @@ function getEndTime(campaign: Campaign, templates: Template[]): Date | null {
       const t = templates.find((t) => t.id === tid);
       return sum + (t?.groups.length || 0);
     }, 0);
-    const durationMs = Math.max(groups, 1) * 60 * 1000;
+    const durationMs = Math.max(groups, 1) * 90 * 1000; // 90s max delay per group (worst case)
     return new Date(new Date(campaign.scheduledAt).getTime() + durationMs);
   } catch { return null; }
 }

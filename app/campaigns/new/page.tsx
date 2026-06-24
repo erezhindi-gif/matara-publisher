@@ -91,7 +91,7 @@ function ScheduleStep({
     return sum + (t?.groups.length || 0);
   }, 0);
   // Duration in minutes: avg 60s per group
-  const myDurationMin = Math.max(myGroupCount, 1);
+  const myDurationMin = Math.ceil(Math.max(myGroupCount, 1) * 1.5); // 90s max per group = 1.5 min
 
   // Helper: get group count from templateIds string
   function groupsFromTemplateIds(templateIdsStr: string): number {
@@ -117,7 +117,7 @@ function ScheduleStep({
       const start = new Date(c.scheduledAt);
       const startMin = start.getHours() * 60 + start.getMinutes();
       const groups = groupsFromTemplateIds(c.templateIds);
-      const durationMin = Math.max(groups, 5);
+      const durationMin = Math.ceil(Math.max(groups, 1) * 1.5); // 90s worst case
       return { startMin, endMin: startMin + durationMin, title: c.title };
     });
 
