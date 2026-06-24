@@ -81,6 +81,32 @@ export default function CampaignDetailPage() {
     setEditImagePreviews((prev) => prev.filter((_, idx) => idx !== i));
   }
 
+  // AI state
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiVersions, setAiVersions] = useState<{ versionA: string; versionB: string } | null>(null);
+
+  async function generateAI() {
+    if (!campaign) return;
+    setAiLoading(true);
+    setAiVersions(null);
+    try {
+      const res = await fetch("/api/ai/generate-post", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobTitle: campaign.title,
+          location: "",
+          whatsappLink: campaign.whatsappLink || "",
+          emailLink: campaign.emailLink || "",
+          businessType: campaign.business.type,
+        }),
+      });
+      const data = await res.json();
+      setAiVersions(data);
+    } catch { /* ignore */ }
+    setAiLoading(false);
+  }
+
   // Duplicate state
   const [dupTemplates, setDupTemplates] = useState<string[]>([]);
 
@@ -323,12 +349,37 @@ export default function CampaignDetailPage() {
         {mode === "edit" && (
           <div className="space-y-5">
             <div className="bg-white border border-gray-200 rounded-2xl p-5">
-              <label className="block text-sm text-gray-500 mb-2">תוכן הפוסט</label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm text-gray-500">תוכן הפוסט</label>
+                <button
+                  onClick={generateAI}
+                  disabled={aiLoading}
+                  className="flex items-center gap-1.5 text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+                >
+                  {aiLoading ? "מייצר..." : "✨ צור עם AI"}
+                </button>
+              </div>
               <textarea
                 className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900 text-sm min-h-[200px]"
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
               />
+              {aiVersions && (
+                <div className="mt-3 space-y-2">
+                  <div className="text-xs text-gray-500 font-medium">בחר גרסה:</div>
+                  {[aiVersions.versionA, aiVersions.versionB].map((v, i) => (
+                    <div key={i} className="border border-purple-200 rounded-xl p-3 bg-purple-50">
+                      <pre className="whitespace-pre-wrap text-xs text-gray-800 font-sans leading-relaxed">{v}</pre>
+                      <button
+                        onClick={() => { setEditContent(v); setAiVersions(null); }}
+                        className="mt-2 text-xs bg-purple-600 text-white px-3 py-1 rounded-lg hover:bg-purple-700"
+                      >
+                        השתמש בגרסה {i === 0 ? "א" : "ב"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="bg-white border border-gray-200 rounded-2xl p-5">
