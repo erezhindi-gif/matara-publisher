@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -8,10 +8,11 @@ type Stats = {
   approved: number;
   publishedToday: number;
   totalCampaigns: number;
+  totalPosts: number;
 };
 
 export default function Home() {
-  const [stats, setStats] = useState<Stats>({ pending: 0, approved: 0, publishedToday: 0, totalCampaigns: 0 });
+  const [stats, setStats] = useState<Stats>({ pending: 0, approved: 0, publishedToday: 0, totalCampaigns: 0, totalPosts: 0 });
 
   useEffect(() => {
     fetch("/api/campaigns")
@@ -19,101 +20,69 @@ export default function Home() {
       .then((campaigns) => {
         if (!Array.isArray(campaigns)) return;
         const today = new Date().toDateString();
+        const totalPosts = campaigns.reduce((sum: number, c: { posts: { status: string }[] }) => sum + (c.posts?.filter((p) => p.status === "published").length || 0), 0);
         setStats({
           pending: campaigns.filter((c) => c.status === "pending_approval").length,
           approved: campaigns.filter((c) => c.status === "approved").length,
           publishedToday: campaigns.filter((c) => c.status === "done" && new Date(c.createdAt).toDateString() === today).length,
           totalCampaigns: campaigns.length,
+          totalPosts,
         });
       })
       .catch(() => {});
   }, []);
 
   return (
-    <main className="min-h-screen bg-gray-50 text-gray-900" dir="rtl">
+    <div className="min-h-screen bg-gray-50 text-gray-900 p-8" dir="rtl">
       {/* Header */}
-      <div className="border-b border-gray-200 bg-white  sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-8 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-sm font-bold">M</div>
-            <span className="font-semibold text-lg">Matara Publisher</span>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold">ברוך הבא, נועה הינדי</h1>
+          <p className="text-sm text-gray-500 mt-1">כאן אפשר לנהל את הקמפיינים שלך</p>
+        </div>
+        <Link
+          href="/campaigns/new"
+          className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors"
+        >
+          + יצירת קמפיין חדש
+        </Link>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        {[
+          { label: "סה״כ קמפיינים",     value: stats.totalCampaigns, icon: "📋", color: "text-purple-600", bg: "bg-purple-50" },
+          { label: "פורסמו היום",        value: stats.publishedToday, icon: "🚀", color: "text-green-600",  bg: "bg-green-50"  },
+          { label: "מאושרים לפרסום",    value: stats.approved,        icon: "✅", color: "text-blue-600",  bg: "bg-blue-50"   },
+          { label: "ממתינים לאישור",    value: stats.pending,         icon: "⏳", color: "text-yellow-600", bg: "bg-yellow-50" },
+        ].map((s) => (
+          <div key={s.label} className="bg-white border border-gray-200 rounded-2xl p-5">
+            <div className={`w-10 h-10 ${s.bg} rounded-xl flex items-center justify-center text-xl mb-3`}>{s.icon}</div>
+            <div className={`text-3xl font-bold ${s.color} mb-1`}>{s.value}</div>
+            <div className="text-xs text-gray-500">{s.label}</div>
           </div>
-          <Link href="/campaigns/new" className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 rounded-xl px-5 py-2 text-sm font-semibold transition-all shadow-lg shadow-blue-500/20">
-            + קמפיין חדש
-          </Link>
-        </div>
+        ))}
       </div>
 
-      <div className="max-w-6xl mx-auto px-8 py-12">
-        {/* Hero Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
-          {[
-            { label: "ממתינים לאישור", value: stats.pending, color: "from-yellow-500/20 to-orange-500/10", text: "text-yellow-400", border: "border-yellow-500/20", icon: "⏳" },
-            { label: "מאושרים לפרסום", value: stats.approved, color: "from-blue-500/20 to-cyan-500/10", text: "text-blue-400", border: "border-blue-500/20", icon: "✅" },
-            { label: "פורסמו היום", value: stats.publishedToday, color: "from-green-500/20 to-emerald-500/10", text: "text-green-400", border: "border-green-500/20", icon: "🚀" },
-            { label: "סה״כ קמפיינים", value: stats.totalCampaigns, color: "from-purple-500/20 to-pink-500/10", text: "text-purple-400", border: "border-purple-500/20", icon: "📊" },
-          ].map((s) => (
-            <div key={s.label} className={`bg-gradient-to-br ${s.color} border ${s.border} rounded-2xl p-5`}>
-              <div className="text-2xl mb-2">{s.icon}</div>
-              <div className={`text-3xl font-bold ${s.text} mb-1`}>{s.value}</div>
-              <div className="text-xs text-gray-500">{s.label}</div>
-            </div>
-          ))}
+      {/* Alert */}
+      {stats.pending > 0 && (
+        <Link href="/campaigns" className="flex items-center gap-3 bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-8 hover:bg-yellow-100 transition-colors">
+          <span className="text-2xl">🔔</span>
+          <div className="flex-1">
+            <div className="font-semibold text-yellow-800">יש {stats.pending} קמפיין{stats.pending > 1 ? "ים" : ""} שממתינים לאישורך</div>
+            <div className="text-sm text-yellow-600">לחץ כדי לאשר או לדחות</div>
+          </div>
+          <span className="text-yellow-500">←</span>
+        </Link>
+      )}
+
+      {/* Total posts stat */}
+      {stats.totalPosts > 0 && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-8">
+          <div className="text-sm text-gray-500 mb-1">סה״כ פוסטים שפורסמו</div>
+          <div className="text-4xl font-bold text-blue-600">{stats.totalPosts.toLocaleString()}</div>
         </div>
-
-        {/* Alert for pending */}
-        {stats.pending > 0 && (
-          <Link href="/campaigns" className="block mb-8 bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-4 hover:bg-yellow-500/15 transition-all">
-            <div className="flex items-center gap-3">
-              <div className="text-2xl">🔔</div>
-              <div>
-                <div className="font-semibold text-yellow-300">יש {stats.pending} קמפיין{stats.pending > 1 ? "ים" : ""} שממתינים לאישורך</div>
-                <div className="text-sm text-gray-700">לחץ כדי לאשר או לדחות</div>
-              </div>
-              <div className="mr-auto text-yellow-500">←</div>
-            </div>
-          </Link>
-        )}
-
-        {/* Nav Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Link href="/campaigns" className="group bg-white hover:bg-gray-50 border border-gray-200 hover:border-blue-500/40 rounded-2xl p-6 transition-all">
-            <div className="text-3xl mb-4">📋</div>
-            <h2 className="text-lg font-semibold mb-1 group-hover:text-blue-300 transition-colors">קמפיינים</h2>
-            <p className="text-sm text-gray-500">יצירה, אישור וניהול קמפיינים</p>
-          </Link>
-
-          <Link href="/templates" className="group bg-white hover:bg-gray-50 border border-gray-200 hover:border-purple-500/40 rounded-2xl p-6 transition-all">
-            <div className="text-3xl mb-4">📁</div>
-            <h2 className="text-lg font-semibold mb-1 group-hover:text-purple-300 transition-colors">תבניות קבוצות</h2>
-            <p className="text-sm text-gray-500">ארגון קבוצות לפי אזור ותחום</p>
-          </Link>
-
-          <Link href="/profiles" className="group bg-white hover:bg-gray-50 border border-gray-200 hover:border-green-500/40 rounded-2xl p-6 transition-all">
-            <div className="text-3xl mb-4">👤</div>
-            <h2 className="text-lg font-semibold mb-1 group-hover:text-green-300 transition-colors">פרופילי פייסבוק</h2>
-            <p className="text-sm text-gray-500">חשבונות פייסבוק לפרסום</p>
-          </Link>
-
-          <Link href="/schedule" className="group bg-white hover:bg-gray-50 border border-gray-200 hover:border-cyan-500/40 rounded-2xl p-6 transition-all">
-            <div className="text-3xl mb-4">📅</div>
-            <h2 className="text-lg font-semibold mb-1 group-hover:text-cyan-300 transition-colors">לוח תזמונים</h2>
-            <p className="text-sm text-gray-500">פרסומים מתוזמנים</p>
-          </Link>
-
-          <Link href="/settings" className="group bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-400/40 rounded-2xl p-6 transition-all">
-            <div className="text-3xl mb-4">⚙️</div>
-            <h2 className="text-lg font-semibold mb-1 group-hover:text-gray-300 transition-colors">הגדרות</h2>
-            <p className="text-sm text-gray-500">קישורי וואטסאפ ומייל</p>
-          </Link>
-
-          <Link href="/sync" className="group bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20 hover:border-blue-400/50 rounded-2xl p-6 transition-all">
-            <div className="text-3xl mb-4">🔄</div>
-            <h2 className="text-lg font-semibold mb-1 group-hover:text-blue-300 transition-colors">סנכרון קבוצות</h2>
-            <p className="text-sm text-gray-500">סנכרן קבוצות פייסבוק בלחיצה</p>
-          </Link>
-        </div>
-      </div>
-    </main>
+      )}
+    </div>
   );
 }

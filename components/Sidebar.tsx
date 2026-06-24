@@ -4,11 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV = [
-  { href: "/campaigns",     icon: "⊞",  label: "ניהול קמפיינים" },
-  { href: "/templates",     icon: "◧",  label: "תבניות לקבוצות" },
-  { href: "/schedule",      icon: "◷",  label: "לוח תזמונים" },
-  { href: "/sync",          icon: "↻",  label: "סנכרון קבוצות" },
-  { href: "/settings",      icon: "⚙",  label: "הגדרות" },
+  { href: "/campaigns",  icon: "⊞", label: "ניהול קמפיינים" },
+  { href: "/profiles",   icon: "👤", label: "פרופילי פייסבוק" },
+  { href: "/templates",  icon: "◧", label: "תבניות לקבוצות" },
+  { href: "/schedule",   icon: "◷", label: "לוח תזמונים" },
+  { href: "/sync",       icon: "↻", label: "סנכרון קבוצות" },
+  { href: "/settings",   icon: "⚙", label: "הגדרות" },
 ];
 
 export default function Sidebar() {

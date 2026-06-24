@@ -20,11 +20,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="he" dir="rtl" className={`${geistSans.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-row-reverse bg-gray-50">
-        <Sidebar />
+      <body className="min-h-full flex flex-row bg-gray-50">
         <main className="flex-1 min-h-screen overflow-y-auto">
           {children}
         </main>
+        <Sidebar />
       </body>
     </html>
   );
