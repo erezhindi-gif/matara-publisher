@@ -18,6 +18,7 @@ const DAYS = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
 export default function AnalyticsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterBusiness, setFilterBusiness] = useState<string>("all");
 
   useEffect(() => {
     fetch("/api/campaigns")
@@ -25,11 +26,19 @@ export default function AnalyticsPage() {
       .then((data) => { setCampaigns(Array.isArray(data) ? data : []); setLoading(false); });
   }, []);
 
-  const totalCampaigns = campaigns.length;
-  const totalPublished = campaigns.filter((c) => c.status === "done").length;
-  const totalPosts = campaigns.reduce((sum, c) => sum + (c.posts?.filter((p) => p.status === "published").length || 0), 0);
-  const pending = campaigns.filter((c) => c.status === "pending_approval").length;
-  const approved = campaigns.filter((c) => c.status === "approved").length;
+  const filtered = filterBusiness === "all" ? campaigns : campaigns.filter((c) => c.business.type === filterBusiness);
+
+  // unique businesses
+  const businesses = Array.from(new Set(campaigns.map((c) => c.business.type))).map((type) => ({
+    type,
+    name: campaigns.find((c) => c.business.type === type)?.business.name || type,
+  }));
+
+  const totalCampaigns = filtered.length;
+  const totalPublished = filtered.filter((c) => c.status === "done").length;
+  const totalPosts = filtered.reduce((sum, c) => sum + (c.posts?.filter((p) => p.status === "published").length || 0), 0);
+  const pending = filtered.filter((c) => c.status === "pending_approval").length;
+  const approved = filtered.filter((c) => c.status === "approved").length;
 
   // Posts per day (last 7 days)
   const last7 = Array.from({ length: 7 }, (_, i) => {
@@ -41,7 +50,7 @@ export default function AnalyticsPage() {
 
   const postsPerDay = last7.map((day) => {
     const next = new Date(day); next.setDate(next.getDate() + 1);
-    const count = campaigns.reduce((sum, c) => {
+    const count = filtered.reduce((sum, c) => {
       return sum + (c.posts?.filter((p) => {
         if (!p.publishedAt) return false;
         const d = new Date(p.publishedAt);
@@ -55,7 +64,7 @@ export default function AnalyticsPage() {
 
   // By business
   const byBusiness: Record<string, { name: string; campaigns: number; posts: number }> = {};
-  campaigns.forEach((c) => {
+  filtered.forEach((c) => {
     if (!byBusiness[c.business.name]) byBusiness[c.business.name] = { name: c.business.name, campaigns: 0, posts: 0 };
     byBusiness[c.business.name].campaigns++;
     byBusiness[c.business.name].posts += c.posts?.filter((p) => p.status === "published").length || 0;
@@ -66,7 +75,7 @@ export default function AnalyticsPage() {
     { label: "הושלמו",         value: totalPublished, color: "bg-green-500"  },
     { label: "מאושרים",        value: approved,        color: "bg-blue-500"   },
     { label: "ממתינים לאישור", value: pending,          color: "bg-yellow-400" },
-    { label: "טיוטות",         value: campaigns.filter((c) => c.status === "draft").length, color: "bg-gray-400" },
+    { label: "טיוטות",         value: filtered.filter((c) => c.status === "draft").length, color: "bg-gray-400" },
   ];
 
   return (
@@ -79,6 +88,20 @@ export default function AnalyticsPage() {
       </div>
 
       <div className="max-w-5xl mx-auto px-8 py-6">
+        {/* Business filter */}
+        {!loading && businesses.length > 1 && (
+          <div className="flex gap-2 mb-6">
+            <button onClick={() => setFilterBusiness("all")} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${filterBusiness === "all" ? "bg-blue-600 text-white" : "bg-white border border-gray-300 hover:border-gray-400"}`}>
+              הכל
+            </button>
+            {businesses.map((b) => (
+              <button key={b.type} onClick={() => setFilterBusiness(b.type)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${filterBusiness === b.type ? "bg-blue-600 text-white" : "bg-white border border-gray-300 hover:border-gray-400"}`}>
+                {b.name}
+              </button>
+            ))}
+          </div>
+        )}
+
         {loading ? (
           <div className="text-center text-gray-400 py-20">טוען...</div>
         ) : (
