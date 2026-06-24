@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -14,76 +14,147 @@ type Campaign = {
   posts: { status: string }[];
 };
 
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  draft: { label: "טיוטה", color: "text-gray-700" },
-  pending_approval: { label: "ממתין לאישור", color: "text-yellow-400" },
-  approved: { label: "מאושר", color: "text-blue-400" },
-  publishing: { label: "מפרסם...", color: "text-purple-400" },
-  done: { label: "הושלם", color: "text-green-400" },
-  paused: { label: "מושהה", color: "text-red-400" },
+const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  draft:            { label: "טיוטה",          color: "text-gray-600",  bg: "bg-gray-100" },
+  pending_approval: { label: "ממתין לאישור",   color: "text-yellow-700", bg: "bg-yellow-100" },
+  approved:         { label: "מאושר",           color: "text-blue-700",  bg: "bg-blue-100" },
+  publishing:       { label: "מפרסם...",        color: "text-purple-700", bg: "bg-purple-100" },
+  done:             { label: "הושלם",           color: "text-green-700", bg: "bg-green-100" },
+  paused:           { label: "מושהה",           color: "text-red-700",   bg: "bg-red-100" },
 };
+
+const DAY_SHORT = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
 
   useEffect(() => {
     fetch("/api/campaigns")
       .then((r) => r.json())
-      .then((data) => {
-        setCampaigns(data);
-        setLoading(false);
-      });
+      .then((data) => { setCampaigns(data); setLoading(false); });
   }, []);
 
+  const filtered = campaigns.filter((c) => {
+    const matchSearch = !search || c.title.includes(search) || c.content.includes(search);
+    const matchStatus = filterStatus === "all" || c.status === filterStatus;
+    return matchSearch && matchStatus;
+  });
+
   return (
-    <main className="min-h-screen bg-white text-gray-900 p-8" dir="rtl">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+    <main className="min-h-screen bg-gray-50 text-gray-900" dir="rtl">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-8 py-5">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/" className="text-gray-700 hover:text-gray-900">← ראשי</Link>
-            <h1 className="text-2xl font-bold">קמפיינים</h1>
+            <Link href="/" className="text-gray-500 hover:text-gray-900 text-sm">← ראשי</Link>
+            <h1 className="text-xl font-bold">קמפיינים</h1>
           </div>
-          <Link href="/campaigns/new" className="bg-blue-600 hover:bg-blue-700 rounded-xl px-5 py-2.5 font-semibold transition-colors">
+          <Link href="/campaigns/new" className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors">
             + קמפיין חדש
           </Link>
         </div>
+      </div>
 
-        {loading && <div className="text-center text-gray-500 py-20">טוען...</div>}
+      <div className="max-w-7xl mx-auto px-8 py-6">
+        {/* Search + Filter */}
+        <div className="flex gap-3 mb-6">
+          <input
+            type="text"
+            placeholder="חפש קמפיינים לפי שם, תבנית או תוכן..."
+            className="flex-1 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-400"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select
+            className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none"
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+          >
+            <option value="all">כל הסטטוסים</option>
+            <option value="draft">טיוטה</option>
+            <option value="pending_approval">ממתין לאישור</option>
+            <option value="approved">מאושר</option>
+            <option value="publishing">מפרסם</option>
+            <option value="done">הושלם</option>
+            <option value="paused">מושהה</option>
+          </select>
+        </div>
 
-        {!loading && campaigns.length === 0 && (
-          <div className="text-center text-gray-500 py-20">
+        {loading && <div className="text-center text-gray-400 py-20">טוען...</div>}
+
+        {!loading && filtered.length === 0 && (
+          <div className="text-center text-gray-400 py-20">
             <div className="text-5xl mb-4">📋</div>
-            <p>אין קמפיינים עדיין</p>
-            <Link href="/campaigns/new" className="text-blue-400 hover:underline mt-2 inline-block">
-              צור קמפיין ראשון
-            </Link>
+            <p>{search ? "לא נמצאו קמפיינים" : "אין קמפיינים עדיין"}</p>
+            {!search && (
+              <Link href="/campaigns/new" className="text-blue-500 hover:underline mt-2 inline-block text-sm">
+                צור קמפיין ראשון
+              </Link>
+            )}
           </div>
         )}
 
-        {!loading && campaigns.length > 0 && (
-          <div className="space-y-4">
-            {campaigns.map((c) => {
-              const statusInfo = STATUS_LABELS[c.status] || { label: c.status, color: "text-gray-700" };
+        {/* Grid */}
+        {!loading && filtered.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filtered.map((c) => {
+              const statusInfo = STATUS_LABELS[c.status] || { label: c.status, color: "text-gray-600", bg: "bg-gray-100" };
               const published = c.posts.filter((p) => p.status === "published").length;
               const total = c.posts.length;
+              const scheduledDate = c.scheduledAt ? new Date(c.scheduledAt) : null;
+
               return (
-                <Link key={c.id} href={`/campaigns/${c.id}`} className="block bg-gray-100 border border-gray-200 rounded-2xl p-5 hover:border-gray-600 transition-all">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <h2 className="font-semibold text-lg">{c.title}</h2>
-                      <span className="text-xs text-gray-500">{c.business.name}</span>
+                <Link
+                  key={c.id}
+                  href={`/campaigns/${c.id}`}
+                  className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-md hover:border-blue-300 transition-all group"
+                >
+                  {/* Color bar by business */}
+                  <div className={`h-1.5 w-full ${c.business.type === "recruitment" ? "bg-blue-500" : "bg-orange-400"}`} />
+
+                  <div className="p-4">
+                    {/* Status badge */}
+                    <div className="flex items-center justify-between mb-3">
+                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusInfo.bg} ${statusInfo.color}`}>
+                        {statusInfo.label}
+                      </span>
+                      <span className="text-xs text-gray-400">{c.business.name.split(" ")[0]}</span>
                     </div>
-                    <span className={`text-sm font-medium ${statusInfo.color}`}>{statusInfo.label}</span>
-                  </div>
-                  <p className="text-sm text-gray-700 line-clamp-2 mb-3">{c.content}</p>
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>{total > 0 ? `${published}/${total} קבוצות פורסמו` : "טרם הוקצו קבוצות"}</span>
-                    <span>
-                      {c.scheduledAt
-                        ? `מתוזמן: ${new Date(c.scheduledAt).toLocaleString("he-IL")}`
-                        : new Date(c.createdAt).toLocaleDateString("he-IL")}
-                    </span>
+
+                    {/* Title */}
+                    <h2 className="font-semibold text-sm leading-tight mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                      {c.title}
+                    </h2>
+
+                    {/* Content preview */}
+                    <p className="text-xs text-gray-500 line-clamp-3 mb-4 leading-relaxed">
+                      {c.content}
+                    </p>
+
+                    {/* Footer */}
+                    <div className="border-t border-gray-100 pt-3 space-y-1.5">
+                      {scheduledDate ? (
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                          <span className="font-medium">
+                            {DAY_SHORT[scheduledDate.getDay()]}׳ {scheduledDate.toLocaleDateString("he-IL")}
+                          </span>
+                          <span className="font-semibold text-gray-700">
+                            {scheduledDate.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-gray-400">לא מתוזמן</div>
+                      )}
+                      <div className="text-xs text-gray-400">
+                        {total > 0
+                          ? <span>{total} קבוצות{published > 0 ? ` · ${published} פורסמו` : ""}</span>
+                          : <span className="text-orange-500">טרם הוקצו קבוצות</span>
+                        }
+                      </div>
+                    </div>
                   </div>
                 </Link>
               );
