@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getBusinessFilter, setBusinessFilter, BUSINESSES } from "@/lib/businessFilter";
+import { getBusinessFilter, setBusinessFilter } from "@/lib/businessFilter";
+
+type Business = { id: string; name: string; type: string };
 
 const NAV = [
   { href: "/campaigns",  icon: "⊞", label: "ניהול קמפיינים" },
@@ -19,6 +21,7 @@ export default function Sidebar() {
   const path = usePathname();
   const router = useRouter();
   const [business, setBusiness] = useState("all");
+  const [businesses, setBusinesses] = useState<Business[]>([]);
 
   useEffect(() => {
     setBusiness(getBusinessFilter());
@@ -27,13 +30,17 @@ export default function Sidebar() {
     return () => window.removeEventListener("businessFilterChange", handler);
   }, []);
 
+  useEffect(() => {
+    fetch("/api/businesses").then((r) => r.json()).then((data) => {
+      if (Array.isArray(data)) setBusinesses(data);
+    });
+  }, []);
+
   function handleBusinessChange(id: string) {
     setBusinessFilter(id);
     setBusiness(id);
     router.refresh();
   }
-
-  const selected = BUSINESSES.find((b) => b.id === business) || BUSINESSES[0];
 
   return (
     <aside className="w-56 min-h-screen bg-gray-900 text-white flex flex-col flex-shrink-0" dir="ltr">
@@ -44,24 +51,32 @@ export default function Sidebar() {
       </div>
 
       {/* Business selector */}
-      <div className="px-3 py-3 border-b border-gray-700">
-        <div className="text-xs text-gray-500 mb-2 px-1">עסק פעיל</div>
-        <div className="space-y-1">
-          {BUSINESSES.map((b) => (
+      {businesses.length > 0 && (
+        <div className="px-3 py-3 border-b border-gray-700">
+          <div className="text-xs text-gray-500 mb-2 px-1">עסק פעיל</div>
+          <div className="space-y-1">
             <button
-              key={b.id}
-              onClick={() => handleBusinessChange(b.id)}
+              onClick={() => handleBusinessChange("all")}
               className={`w-full text-right px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                business === b.id
-                  ? "bg-blue-600 text-white"
-                  : "text-gray-400 hover:text-white hover:bg-gray-800"
+                business === "all" ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"
               }`}
             >
-              {b.name}
+              כל העסקים
             </button>
-          ))}
+            {businesses.map((b) => (
+              <button
+                key={b.id}
+                onClick={() => handleBusinessChange(b.type)}
+                className={`w-full text-right px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                  business === b.type ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"
+                }`}
+              >
+                {b.name}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Nav */}
       <nav className="flex-1 py-3 space-y-1 px-3">
@@ -72,9 +87,7 @@ export default function Sidebar() {
               key={item.href}
               href={item.href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                active
-                  ? "bg-blue-600 text-white"
-                  : "text-gray-400 hover:text-white hover:bg-gray-800"
+                active ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"
               }`}
             >
               <span className="text-base w-5 text-center">{item.icon}</span>
