@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
       content: body.content,
       whatsappLink: body.whatsappLink || null,
       emailLink: body.emailLink || null,
+      imageUrls: body.imageUrls || [],
       businessId: business.id,
       templateIds: JSON.stringify(body.templateIds || []),
       scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,

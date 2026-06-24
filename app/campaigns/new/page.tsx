@@ -80,6 +80,26 @@ export default function NewCampaignPage() {
     content: "",
   });
 
+  const [images, setImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
+
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setImages((prev) => [...prev, ...files]);
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => setImagePreviews((prev) => [...prev, ev.target?.result as string]);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function removeImage(i: number) {
+    setImages((prev) => prev.filter((_, idx) => idx !== i));
+    setImagePreviews((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
   // Multi-day scheduling
   const [scheduleDays, setScheduleDays] = useState<number[]>([]);
   const [scheduleTime, setScheduleTime] = useState("10:00");
@@ -135,8 +155,19 @@ export default function NewCampaignPage() {
   async function saveCampaign() {
     setLoading(true);
     try {
+      // Upload images first
+      let imageUrls: string[] = [];
+      if (images.length > 0) {
+        setUploadingImages(true);
+        const fd = new FormData();
+        images.forEach((img) => fd.append("files", img));
+        const uploadRes = await fetch("/api/upload", { method: "POST", body: fd });
+        const uploadData = await uploadRes.json();
+        imageUrls = uploadData.urls || [];
+        setUploadingImages(false);
+      }
+
       const scheduledDates = buildScheduledDates();
-      // Create one campaign per scheduled date (or one if no dates)
       for (const scheduledAt of scheduledDates) {
         await fetch("/api/campaigns", {
           method: "POST",
@@ -147,6 +178,7 @@ export default function NewCampaignPage() {
             content: form.content,
             whatsappLink: form.whatsappLink,
             emailLink: form.emailLink,
+            imageUrls,
             scheduledAt,
             templateIds: selectedTemplates,
           }),
@@ -278,6 +310,30 @@ export default function NewCampaignPage() {
                   value={form.content}
                   onChange={(e) => setForm({ ...form, content: e.target.value })}
                 />
+              </div>
+
+              {/* Image Upload */}
+              <div>
+                <label className="block text-sm text-gray-700 mb-2">תמונות (אופציונלי)</label>
+                <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                  <span className="text-2xl mb-1">🖼️</span>
+                  <span className="text-sm text-gray-500">לחץ להעלאת תמונות</span>
+                  <span className="text-xs text-gray-400">JPG, PNG, GIF עד 10MB</span>
+                  <input type="file" multiple accept="image/*" className="hidden" onChange={handleImageSelect} />
+                </label>
+                {imagePreviews.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {imagePreviews.map((src, i) => (
+                      <div key={i} className="relative">
+                        <img src={src} className="w-20 h-20 object-cover rounded-lg border border-gray-200" />
+                        <button
+                          onClick={() => removeImage(i)}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center hover:bg-red-600"
+                        >✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <button

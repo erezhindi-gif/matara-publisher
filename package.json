@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
+    "@vercel/blob": "^2.4.1",
     "next": "16.2.9",
     "next-auth": "^4.24.14",
     "puppeteer-core": "^25.2.0",
