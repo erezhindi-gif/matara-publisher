@@ -1,24 +1,42 @@
 /**
  * sync-groups.js - סנכרון קבוצות פייסבוק
- * שולף את כל הקבוצות שאתה חבר בהן ומעלה למערכת
- *
  * הפעלה: node sync-groups.js
+ *
+ * הוראות:
+ * 1. הסקריפט יפתח את פייסבוק
+ * 2. גלול ידנית בסרגל הקבוצות הימני כדי לטעון את כל הקבוצות
+ * 3. לחץ Enter בפאוורשל כשסיימת לגלול
  */
 
 const puppeteer = require("puppeteer-core");
 const path = require("path");
 const os = require("os");
+const readline = require("readline");
 
 const API_BASE = "https://matara-publisher.vercel.app";
 const EDGE_PATH = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 const EDGE_USER_DATA = path.join(os.homedir(), "AppData", "Local", "Microsoft", "Edge", "User Data");
-
-// שנה את זה לפי הפרופיל שרוצים לסנכרן
 const EDGE_PROFILE = "Default";
-const BUSINESS_ID = "carpentry"; // "carpentry" או "recruitment"
+const BUSINESS_ID = "carpentry"; // שנה ל "recruitment" עבור גיוס
+
+const SKIP_IDS = new Set([
+  "feed", "discover", "create", "joins", "membership", "requests",
+  "search", "notifications", "invite", "category", "updates", "all",
+  "archived", "suggested", "local", "explore", "buy", "sell",
+]);
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+function waitForEnter() {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    rl.question("\n>>> גלול את הסרגל הימני בפייסבוק כדי לטעון את כל הקבוצות, ואז לחץ Enter כאן...\n", () => {
+      rl.close();
+      resolve();
+    });
+  });
 }
 
 async function syncGroups() {
@@ -27,11 +45,7 @@ async function syncGroups() {
   const browser = await puppeteer.launch({
     executablePath: EDGE_PATH,
     userDataDir: EDGE_USER_DATA,
-    args: [
-      `--profile-directory=${EDGE_PROFILE}`,
-      "--no-first-run",
-      "--no-default-browser-check",
-    ],
+    args: [`--profile-directory=${EDGE_PROFILE}`, "--no-first-run"],
     headless: false,
   });
 
@@ -39,115 +53,87 @@ async function syncGroups() {
   await page.setViewport({ width: 1280, height: 900 });
 
   try {
-    // בדוק חיבור לפייסבוק
-    console.log("נכנס לפייסבוק...");
     await page.goto("https://www.facebook.com", { waitUntil: "networkidle2", timeout: 30000 });
     await sleep(2000);
 
     if (page.url().includes("login")) {
-      console.error("❌ לא מחובר לפייסבוק. פתח את Edge והתחבר ידנית.");
+      console.error("לא מחובר לפייסבוק.");
       await browser.close();
       return;
     }
-    console.log("✓ מחובר לפייסבוק\n");
+    console.log("מחובר לפייסבוק\n");
 
-    // נכנס לדף הקבוצות
-    console.log("טוען רשימת קבוצות...");
-    await page.goto("https://www.facebook.com/groups/feed/", { waitUntil: "networkidle2", timeout: 30000 });
-    await sleep(3000);
+    // כנס לפיד הקבוצות
+    await page.goto("https://www.facebook.com/groups/feed/", {
+      waitUntil: "networkidle2",
+      timeout: 30000,
+    });
+    await sleep(2000);
 
-    // גלול כדי לטעון יותר קבוצות
-    console.log("גולל כדי לטעון את כל הקבוצות...");
-    for (let i = 0; i < 5; i++) {
-      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      await sleep(2000);
-    }
+    console.log("פייסבוק פתוח.");
+    console.log("בסרגל הימני תראה את רשימת הקבוצות שלך.");
+    console.log("גלול לאט בסרגל הימני עד לתחתית כדי לטעון את כל הקבוצות.");
 
-    // שלוף את הקבוצות מהסרגל הצדדי
-    const groups = await page.evaluate(() => {
+    await waitForEnter();
+
+    console.log("\nשולף קבוצות...");
+
+    const groups = await page.evaluate((skipIds) => {
       const results = [];
       const seen = new Set();
 
-      // חפש קישורי קבוצות
-      const links = document.querySelectorAll('a[href*="/groups/"]');
-
-      for (const link of links) {
-        const href = link.href;
-        const match = href.match(/facebook\.com\/groups\/([^/?]+)/);
-        if (!match) continue;
+      // שלוף את כל הקישורים לקבוצות
+      document.querySelectorAll('a[href*="/groups/"]').forEach((link) => {
+        const href = link.href || "";
+        const match = href.match(/facebook\.com\/groups\/([^/?#\s]+)/);
+        if (!match) return;
 
         const groupId = match[1];
-        if (seen.has(groupId) || groupId === "feed" || groupId === "discover" || groupId === "create" || groupId === "joins" || /^\d{5,}$/.test(groupId) === false && !/^[a-zA-Z]/.test(groupId)) {
-          // נסה בכל מקרה
-        }
-        if (seen.has(groupId)) continue;
+        if (skipIds.includes(groupId)) return;
+
+        // רק מזהים נומריים או slugs
+        const isNumeric = /^\d+$/.test(groupId);
+        const isSlug = /^[a-zA-Z0-9._-]{3,}$/.test(groupId);
+        if (!isNumeric && !isSlug) return;
+
+        if (seen.has(groupId)) return;
         seen.add(groupId);
 
-        // מצא את שם הקבוצה
-        const nameEl = link.querySelector("span, div");
-        const name = nameEl?.innerText?.trim() || link.innerText?.trim();
+        // שם הקבוצה - קח את הטקסט הראשון שנראה כמו שם
+        let name = "";
+        const allText = link.innerText?.trim() || "";
+        const lines = allText.split("\n").map(l => l.trim()).filter(l => l.length > 2);
 
-        if (name && name.length > 2 && name.length < 100) {
-          results.push({
-            fbGroupId: groupId,
-            name: name,
-            url: href,
-          });
-        }
-      }
-
-      return results;
-    });
-
-    console.log(`נמצאו ${groups.length} קבוצות\n`);
-
-    if (groups.length === 0) {
-      // נסה דרך אחרת - דף הקבוצות שלי
-      console.log("מנסה דרך אחרת...");
-      await page.goto("https://www.facebook.com/groups/?category=joined", { waitUntil: "networkidle2" });
-      await sleep(3000);
-
-      for (let i = 0; i < 8; i++) {
-        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-        await sleep(1500);
-      }
-
-      const groups2 = await page.evaluate(() => {
-        const results = [];
-        const seen = new Set();
-        const cards = document.querySelectorAll('[role="article"], [data-testid="groups-join-button"]');
-
-        document.querySelectorAll('a[href*="/groups/"]').forEach((link) => {
-          const href = link.href;
-          const match = href.match(/facebook\.com\/groups\/([^/?#]+)/);
-          if (!match) return;
-          const groupId = match[1];
-          if (["feed", "discover", "create", "joins", "membership", "requests"].includes(groupId)) return;
-          if (seen.has(groupId)) return;
-          seen.add(groupId);
-
-          const text = link.innerText?.trim();
-          if (text && text.length > 2 && text.length < 120) {
-            results.push({ fbGroupId: groupId, name: text, url: href });
+        for (const line of lines) {
+          if (!line.includes("לפני") && !line.includes("פעילות") && !line.includes("דקות") && !line.includes("שעות") && !line.includes("ימים") && !line.includes("שנה") && line.length < 150) {
+            name = line;
+            break;
           }
-        });
-        return results;
+        }
+
+        if (name && name.length > 2) {
+          results.push({ fbGroupId: groupId, name, url: href });
+        }
       });
 
-      if (groups2.length > 0) {
-        groups.push(...groups2);
-        console.log(`נמצאו ${groups2.length} קבוצות בדרך השנייה\n`);
-      }
-    }
+      return results;
+    }, Array.from(SKIP_IDS));
+
+    console.log(`נמצאו ${groups.length} קבוצות`);
 
     if (groups.length === 0) {
-      console.log("❌ לא נמצאו קבוצות. נסה להריץ שוב כשהעמוד טעון.");
+      console.log("לא נמצאו קבוצות. נסה לגלול יותר ולהריץ שוב.");
       await browser.close();
       return;
     }
 
+    // הצג דוגמאות
+    console.log("\nדוגמאות:");
+    groups.slice(0, 8).forEach((g) => console.log(`  - ${g.name}`));
+    if (groups.length > 8) console.log(`  ... ועוד ${groups.length - 8}`);
+
     // שלח לשרת
-    console.log("מעלה קבוצות לשרת...");
+    console.log("\nמעלה לשרת...");
     const res = await fetch(`${API_BASE}/api/sync-groups`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -156,10 +142,9 @@ async function syncGroups() {
 
     if (res.ok) {
       const data = await res.json();
-      console.log(`✓ הועלו ${data.count} קבוצות בהצלחה!`);
-      console.log("\nעכשיו כנס לאתר ותארגן את הקבוצות לתבניות.");
+      console.log(`הועלו ${data.count} קבוצות בהצלחה!`);
     } else {
-      console.error("❌ שגיאה בהעלאה:", await res.text());
+      console.error("שגיאה:", await res.text());
     }
 
   } catch (err) {

@@ -107,15 +107,11 @@ export default function Home() {
             <p className="text-sm text-gray-500">קישורי וואטסאפ ומייל</p>
           </Link>
 
-          {/* Sync button */}
-          <div className="group bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-2xl p-6">
+          <Link href="/sync" className="group bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20 hover:border-blue-400/50 rounded-2xl p-6 transition-all">
             <div className="text-3xl mb-4">🔄</div>
-            <h2 className="text-lg font-semibold mb-1">סנכרון קבוצות</h2>
-            <p className="text-sm text-gray-500 mb-3">הפעל סקריפט על המחשב שלך</p>
-            <code className="text-xs bg-black/40 text-green-400 px-2 py-1 rounded-lg block">
-              node sync-groups.js
-            </code>
-          </div>
+            <h2 className="text-lg font-semibold mb-1 group-hover:text-blue-300 transition-colors">סנכרון קבוצות</h2>
+            <p className="text-sm text-gray-500">סנכרן קבוצות פייסבוק בלחיצה</p>
+          </Link>
         </div>
       </div>
     </main>
