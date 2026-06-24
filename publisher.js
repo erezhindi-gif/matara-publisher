@@ -27,8 +27,12 @@ function sleep(ms) {
 }
 
 function randomDelay(minSec, maxSec) {
-  const ms = (Math.random() * (maxSec - minSec) + minSec) * 1000;
-  return sleep(ms);
+  // Add gaussian-like noise: average of 3 random numbers feels more natural than uniform
+  const r = (Math.random() + Math.random() + Math.random()) / 3;
+  const sec = minSec + r * (maxSec - minSec);
+  // Occasionally (10% chance) take a longer break - like a human distracted
+  const longBreak = Math.random() < 0.1 ? (20 + Math.random() * 40) : 0;
+  return sleep((sec + longBreak) * 1000);
 }
 
 async function fetchApprovedCampaigns() {
