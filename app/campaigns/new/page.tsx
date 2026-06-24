@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -7,6 +7,8 @@ const BUSINESSES = [
   { id: "recruitment", name: "מטרה - גיוס והשמה", type: "recruitment" },
   { id: "carpentry", name: "נויה מטבחים", type: "carpentry" },
 ];
+
+const DAY_NAMES = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי"];
 
 type ContactLink = {
   id: string;
@@ -24,10 +26,42 @@ type Template = {
   groups: { id: string }[];
 };
 
+function FacebookPreview({ content, whatsappLink }: { content: string; whatsappLink: string }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+      <div className="p-4 border-b border-gray-100">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm">M</div>
+          <div>
+            <div className="font-semibold text-sm text-gray-900">Matara Publisher</div>
+            <div className="text-xs text-gray-500">עכשיו · 🌍</div>
+          </div>
+        </div>
+      </div>
+      <div className="p-4">
+        <pre className="whitespace-pre-wrap font-sans text-sm text-gray-900 leading-relaxed">
+          {content || "תוכן הפוסט יופיע כאן..."}
+        </pre>
+        {whatsappLink && (
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <span className="text-green-600 text-sm">📱 {whatsappLink}</span>
+          </div>
+        )}
+      </div>
+      <div className="px-4 py-2 border-t border-gray-100 flex gap-4 text-xs text-gray-400">
+        <span>👍 אהבתי</span>
+        <span>💬 תגובה</span>
+        <span>↗️ שתף</span>
+      </div>
+    </div>
+  );
+}
+
 export default function NewCampaignPage() {
   const router = useRouter();
-  const [step, setStep] = useState<"form" | "versions" | "templates" | "schedule">("form");
+  const [step, setStep] = useState<"form" | "templates" | "schedule">("form");
   const [loading, setLoading] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
   const [contactLinks, setContactLinks] = useState<ContactLink[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
@@ -43,49 +77,82 @@ export default function NewCampaignPage() {
     location: "",
     whatsappLink: "",
     emailLink: "",
-    rawContent: "",
+    content: "",
   });
 
-  const [versions, setVersions] = useState<{ versionA: string; versionB: string } | null>(null);
-  const [selectedVersion, setSelectedVersion] = useState<"A" | "B" | null>(null);
-  const [editedContent, setEditedContent] = useState("");
-  const [scheduledAt, setScheduledAt] = useState("");
+  // Multi-day scheduling
+  const [scheduleDays, setScheduleDays] = useState<number[]>([]);
+  const [scheduleTime, setScheduleTime] = useState("10:00");
+  const [scheduleStartDate, setScheduleStartDate] = useState("");
 
   const selectedBusiness = BUSINESSES.find((b) => b.id === form.businessId)!;
 
-  async function generateVersions() {
-    // כרגע כותבים ידנית - בעתיד יחליף סוכן AI
-    setVersions({
-      versionA: form.rawContent,
-      versionB: form.rawContent,
-    });
-    setStep("versions");
+  async function generateWithAI() {
+    if (!form.jobTitle) return;
+    setAiLoading(true);
+    try {
+      const res = await fetch("/api/ai/generate-post", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobTitle: form.jobTitle,
+          location: form.location,
+          whatsappLink: form.whatsappLink,
+          emailLink: form.emailLink,
+          businessType: selectedBusiness.type,
+        }),
+      });
+      const data = await res.json();
+      if (data.versionA) {
+        setForm((f) => ({ ...f, content: data.versionA }));
+      }
+    } catch {
+      alert("שגיאה ביצירת תוכן AI");
+    } finally {
+      setAiLoading(false);
+    }
   }
 
-  function selectVersion(v: "A" | "B") {
-    setSelectedVersion(v);
-    setEditedContent(v === "A" ? versions!.versionA : versions!.versionB);
+  // Build scheduled dates from selected days
+  function buildScheduledDates(): string[] {
+    if (scheduleDays.length === 0) return [new Date().toISOString()];
+    if (!scheduleStartDate) return [new Date().toISOString()];
+
+    const dates: string[] = [];
+    const start = new Date(scheduleStartDate);
+    // Find next occurrence of each selected day
+    scheduleDays.forEach((day) => {
+      const d = new Date(start);
+      const diff = (day - d.getDay() + 7) % 7;
+      d.setDate(d.getDate() + diff);
+      const [h, m] = scheduleTime.split(":").map(Number);
+      d.setHours(h, m, 0, 0);
+      dates.push(d.toISOString());
+    });
+    return dates.sort();
   }
 
   async function saveCampaign() {
     setLoading(true);
     try {
-      const res = await fetch("/api/campaigns", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          businessId: form.businessId,
-          title: form.jobTitle,
-          content: editedContent,
-          whatsappLink: form.whatsappLink,
-          emailLink: form.emailLink,
-          scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
-          templateIds: selectedTemplates,
-        }),
-      });
-      if (res.ok) {
-        router.push("/campaigns");
+      const scheduledDates = buildScheduledDates();
+      // Create one campaign per scheduled date (or one if no dates)
+      for (const scheduledAt of scheduledDates) {
+        await fetch("/api/campaigns", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            businessId: form.businessId,
+            title: form.jobTitle,
+            content: form.content,
+            whatsappLink: form.whatsappLink,
+            emailLink: form.emailLink,
+            scheduledAt,
+            templateIds: selectedTemplates,
+          }),
+        });
       }
+      router.push("/campaigns");
     } catch {
       alert("שגיאה בשמירת הקמפיין");
     } finally {
@@ -94,231 +161,180 @@ export default function NewCampaignPage() {
   }
 
   return (
-    <main className="min-h-screen bg-white text-gray-900 p-8" dir="rtl">
-      <div className="max-w-2xl mx-auto">
+    <main className="min-h-screen bg-gray-50 text-gray-900 p-8" dir="rtl">
+      <div className="max-w-6xl mx-auto">
         <div className="flex items-center gap-4 mb-8">
-          <button onClick={() => router.back()} className="text-gray-700 hover:text-gray-900">
-            ← חזרה
-          </button>
+          <button onClick={() => router.back()} className="text-gray-500 hover:text-gray-900">← חזרה</button>
           <h1 className="text-2xl font-bold">קמפיין חדש</h1>
         </div>
 
         {/* Step indicator */}
         <div className="flex gap-2 mb-8">
-          {["פרטים", "בחירת גרסה", "תבניות", "תזמון"].map((s, i) => (
-            <div key={i} className={`flex-1 h-1 rounded-full ${i === ["form", "versions", "templates", "schedule"].indexOf(step) ? "bg-blue-500" : i < ["form", "versions", "templates", "schedule"].indexOf(step) ? "bg-green-500" : "bg-gray-300"}`} />
-          ))}
+          {["פרטים ותוכן", "תבניות", "תזמון"].map((s, i) => {
+            const stepIdx = ["form", "templates", "schedule"].indexOf(step);
+            return (
+              <div key={i} className={`flex-1 h-1 rounded-full ${i === stepIdx ? "bg-blue-500" : i < stepIdx ? "bg-green-500" : "bg-gray-300"}`} />
+            );
+          })}
         </div>
 
-        {/* Step 1: Form */}
+        {/* Step 1: Form + Preview */}
         {step === "form" && (
-          <div className="space-y-5">
-            <div>
-              <label className="block text-sm text-gray-700 mb-1">עסק</label>
-              <select
-                className="w-full bg-gray-100 border border-gray-300 rounded-xl p-3 text-gray-900"
-                value={form.businessId}
-                onChange={(e) => setForm({ ...form, businessId: e.target.value })}
-              >
-                {BUSINESSES.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-700 mb-1">
-                {selectedBusiness.type === "recruitment" ? "שם התפקיד" : "תיאור העבודה / מוצר"}
-              </label>
-              <input
-                className="w-full bg-gray-100 border border-gray-300 rounded-xl p-3 text-gray-900"
-                placeholder={selectedBusiness.type === "recruitment" ? "למשל: מנהל/ת חשבונות" : "למשל: מטבח שהושלם בנתניה"}
-                value={form.jobTitle}
-                onChange={(e) => setForm({ ...form, jobTitle: e.target.value })}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-700 mb-1">מיקום</label>
-              <input
-                className="w-full bg-gray-100 border border-gray-300 rounded-xl p-3 text-gray-900"
-                placeholder="למשל: נתניה"
-                value={form.location}
-                onChange={(e) => setForm({ ...form, location: e.target.value })}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-700 mb-1">קישור וואטסאפ</label>
-              {contactLinks.filter((l) => l.type === "whatsapp" && l.businessId === form.businessId).length > 0 ? (
-                <select
-                  className="w-full bg-gray-100 border border-gray-300 rounded-xl p-3 text-gray-900"
-                  value={form.whatsappLink}
-                  onChange={(e) => setForm({ ...form, whatsappLink: e.target.value })}
-                >
-                  <option value="">ללא קישור וואטסאפ</option>
-                  {contactLinks
-                    .filter((l) => l.type === "whatsapp" && l.businessId === form.businessId)
-                    .map((l) => (
-                      <option key={l.id} value={l.value}>{l.label}</option>
-                    ))}
-                </select>
-              ) : (
-                <div className="text-sm text-gray-500 bg-gray-100 border border-gray-300 rounded-xl p-3">
-                  אין קישורים שמורים - <a href="/settings" className="text-blue-400 hover:underline">הוסף בהגדרות</a>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-700 mb-1">מייל (אופציונלי)</label>
-              {contactLinks.filter((l) => l.type === "email" && l.businessId === form.businessId).length > 0 ? (
-                <select
-                  className="w-full bg-gray-100 border border-gray-300 rounded-xl p-3 text-gray-900"
-                  value={form.emailLink}
-                  onChange={(e) => setForm({ ...form, emailLink: e.target.value })}
-                >
-                  <option value="">ללא מייל</option>
-                  {contactLinks
-                    .filter((l) => l.type === "email" && l.businessId === form.businessId)
-                    .map((l) => (
-                      <option key={l.id} value={l.value}>{l.label}</option>
-                    ))}
-                </select>
-              ) : (
-                <input
-                  className="w-full bg-gray-100 border border-gray-300 rounded-xl p-3 text-gray-900"
-                  placeholder="jobs@example.com"
-                  value={form.emailLink}
-                  onChange={(e) => setForm({ ...form, emailLink: e.target.value })}
-                />
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-700 mb-1">תוכן הפוסט</label>
-              <textarea
-                className="w-full bg-gray-100 border border-gray-300 rounded-xl p-3 text-gray-900 min-h-[180px] font-sans text-sm"
-                placeholder="כתוב כאן את תוכן הפוסט..."
-                value={form.rawContent}
-                onChange={(e) => setForm({ ...form, rawContent: e.target.value })}
-              />
-            </div>
-
-            <button
-              onClick={generateVersions}
-              disabled={!form.jobTitle || !form.rawContent}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-400 rounded-xl p-4 font-semibold transition-colors"
-            >
-              המשך לבחירת תבניות →
-            </button>
-          </div>
-        )}
-
-        {/* Step 2: Choose version */}
-        {step === "versions" && versions && (
-          <div className="space-y-5">
-            <p className="text-gray-700">בחר גרסה או ערוך לפי הטעם שלך:</p>
-
-            {(["A", "B"] as const).map((v) => (
-              <div
-                key={v}
-                onClick={() => selectVersion(v)}
-                className={`border rounded-xl p-4 cursor-pointer transition-all ${selectedVersion === v ? "border-blue-500 bg-blue-950/30" : "border-gray-300 hover:border-gray-500"}`}
-              >
-                <div className="text-xs text-gray-500 mb-2">גרסה {v}</div>
-                <pre className="whitespace-pre-wrap text-sm font-sans">
-                  {v === "A" ? versions.versionA : versions.versionB}
-                </pre>
-              </div>
-            ))}
-
-            {selectedVersion && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Form */}
+            <div className="space-y-5">
               <div>
-                <label className="block text-sm text-gray-700 mb-1">עריכה חופשית</label>
-                <textarea
-                  className="w-full bg-gray-100 border border-gray-300 rounded-xl p-3 text-gray-900 min-h-[200px] font-sans text-sm"
-                  value={editedContent}
-                  onChange={(e) => setEditedContent(e.target.value)}
+                <label className="block text-sm text-gray-700 mb-1">עסק</label>
+                <select
+                  className="w-full bg-white border border-gray-300 rounded-xl p-3 text-gray-900"
+                  value={form.businessId}
+                  onChange={(e) => setForm({ ...form, businessId: e.target.value })}
+                >
+                  {BUSINESSES.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">
+                  {selectedBusiness.type === "recruitment" ? "שם התפקיד" : "תיאור העבודה / מוצר"}
+                </label>
+                <input
+                  className="w-full bg-white border border-gray-300 rounded-xl p-3 text-gray-900"
+                  placeholder={selectedBusiness.type === "recruitment" ? "למשל: מנהל/ת חשבונות" : "למשל: מטבח שהושלם בנתניה"}
+                  value={form.jobTitle}
+                  onChange={(e) => setForm({ ...form, jobTitle: e.target.value })}
                 />
               </div>
-            )}
 
-            <div className="flex gap-3">
-              <button onClick={() => setStep("form")} className="flex-1 bg-gray-200 hover:bg-gray-300 rounded-xl p-3 transition-colors">
-                חזרה
-              </button>
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">מיקום</label>
+                <input
+                  className="w-full bg-white border border-gray-300 rounded-xl p-3 text-gray-900"
+                  placeholder="למשל: נתניה"
+                  value={form.location}
+                  onChange={(e) => setForm({ ...form, location: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">קישור וואטסאפ</label>
+                {contactLinks.filter((l) => l.type === "whatsapp" && l.businessId === form.businessId).length > 0 ? (
+                  <select
+                    className="w-full bg-white border border-gray-300 rounded-xl p-3 text-gray-900"
+                    value={form.whatsappLink}
+                    onChange={(e) => setForm({ ...form, whatsappLink: e.target.value })}
+                  >
+                    <option value="">ללא קישור וואטסאפ</option>
+                    {contactLinks.filter((l) => l.type === "whatsapp" && l.businessId === form.businessId)
+                      .map((l) => <option key={l.id} value={l.value}>{l.label}</option>)}
+                  </select>
+                ) : (
+                  <div className="text-sm text-gray-500 bg-white border border-gray-300 rounded-xl p-3">
+                    אין קישורים שמורים - <a href="/settings" className="text-blue-500 hover:underline">הוסף בהגדרות</a>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">מייל (אופציונלי)</label>
+                {contactLinks.filter((l) => l.type === "email" && l.businessId === form.businessId).length > 0 ? (
+                  <select
+                    className="w-full bg-white border border-gray-300 rounded-xl p-3 text-gray-900"
+                    value={form.emailLink}
+                    onChange={(e) => setForm({ ...form, emailLink: e.target.value })}
+                  >
+                    <option value="">ללא מייל</option>
+                    {contactLinks.filter((l) => l.type === "email" && l.businessId === form.businessId)
+                      .map((l) => <option key={l.id} value={l.value}>{l.label}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    className="w-full bg-white border border-gray-300 rounded-xl p-3 text-gray-900"
+                    placeholder="jobs@example.com"
+                    value={form.emailLink}
+                    onChange={(e) => setForm({ ...form, emailLink: e.target.value })}
+                  />
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm text-gray-700">תוכן הפוסט</label>
+                  <button
+                    onClick={generateWithAI}
+                    disabled={!form.jobTitle || aiLoading}
+                    className="flex items-center gap-1.5 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 disabled:text-gray-400 text-white text-xs px-3 py-1.5 rounded-lg transition-colors font-medium"
+                  >
+                    {aiLoading ? (
+                      <><span className="animate-spin">⟳</span> יוצר...</>
+                    ) : (
+                      <>✨ כתוב עם AI</>
+                    )}
+                  </button>
+                </div>
+                <textarea
+                  className="w-full bg-white border border-gray-300 rounded-xl p-3 text-gray-900 min-h-[220px] font-sans text-sm"
+                  placeholder="כתוב כאן את תוכן הפוסט, או לחץ 'כתוב עם AI'..."
+                  value={form.content}
+                  onChange={(e) => setForm({ ...form, content: e.target.value })}
+                />
+              </div>
+
               <button
                 onClick={() => setStep("templates")}
-                disabled={!selectedVersion}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-400 rounded-xl p-3 font-semibold transition-colors"
+                disabled={!form.jobTitle || !form.content}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-400 text-white rounded-xl p-4 font-semibold transition-colors"
               >
                 המשך לתבניות →
               </button>
             </div>
+
+            {/* Preview */}
+            <div className="lg:sticky lg:top-8 lg:self-start">
+              <div className="text-sm text-gray-500 mb-3 font-medium">תצוגה מקדימה</div>
+              <FacebookPreview content={form.content} whatsappLink={form.whatsappLink} />
+            </div>
           </div>
         )}
 
-        {/* Step 3: Templates */}
+        {/* Step 2: Templates */}
         {step === "templates" && (
-          <div className="space-y-5">
+          <div className="max-w-2xl space-y-5">
             <p className="text-gray-700">בחר תבניות קבוצות לפרסום:</p>
 
             {templates.filter((t) => t.businessId === form.businessId).length === 0 ? (
-              <div className="text-center text-gray-500 bg-gray-100 rounded-2xl p-8 border border-gray-200">
+              <div className="text-center text-gray-500 bg-white rounded-2xl p-8 border border-gray-200">
                 <p>אין תבניות לעסק זה עדיין</p>
-                <a href="/templates" target="_blank" className="text-blue-400 hover:underline text-sm mt-2 inline-block">
-                  צור תבנית חדשה
-                </a>
+                <a href="/templates" target="_blank" className="text-blue-500 hover:underline text-sm mt-2 inline-block">צור תבנית חדשה</a>
               </div>
             ) : (
               <div className="space-y-3">
-                {templates
-                  .filter((t) => t.businessId === form.businessId)
-                  .map((t) => (
-                    <div
-                      key={t.id}
-                      onClick={() => {
-                        setSelectedTemplates((prev) =>
-                          prev.includes(t.id) ? prev.filter((id) => id !== t.id) : [...prev, t.id]
-                        );
-                      }}
-                      className={`border rounded-xl p-4 cursor-pointer transition-all ${
-                        selectedTemplates.includes(t.id)
-                          ? "border-blue-500 bg-blue-950/30"
-                          : "border-gray-300 hover:border-gray-500"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-medium">{t.name}</div>
-                          <div className="text-xs text-gray-500">{t.groups.length} קבוצות</div>
-                        </div>
-                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                          selectedTemplates.includes(t.id) ? "border-blue-500 bg-blue-500" : "border-gray-600"
-                        }`}>
-                          {selectedTemplates.includes(t.id) && <span className="text-gray-900 text-xs">✓</span>}
-                        </div>
+                {templates.filter((t) => t.businessId === form.businessId).map((t) => (
+                  <div
+                    key={t.id}
+                    onClick={() => setSelectedTemplates((prev) => prev.includes(t.id) ? prev.filter((id) => id !== t.id) : [...prev, t.id])}
+                    className={`border rounded-xl p-4 cursor-pointer transition-all ${selectedTemplates.includes(t.id) ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white hover:border-gray-400"}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">{t.name}</div>
+                        <div className="text-xs text-gray-500">{t.groups.length} קבוצות</div>
+                      </div>
+                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${selectedTemplates.includes(t.id) ? "border-blue-500 bg-blue-500" : "border-gray-400"}`}>
+                        {selectedTemplates.includes(t.id) && <span className="text-white text-xs">✓</span>}
                       </div>
                     </div>
-                  ))}
-              </div>
-            )}
-
-            {selectedTemplates.length > 0 && (
-              <div className="bg-blue-950/20 border border-blue-800/50 rounded-xl p-3 text-sm text-blue-300">
-                נבחרו {selectedTemplates.length} תבניות
+                  </div>
+                ))}
               </div>
             )}
 
             <div className="flex gap-3">
-              <button onClick={() => setStep("versions")} className="flex-1 bg-gray-200 hover:bg-gray-300 rounded-xl p-3 transition-colors">
-                חזרה
-              </button>
+              <button onClick={() => setStep("form")} className="flex-1 bg-gray-200 hover:bg-gray-300 rounded-xl p-3 transition-colors">חזרה</button>
               <button
                 onClick={() => setStep("schedule")}
                 disabled={selectedTemplates.length === 0}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-400 rounded-xl p-3 font-semibold transition-colors"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-400 text-white rounded-xl p-3 font-semibold transition-colors"
               >
                 המשך לתזמון →
               </button>
@@ -326,41 +342,89 @@ export default function NewCampaignPage() {
           </div>
         )}
 
-        {/* Step 4: Schedule */}
+        {/* Step 3: Schedule */}
         {step === "schedule" && (
-          <div className="space-y-5">
-            <div className="bg-gray-100 border border-gray-300 rounded-xl p-4">
-              <div className="text-xs text-gray-500 mb-2">הפוסט שנבחר</div>
-              <pre className="whitespace-pre-wrap text-sm font-sans text-gray-200">
-                {editedContent}
-              </pre>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="space-y-5">
+              {/* Post preview summary */}
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <div className="text-xs text-gray-500 mb-2">הפוסט</div>
+                <pre className="whitespace-pre-wrap text-sm font-sans text-gray-900 max-h-40 overflow-y-auto">{form.content}</pre>
+              </div>
+
+              {/* Days selector */}
+              <div>
+                <label className="block text-sm text-gray-700 mb-2">ימי פרסום (בחר כמה שרוצה)</label>
+                <div className="flex flex-wrap gap-2">
+                  {DAY_NAMES.map((day, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setScheduleDays((prev) => prev.includes(i) ? prev.filter((d) => d !== i) : [...prev, i])}
+                      className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${scheduleDays.includes(i) ? "bg-blue-600 text-white" : "bg-white border border-gray-300 text-gray-700 hover:border-blue-400"}`}
+                    >
+                      {day}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Time */}
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">שעת פרסום</label>
+                <input
+                  type="time"
+                  className="w-full bg-white border border-gray-300 rounded-xl p-3 text-gray-900"
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                />
+              </div>
+
+              {/* Start date */}
+              {scheduleDays.length > 0 && (
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">החל מתאריך</label>
+                  <input
+                    type="date"
+                    className="w-full bg-white border border-gray-300 rounded-xl p-3 text-gray-900"
+                    value={scheduleStartDate}
+                    onChange={(e) => setScheduleStartDate(e.target.value)}
+                    min={new Date().toISOString().split("T")[0]}
+                  />
+                </div>
+              )}
+
+              {scheduleDays.length === 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-700">
+                  לא נבחרו ימים - הקמפיין יישלח לאישור ויפורסם מיד לאחר אישור
+                </div>
+              )}
+
+              {scheduleDays.length > 0 && (
+                <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-700">
+                  יווצרו {scheduleDays.length} קמפיינים - אחד לכל יום שנבחר
+                </div>
+              )}
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-sm text-yellow-700">
+                הקמפיין ייצא לאישור לפני פרסום. תקבל הודעה במייל ובוואטסאפ.
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={() => setStep("templates")} className="flex-1 bg-gray-200 hover:bg-gray-300 rounded-xl p-3 transition-colors">חזרה</button>
+                <button
+                  onClick={saveCampaign}
+                  disabled={loading || (scheduleDays.length > 0 && !scheduleStartDate)}
+                  className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-xl p-3 font-semibold transition-colors"
+                >
+                  {loading ? "שומר..." : "✓ שמור קמפיין"}
+                </button>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm text-gray-700 mb-1">תזמון (אופציונלי - ריק = עכשיו)</label>
-              <input
-                type="datetime-local"
-                className="w-full bg-gray-100 border border-gray-300 rounded-xl p-3 text-gray-900"
-                value={scheduledAt}
-                onChange={(e) => setScheduledAt(e.target.value)}
-              />
-            </div>
-
-            <div className="bg-yellow-950/30 border border-yellow-700/50 rounded-xl p-4 text-sm text-yellow-300">
-              הקמפיין ייצא לאישור לפני פרסום. תקבל הודעה בוואטסאפ.
-            </div>
-
-            <div className="flex gap-3">
-              <button onClick={() => setStep("versions")} className="flex-1 bg-gray-200 hover:bg-gray-300 rounded-xl p-3 transition-colors">
-                חזרה
-              </button>
-              <button
-                onClick={saveCampaign}
-                disabled={loading}
-                className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 rounded-xl p-3 font-semibold transition-colors"
-              >
-                {loading ? "שומר..." : "✓ שמור קמפיין"}
-              </button>
+            {/* Preview */}
+            <div className="lg:sticky lg:top-8 lg:self-start">
+              <div className="text-sm text-gray-500 mb-3 font-medium">תצוגה מקדימה</div>
+              <FacebookPreview content={form.content} whatsappLink={form.whatsappLink} />
             </div>
           </div>
         )}

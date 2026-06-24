@@ -14,9 +14,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = await req.json();
-  const campaign = await prisma.campaign.update({
-    where: { id },
-    data: body,
-  });
+  const data: Record<string, unknown> = { ...body };
+  if (body.scheduledAt) data.scheduledAt = new Date(body.scheduledAt);
+  const campaign = await prisma.campaign.update({ where: { id }, data });
   return NextResponse.json(campaign);
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  await prisma.post.deleteMany({ where: { campaignId: id } });
+  await prisma.campaign.delete({ where: { id } });
+  return NextResponse.json({ ok: true });
 }

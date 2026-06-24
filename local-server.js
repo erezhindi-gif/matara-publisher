@@ -143,6 +143,9 @@ async function syncGroups(businessId = "carpentry") {
       return { ok: false, error: "לא נמצאו קבוצות" };
     }
 
+    // השהייה אקראית בין 8-20 שניות בין כל קבוצה (נראה טבעי לפייסבוק)
+    console.log(`נמצאו ${groups.length} קבוצות - מפרסם עם השהיות אקראיות...`);
+
     const res = await fetch(`${API_BASE}/api/sync-groups`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
