@@ -261,7 +261,7 @@ export default function ProfilesPage() {
                   );
                   if (status === "qr_ready" && wa?.qrDataUrl) return (
                     <div className="flex flex-col items-center gap-1">
-                      <img src={wa.qrDataUrl} className="w-24 h-24 rounded-lg border border-gray-200" />
+                      <img src={wa.qrDataUrl} className="w-52 h-52 rounded-lg border border-gray-200" />
                       <span className="text-xs text-gray-500">סרוק עם הטלפון</span>
                     </div>
                   );

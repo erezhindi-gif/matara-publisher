@@ -52,7 +52,7 @@ function initWhatsApp(profileId, phoneNumber) {
     console.log(`[וואטסאפ] QR מוכן לפרופיל: ${profileId}`);
     qrcode.generate(qr, { small: true });
     try {
-      const dataUrl = await QRCode.toDataURL(qr, { width: 300 });
+      const dataUrl = await QRCode.toDataURL(qr, { width: 500, margin: 2 });
       WA_SESSIONS[profileId].qrDataUrl = dataUrl;
       WA_SESSIONS[profileId].status = "qr_ready";
     } catch {}
@@ -64,10 +64,17 @@ function initWhatsApp(profileId, phoneNumber) {
     WA_SESSIONS[profileId].qrDataUrl = null;
   });
 
-  client.on("disconnected", () => {
-    console.log(`[וואטסאפ] התנתק: ${profileId}`);
+  client.on("disconnected", (reason) => {
+    console.log(`[וואטסאפ] התנתק: ${profileId} (${reason}) - מנסה חיבור מחדש בעוד 15 שניות...`);
     WA_SESSIONS[profileId].status = "disconnected";
     WA_SESSIONS[profileId].client = null;
+    // חיבור מחדש אוטומטי
+    setTimeout(() => {
+      if (WA_SESSIONS[profileId]?.status === "disconnected") {
+        console.log(`[וואטסאפ] מתחבר מחדש: ${profileId}`);
+        initWhatsApp(profileId, WA_SESSIONS[profileId]?.phoneNumber);
+      }
+    }, 15000);
   });
 
   client.initialize();
