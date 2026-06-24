@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -58,10 +58,10 @@ export default function SettingsPage() {
   }));
 
   return (
-    <main className="min-h-screen bg-gray-950 text-white p-8" dir="rtl">
+    <main className="min-h-screen bg-white text-gray-900 p-8" dir="rtl">
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center gap-4 mb-8">
-          <Link href="/" className="text-gray-400 hover:text-white">← ראשי</Link>
+          <Link href="/" className="text-gray-700 hover:text-gray-900">← ראשי</Link>
           <h1 className="text-2xl font-bold">הגדרות</h1>
         </div>
 
@@ -78,11 +78,11 @@ export default function SettingsPage() {
           </div>
 
           {showNew && (
-            <div className="bg-gray-900 border border-blue-500 rounded-2xl p-5 mb-4 space-y-3">
+            <div className="bg-gray-100 border border-blue-500 rounded-2xl p-5 mb-4 space-y-3">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">שם תצוגה</label>
+                <label className="block text-sm text-gray-700 mb-1">שם תצוגה</label>
                 <input
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white"
+                  className="w-full bg-gray-200 border border-gray-300 rounded-xl p-3 text-gray-900"
                   placeholder='למשל: "וואטסאפ גיוס ראשי"'
                   value={form.label}
                   onChange={(e) => setForm({ ...form, label: e.target.value })}
@@ -90,9 +90,9 @@ export default function SettingsPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">סוג</label>
+                  <label className="block text-sm text-gray-700 mb-1">סוג</label>
                   <select
-                    className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white"
+                    className="w-full bg-gray-200 border border-gray-300 rounded-xl p-3 text-gray-900"
                     value={form.type}
                     onChange={(e) => setForm({ ...form, type: e.target.value })}
                   >
@@ -101,9 +101,9 @@ export default function SettingsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">עסק</label>
+                  <label className="block text-sm text-gray-700 mb-1">עסק</label>
                   <select
-                    className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white"
+                    className="w-full bg-gray-200 border border-gray-300 rounded-xl p-3 text-gray-900"
                     value={form.businessId}
                     onChange={(e) => setForm({ ...form, businessId: e.target.value })}
                   >
@@ -114,11 +114,11 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">
+                <label className="block text-sm text-gray-700 mb-1">
                   {form.type === "whatsapp" ? "קישור וואטסאפ" : "כתובת מייל"}
                 </label>
                 <input
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white"
+                  className="w-full bg-gray-200 border border-gray-300 rounded-xl p-3 text-gray-900"
                   placeholder={form.type === "whatsapp" ? "https://wa.me/972..." : "jobs@example.com"}
                   value={form.value}
                   onChange={(e) => setForm({ ...form, value: e.target.value })}
@@ -132,16 +132,16 @@ export default function SettingsPage() {
                   onChange={(e) => setForm({ ...form, isDefault: e.target.checked })}
                   className="rounded"
                 />
-                <span className="text-sm text-gray-400">ברירת מחדל לעסק זה</span>
+                <span className="text-sm text-gray-700">ברירת מחדל לעסק זה</span>
               </label>
               <div className="flex gap-3">
-                <button onClick={() => setShowNew(false)} className="flex-1 bg-gray-800 hover:bg-gray-700 rounded-xl p-3 transition-colors">
+                <button onClick={() => setShowNew(false)} className="flex-1 bg-gray-200 hover:bg-gray-300 rounded-xl p-3 transition-colors">
                   ביטול
                 </button>
                 <button
                   onClick={createLink}
                   disabled={!form.label || !form.value || saving}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 rounded-xl p-3 font-semibold transition-colors"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 rounded-xl p-3 font-semibold transition-colors"
                 >
                   {saving ? "שומר..." : "שמור"}
                 </button>
@@ -155,13 +155,13 @@ export default function SettingsPage() {
             <div className="space-y-6">
               {byBusiness.map((b) => (
                 <div key={b.id}>
-                  <div className="text-sm font-semibold text-gray-400 mb-2">{b.name}</div>
+                  <div className="text-sm font-semibold text-gray-700 mb-2">{b.name}</div>
                   {b.links.length === 0 ? (
-                    <div className="text-sm text-gray-600 bg-gray-900 rounded-xl p-4">אין קישורים עדיין</div>
+                    <div className="text-sm text-gray-700 bg-gray-100 rounded-xl p-4">אין קישורים עדיין</div>
                   ) : (
                     <div className="space-y-2">
                       {b.links.map((l) => (
-                        <div key={l.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-center justify-between">
+                        <div key={l.id} className="bg-gray-100 border border-gray-200 rounded-xl p-4 flex items-center justify-between">
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-medium">{l.label}</span>
@@ -176,7 +176,7 @@ export default function SettingsPage() {
                           </div>
                           <button
                             onClick={() => deleteLink(l.id)}
-                            className="text-gray-600 hover:text-red-400 transition-colors text-lg"
+                            className="text-gray-700 hover:text-red-400 transition-colors text-lg"
                           >
                             ✕
                           </button>
@@ -193,7 +193,7 @@ export default function SettingsPage() {
         {/* Profiles section - placeholder */}
         <div>
           <h2 className="text-lg font-semibold mb-4">פרופילי פייסבוק</h2>
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 text-center text-gray-500">
+          <div className="bg-gray-100 border border-gray-200 rounded-2xl p-5 text-center text-gray-500">
             <p>ניהול פרופילי פייסבוק יתווסף בשלב הבא</p>
           </div>
         </div>

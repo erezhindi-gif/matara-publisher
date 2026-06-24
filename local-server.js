@@ -8,6 +8,7 @@
 
 const http = require("http");
 const puppeteer = require("puppeteer-core");
+const { execSync, exec } = require("child_process");
 const path = require("path");
 const os = require("os");
 
@@ -29,6 +30,14 @@ function sleep(ms) {
 }
 
 async function syncGroups(businessId = "carpentry") {
+  // סגור Edge אם פתוח, פתח מחדש עם puppeteer, וסיים בפתיחה מחדש
+  let edgeWasOpen = false;
+  try {
+    execSync("tasklist /FI \"IMAGENAME eq msedge.exe\" 2>nul", { encoding: "utf8" }).includes("msedge.exe") && (edgeWasOpen = true);
+    execSync("taskkill /F /IM msedge.exe 2>nul", { encoding: "utf8" });
+  } catch {}
+  await sleep(1500);
+
   const browser = await puppeteer.launch({
     executablePath: EDGE_PATH,
     userDataDir: EDGE_USER_DATA,
@@ -51,15 +60,43 @@ async function syncGroups(businessId = "carpentry") {
       return { ok: false, error: "לא מחובר לפייסבוק" };
     }
 
-    // גלול אוטומטית בסרגל הימני
-    for (let i = 0; i < 30; i++) {
+    // מצא את הסרגל הצדדי עם רשימת הקבוצות וגלול אותו
+    for (let i = 0; i < 40; i++) {
       await page.evaluate(() => {
-        // נסה לגלול את הסרגל הצדדי
-        const sidebar = document.querySelector('[role="complementary"], [data-pagelet="LeftRail"], nav');
-        if (sidebar) sidebar.scrollTop += 500;
-        window.scrollTo(0, document.body.scrollHeight);
+        // מצא את הרכיב הגלילה שמכיל קישורים לקבוצות
+        const allLinks = Array.from(document.querySelectorAll('a[href*="/groups/"]'));
+        if (allLinks.length === 0) return;
+
+        // מצא את האב הגלילה של הקישורים
+        const findScrollable = (el) => {
+          while (el && el !== document.body) {
+            const style = window.getComputedStyle(el);
+            const overflow = style.overflow + style.overflowY;
+            if (overflow.includes("scroll") || overflow.includes("auto")) {
+              if (el.scrollHeight > el.clientHeight) return el;
+            }
+            el = el.parentElement;
+          }
+          return null;
+        };
+
+        // נסה כל קישור עד שנמצא רכיב גלילה
+        for (const link of allLinks) {
+          const scrollable = findScrollable(link.parentElement);
+          if (scrollable && scrollable !== document.documentElement) {
+            scrollable.scrollTop += 600;
+            return;
+          }
+        }
+
+        // גיבוי - גלול לפי pagelet
+        const pagelet = document.querySelector('[data-pagelet="LeftRail"], [data-pagelet="GroupsLeftColumn"]');
+        if (pagelet) {
+          const scrollable = findScrollable(pagelet);
+          if (scrollable) scrollable.scrollTop += 600;
+        }
       });
-      await sleep(800);
+      await sleep(700);
     }
 
     const groups = await page.evaluate((skipIds) => {
@@ -99,6 +136,9 @@ async function syncGroups(businessId = "carpentry") {
 
     await browser.close();
 
+    // פתח Edge מחדש
+    exec(`"${EDGE_PATH}"`);
+
     if (groups.length === 0) {
       return { ok: false, error: "לא נמצאו קבוצות" };
     }
@@ -114,6 +154,7 @@ async function syncGroups(businessId = "carpentry") {
 
   } catch (err) {
     await browser.close().catch(() => {});
+    exec(`"${EDGE_PATH}"`);
     return { ok: false, error: err.message };
   }
 }

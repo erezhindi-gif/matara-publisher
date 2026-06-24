@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -15,7 +15,7 @@ type Campaign = {
 };
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  draft: { label: "טיוטה", color: "text-gray-400" },
+  draft: { label: "טיוטה", color: "text-gray-700" },
   pending_approval: { label: "ממתין לאישור", color: "text-yellow-400" },
   approved: { label: "מאושר", color: "text-blue-400" },
   publishing: { label: "מפרסם...", color: "text-purple-400" },
@@ -37,11 +37,11 @@ export default function CampaignsPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-gray-950 text-white p-8" dir="rtl">
+    <main className="min-h-screen bg-white text-gray-900 p-8" dir="rtl">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <Link href="/" className="text-gray-400 hover:text-white">← ראשי</Link>
+            <Link href="/" className="text-gray-700 hover:text-gray-900">← ראשי</Link>
             <h1 className="text-2xl font-bold">קמפיינים</h1>
           </div>
           <Link href="/campaigns/new" className="bg-blue-600 hover:bg-blue-700 rounded-xl px-5 py-2.5 font-semibold transition-colors">
@@ -64,11 +64,11 @@ export default function CampaignsPage() {
         {!loading && campaigns.length > 0 && (
           <div className="space-y-4">
             {campaigns.map((c) => {
-              const statusInfo = STATUS_LABELS[c.status] || { label: c.status, color: "text-gray-400" };
+              const statusInfo = STATUS_LABELS[c.status] || { label: c.status, color: "text-gray-700" };
               const published = c.posts.filter((p) => p.status === "published").length;
               const total = c.posts.length;
               return (
-                <Link key={c.id} href={`/campaigns/${c.id}`} className="block bg-gray-900 border border-gray-800 rounded-2xl p-5 hover:border-gray-600 transition-all">
+                <Link key={c.id} href={`/campaigns/${c.id}`} className="block bg-gray-100 border border-gray-200 rounded-2xl p-5 hover:border-gray-600 transition-all">
                   <div className="flex items-start justify-between mb-2">
                     <div>
                       <h2 className="font-semibold text-lg">{c.title}</h2>
@@ -76,7 +76,7 @@ export default function CampaignsPage() {
                     </div>
                     <span className={`text-sm font-medium ${statusInfo.color}`}>{statusInfo.label}</span>
                   </div>
-                  <p className="text-sm text-gray-400 line-clamp-2 mb-3">{c.content}</p>
+                  <p className="text-sm text-gray-700 line-clamp-2 mb-3">{c.content}</p>
                   <div className="flex items-center justify-between text-xs text-gray-500">
                     <span>{total > 0 ? `${published}/${total} קבוצות פורסמו` : "טרם הוקצו קבוצות"}</span>
                     <span>

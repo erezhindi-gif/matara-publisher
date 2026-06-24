@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -51,25 +51,25 @@ export default function SyncPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#0a0a0f] text-white p-8" dir="rtl">
+    <main className="min-h-screen bg-gray-50 text-gray-900 p-8" dir="rtl">
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center gap-4 mb-8">
-          <Link href="/" className="text-gray-400 hover:text-white">← ראשי</Link>
+          <Link href="/" className="text-gray-700 hover:text-gray-900">← ראשי</Link>
           <h1 className="text-2xl font-bold">סנכרון קבוצות פייסבוק</h1>
         </div>
 
         {/* הוראות */}
         <div className="bg-blue-950/20 border border-blue-800/40 rounded-2xl p-5 mb-6">
           <h2 className="font-semibold text-blue-300 mb-3">לפני הסנכרון</h2>
-          <p className="text-sm text-gray-400 mb-2">ודא שהשרת המקומי פועל על המחשב שלך:</p>
-          <code className="block bg-black/40 text-green-400 px-4 py-3 rounded-xl text-sm mb-3">
+          <p className="text-sm text-gray-700 mb-2">ודא שהשרת המקומי פועל על המחשב שלך:</p>
+          <code className="block bg-white text-green-400 px-4 py-3 rounded-xl text-sm mb-3">
             node local-server.js
           </code>
           <p className="text-xs text-gray-500">הפעל פעם אחת ביום - השאר את החלון פתוח</p>
         </div>
 
         {/* בדיקת שרת */}
-        <div className="bg-white/3 border border-white/8 rounded-2xl p-5 mb-4">
+        <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-4">
           <div className="flex items-center justify-between">
             <div>
               <div className="font-medium mb-1">סטטוס השרת המקומי</div>
@@ -80,7 +80,7 @@ export default function SyncPage() {
             <button
               onClick={checkServer}
               disabled={status === "checking"}
-              className="bg-gray-800 hover:bg-gray-700 rounded-xl px-4 py-2 text-sm transition-colors disabled:opacity-50"
+              className="bg-gray-200 hover:bg-gray-300 rounded-xl px-4 py-2 text-sm transition-colors disabled:opacity-50"
             >
               {status === "checking" ? "בודק..." : "בדוק חיבור"}
             </button>
@@ -88,10 +88,10 @@ export default function SyncPage() {
         </div>
 
         {/* בחירת עסק */}
-        <div className="bg-white/3 border border-white/8 rounded-2xl p-5 mb-4">
-          <label className="block text-sm text-gray-400 mb-2">סנכרן קבוצות עבור:</label>
+        <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-4">
+          <label className="block text-sm text-gray-700 mb-2">סנכרן קבוצות עבור:</label>
           <select
-            className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white"
+            className="w-full bg-gray-200 border border-gray-300 rounded-xl p-3 text-gray-900"
             value={businessId}
             onChange={(e) => setBusinessId(e.target.value)}
           >
@@ -104,7 +104,7 @@ export default function SyncPage() {
         <button
           onClick={startSync}
           disabled={status === "syncing" || serverOnline === false}
-          className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:from-gray-700 disabled:to-gray-700 disabled:text-gray-500 rounded-2xl p-4 font-semibold text-lg transition-all shadow-lg shadow-blue-500/20"
+          className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:from-gray-700 disabled:to-gray-700 disabled:text-gray-400 rounded-2xl p-4 font-semibold text-lg transition-all shadow-lg shadow-blue-500/20"
         >
           {status === "syncing" ? (
             <span className="flex items-center justify-center gap-2">

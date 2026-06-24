@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -69,11 +69,11 @@ export default function ProfilesPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 text-white p-8" dir="rtl">
+    <main className="min-h-screen bg-white text-gray-900 p-8" dir="rtl">
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <Link href="/" className="text-gray-400 hover:text-white">← ראשי</Link>
+            <Link href="/" className="text-gray-700 hover:text-gray-900">← ראשי</Link>
             <h1 className="text-2xl font-bold">פרופילי פייסבוק</h1>
           </div>
           <button onClick={() => setShowNew(true)} className="bg-blue-600 hover:bg-blue-700 rounded-xl px-5 py-2.5 font-semibold transition-colors">
@@ -88,13 +88,13 @@ export default function ProfilesPage() {
         </div>
 
         {showNew && (
-          <div className="bg-gray-900 border border-blue-500 rounded-2xl p-5 mb-6">
+          <div className="bg-gray-100 border border-blue-500 rounded-2xl p-5 mb-6">
             <h2 className="font-semibold mb-4">פרופיל חדש</h2>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">שם (לזיהוי)</label>
+                <label className="block text-sm text-gray-700 mb-1">שם (לזיהוי)</label>
                 <input
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white"
+                  className="w-full bg-gray-200 border border-gray-300 rounded-xl p-3 text-gray-900"
                   placeholder="למשל: אריאל - גיוס"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -102,18 +102,18 @@ export default function ProfilesPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">שם משתמש פייסבוק</label>
+                <label className="block text-sm text-gray-700 mb-1">שם משתמש פייסבוק</label>
                 <input
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white"
+                  className="w-full bg-gray-200 border border-gray-300 rounded-xl p-3 text-gray-900"
                   placeholder="למשל: ariel.cohen"
                   value={form.fbUsername}
                   onChange={(e) => setForm({ ...form, fbUsername: e.target.value })}
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">עסק</label>
+                <label className="block text-sm text-gray-700 mb-1">עסק</label>
                 <select
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white"
+                  className="w-full bg-gray-200 border border-gray-300 rounded-xl p-3 text-gray-900"
                   value={form.businessId}
                   onChange={(e) => setForm({ ...form, businessId: e.target.value })}
                 >
@@ -123,9 +123,9 @@ export default function ProfilesPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">פרופיל Edge</label>
+                <label className="block text-sm text-gray-700 mb-1">פרופיל Edge</label>
                 <select
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white"
+                  className="w-full bg-gray-200 border border-gray-300 rounded-xl p-3 text-gray-900"
                   value={form.edgeProfile}
                   onChange={(e) => setForm({ ...form, edgeProfile: e.target.value })}
                 >
@@ -138,22 +138,22 @@ export default function ProfilesPage() {
                 </p>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">מגבלה יומית (קבוצות)</label>
+                <label className="block text-sm text-gray-700 mb-1">מגבלה יומית (קבוצות)</label>
                 <input
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white"
+                  className="w-full bg-gray-200 border border-gray-300 rounded-xl p-3 text-gray-900"
                   type="number"
                   value={form.dailyLimit}
                   onChange={(e) => setForm({ ...form, dailyLimit: parseInt(e.target.value) || 150 })}
                 />
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setShowNew(false)} className="flex-1 bg-gray-800 hover:bg-gray-700 rounded-xl p-3 transition-colors">
+                <button onClick={() => setShowNew(false)} className="flex-1 bg-gray-200 hover:bg-gray-300 rounded-xl p-3 transition-colors">
                   ביטול
                 </button>
                 <button
                   onClick={createProfile}
                   disabled={!form.name.trim() || !form.fbUsername.trim() || saving}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 rounded-xl p-3 font-semibold transition-colors"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 rounded-xl p-3 font-semibold transition-colors"
                 >
                   {saving ? "שומר..." : "הוסף פרופיל"}
                 </button>
@@ -175,23 +175,23 @@ export default function ProfilesPage() {
         {!loading && profiles.length > 0 && (
           <div className="space-y-3">
             {profiles.map((p) => (
-              <div key={p.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+              <div key={p.id} className="bg-gray-100 border border-gray-200 rounded-2xl p-5">
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <h2 className="font-semibold">{p.name}</h2>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${p.isActive ? "bg-green-900/50 text-green-400" : "bg-gray-800 text-gray-500"}`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${p.isActive ? "bg-green-900/50 text-green-400" : "bg-gray-200 text-gray-500"}`}>
                         {p.isActive ? "פעיל" : "מושבת"}
                       </span>
                     </div>
-                    <div className="text-sm text-gray-400">@{p.fbUsername}</div>
+                    <div className="text-sm text-gray-700">@{p.fbUsername}</div>
                     <div className="text-xs text-gray-500 mt-1">{p.business.name}</div>
                   </div>
-                  <button onClick={() => deleteProfile(p.id)} className="text-gray-600 hover:text-red-400 transition-colors text-lg">
+                  <button onClick={() => deleteProfile(p.id)} className="text-gray-700 hover:text-red-400 transition-colors text-lg">
                     ✕
                   </button>
                 </div>
-                <div className="mt-3 pt-3 border-t border-gray-800 flex gap-4 text-xs text-gray-500">
+                <div className="mt-3 pt-3 border-t border-gray-200 flex gap-4 text-xs text-gray-500">
                   <span>Edge: {p.edgeProfile}</span>
                   <span>מגבלה: {p.dailyLimit} קבוצות/יום</span>
                   <span>היום: {p.postsToday}</span>
