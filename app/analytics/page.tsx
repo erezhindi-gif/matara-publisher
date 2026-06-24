@@ -116,9 +116,10 @@ export default function AnalyticsPage() {
       </div>
 
       <div className="max-w-5xl mx-auto px-8 py-6">
-        {/* Profile filter */}
-        {!loading && (
+        {/* Profile filter - only show when multiple profiles exist for this business */}
+        {!loading && visibleProfiles.length > 1 && (
           <div className="flex flex-wrap gap-2 mb-6">
+            <div className="text-xs text-gray-500 w-full mb-1">פילטר לפי פרופיל:</div>
             <button onClick={() => setFilterProfileId("all")} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${filterProfileId === "all" ? "bg-blue-600 text-white" : "bg-white border border-gray-300 hover:border-gray-400"}`}>
               כל הפרופילים
             </button>
@@ -128,9 +129,6 @@ export default function AnalyticsPage() {
                 {p.name}
               </button>
             ))}
-            {visibleProfiles.length === 0 && (
-              <span className="text-sm text-gray-400">אין פרופילים - <a href="/profiles" className="text-blue-500 underline">הוסף פרופיל</a></span>
-            )}
           </div>
         )}
 
