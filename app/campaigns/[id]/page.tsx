@@ -62,6 +62,7 @@ export default function CampaignDetailPage() {
   const [editWeeks, setEditWeeks] = useState(4);
   const [editImages, setEditImages] = useState<File[]>([]);
   const [editImagePreviews, setEditImagePreviews] = useState<string[]>([]);
+  const [editTemplateIds, setEditTemplateIds] = useState<string[]>([]);
 
   function handleEditImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
@@ -106,6 +107,7 @@ export default function CampaignDetailPage() {
     setEditDays([]);
     setEditTime("10:00");
     setEditWeeks(4);
+    try { setEditTemplateIds(JSON.parse((campaign as Campaign & { templateIds?: string }).templateIds || "[]")); } catch { setEditTemplateIds([]); }
     setMode("edit");
   }
 
@@ -122,6 +124,7 @@ export default function CampaignDetailPage() {
     const body: Record<string, unknown> = {
       content: editContent,
       imageUrls: newImageUrls,
+      templateIds: editTemplateIds,
     };
     if (editScheduledAt) {
       body.scheduledAt = new Date(editScheduledAt).toISOString();
@@ -413,6 +416,25 @@ export default function CampaignDetailPage() {
                   ))}
                 </div>
               )}
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-2xl p-5">
+              <label className="block text-sm text-gray-500 mb-3">תבניות קבוצות</label>
+              <div className="space-y-2">
+                {businessTemplates.length === 0 && <div className="text-sm text-gray-400">אין תבניות לעסק זה</div>}
+                {businessTemplates.map((t) => (
+                  <label key={t.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100">
+                    <input
+                      type="checkbox"
+                      checked={editTemplateIds.includes(t.id)}
+                      onChange={(e) => setEditTemplateIds(prev => e.target.checked ? [...prev, t.id] : prev.filter(x => x !== t.id))}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm font-medium flex-1">{t.name}</span>
+                    <span className="text-xs text-gray-400">{t.groups.length} קבוצות</span>
+                  </label>
+                ))}
+              </div>
             </div>
 
             <div className="flex gap-3">

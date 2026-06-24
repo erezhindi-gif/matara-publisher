@@ -16,6 +16,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = await req.json();
   const data: Record<string, unknown> = { ...body };
   if (body.scheduledAt) data.scheduledAt = new Date(body.scheduledAt);
+  if (Array.isArray(body.templateIds)) data.templateIds = JSON.stringify(body.templateIds);
   const campaign = await prisma.campaign.update({ where: { id }, data });
   return NextResponse.json(campaign);
 }
