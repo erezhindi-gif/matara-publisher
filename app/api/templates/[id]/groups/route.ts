@@ -5,9 +5,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params;
   const body = await req.json();
 
-  const group = await prisma.group.create({
-    data: {
-      fbGroupId: body.fbGroupId || `manual_${Date.now()}`,
+  const fbGroupId = body.fbGroupId || `manual_${Date.now()}`;
+  const group = await prisma.group.upsert({
+    where: { fbGroupId },
+    update: { name: body.name, memberCount: body.memberCount || null, templateId: id },
+    create: {
+      fbGroupId,
       name: body.name,
       memberCount: body.memberCount || null,
       templateId: id,
