@@ -64,6 +64,179 @@ function FacebookPreview({ content, whatsappLink, imagePreviews }: { content: st
   );
 }
 
+const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7:00-20:00
+
+function ScheduleStep({
+  form, imagePreviews, scheduleDays, setScheduleDays, scheduleTime, setScheduleTime,
+  scheduleStartDate, setScheduleStartDate, existingCampaigns, loading, onBack, onSave,
+}: {
+  form: { content: string; whatsappLink: string };
+  imagePreviews: string[];
+  scheduleDays: number[];
+  setScheduleDays: (fn: (prev: number[]) => number[]) => void;
+  scheduleTime: string;
+  setScheduleTime: (t: string) => void;
+  scheduleStartDate: string;
+  setScheduleStartDate: (d: string) => void;
+  existingCampaigns: { scheduledAt: string; title: string }[];
+  loading: boolean;
+  onBack: () => void;
+  onSave: () => void;
+}) {
+  const selectedHour = parseInt(scheduleTime.split(":")[0]);
+
+  // Get busy hours for the selected date (or today if no date)
+  const refDate = scheduleStartDate ? new Date(scheduleStartDate) : new Date();
+  const busyHours = existingCampaigns
+    .filter((c) => {
+      const d = new Date(c.scheduledAt);
+      return d.toDateString() === refDate.toDateString();
+    })
+    .map((c) => ({ hour: new Date(c.scheduledAt).getHours(), title: c.title }));
+
+  const isBusy = (h: number) => busyHours.some((b) => Math.abs(b.hour - h) < 2);
+  const conflict = isBusy(selectedHour);
+
+  function suggestFreeHour() {
+    for (const h of [9, 10, 11, 12, 13, 14, 15, 16, 17, 18]) {
+      if (!isBusy(h)) {
+        setScheduleTime(`${String(h).padStart(2, "0")}:00`);
+        return;
+      }
+    }
+  }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="space-y-5">
+        {/* Days selector */}
+        <div>
+          <label className="block text-sm text-gray-700 mb-2">ימי פרסום (בחר כמה שרוצה)</label>
+          <div className="flex flex-wrap gap-2">
+            {DAY_NAMES.map((day, i) => (
+              <button
+                key={i}
+                onClick={() => setScheduleDays((prev) => prev.includes(i) ? prev.filter((d) => d !== i) : [...prev, i])}
+                className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${scheduleDays.includes(i) ? "bg-blue-600 text-white" : "bg-white border border-gray-300 text-gray-700 hover:border-blue-400"}`}
+              >
+                {day}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Start date */}
+        {scheduleDays.length > 0 && (
+          <div>
+            <label className="block text-sm text-gray-700 mb-1">החל מתאריך</label>
+            <input
+              type="date"
+              className="w-full bg-white border border-gray-300 rounded-xl p-3 text-gray-900"
+              value={scheduleStartDate}
+              onChange={(e) => setScheduleStartDate(e.target.value)}
+              min={new Date().toISOString().split("T")[0]}
+            />
+          </div>
+        )}
+
+        {/* Smart time picker */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-sm font-medium text-gray-700">שעה חכמה</label>
+            <button onClick={suggestFreeHour} className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 rounded-lg px-3 py-1 transition-colors">
+              ⚡ הצע שעה פנויה
+            </button>
+          </div>
+
+          {/* Hour timeline */}
+          <div className="flex gap-0.5 mb-3 overflow-x-auto pb-1">
+            {HOURS.map((h) => {
+              const busy = isBusy(h);
+              const selected = h === selectedHour;
+              return (
+                <button
+                  key={h}
+                  onClick={() => setScheduleTime(`${String(h).padStart(2, "0")}:00`)}
+                  title={busy ? busyHours.find((b) => Math.abs(b.hour - h) < 2)?.title : "פנוי"}
+                  className={`flex-1 min-w-[36px] text-xs py-2 rounded transition-all font-medium ${
+                    selected
+                      ? busy ? "bg-red-500 text-white" : "bg-blue-600 text-white"
+                      : busy ? "bg-red-100 text-red-600 hover:bg-red-200" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {h}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center gap-3 mb-4 text-xs text-gray-500">
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-600 inline-block" /> נבחר</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100 border border-red-300 inline-block" /> תפוס</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-gray-100 inline-block" /> פנוי</span>
+          </div>
+
+          {/* Conflict warning */}
+          {conflict && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700 mb-3">
+              ⚠️ יש קמפיין אחר קרוב לשעה {scheduleTime}. פייסבוק עלול לחסום. לחץ &quot;הצע שעה פנויה&quot; לבחירה בטוחה.
+            </div>
+          )}
+
+          {/* Time input */}
+          <input
+            type="time"
+            className={`w-full border rounded-xl p-3 text-gray-900 ${conflict ? "border-red-400 bg-red-50" : "border-gray-300 bg-white"}`}
+            value={scheduleTime}
+            onChange={(e) => setScheduleTime(e.target.value)}
+          />
+        </div>
+
+        {scheduleDays.length === 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-700">
+            לא נבחרו ימים - הקמפיין יישלח לאישור ויפורסם מיד לאחר אישור
+          </div>
+        )}
+        {scheduleDays.length > 0 && (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-700">
+            יווצרו {scheduleDays.length} קמפיינים - אחד לכל יום שנבחר
+          </div>
+        )}
+
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-sm text-yellow-700">
+          הקמפיין ייצא לאישור לפני פרסום. תקבל הודעה במייל ובוואטסאפ.
+        </div>
+
+        <div className="flex gap-3">
+          <button onClick={onBack} className="flex-1 bg-gray-200 hover:bg-gray-300 rounded-xl p-3 transition-colors">חזרה</button>
+          <button
+            onClick={onSave}
+            disabled={loading || (scheduleDays.length > 0 && !scheduleStartDate)}
+            className={`flex-1 ${conflict ? "bg-orange-500 hover:bg-orange-600" : "bg-green-600 hover:bg-green-700"} disabled:bg-gray-300 text-white rounded-xl p-3 font-semibold transition-colors`}
+          >
+            {loading ? "שומר..." : conflict ? "⚠️ שמור בכל זאת" : "✓ שמור קמפיין"}
+          </button>
+        </div>
+      </div>
+
+      <div className="lg:sticky lg:top-8 lg:self-start">
+        <div className="text-sm text-gray-500 mb-3 font-medium">תצוגה מקדימה</div>
+        <FacebookPreview content={form.content} whatsappLink={form.whatsappLink} imagePreviews={imagePreviews} />
+        {busyHours.length > 0 && (
+          <div className="mt-4 bg-white border border-gray-200 rounded-2xl p-4">
+            <div className="text-xs font-medium text-gray-500 mb-2">קמפיינים מתוזמנים ביום זה:</div>
+            {busyHours.map((b, i) => (
+              <div key={i} className="text-xs text-gray-700 py-1 border-b border-gray-100 last:border-0">
+                🕐 {String(b.hour).padStart(2, "0")}:00 · {b.title}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function NewCampaignPage() {
   const router = useRouter();
   const [step, setStep] = useState<"form" | "templates" | "schedule">("form");
@@ -76,6 +249,9 @@ export default function NewCampaignPage() {
   useEffect(() => {
     fetch("/api/settings").then((r) => r.json()).then(setContactLinks);
     fetch("/api/templates").then((r) => r.json()).then(setTemplates);
+    fetch("/api/campaigns").then((r) => r.json()).then((data) => {
+      if (Array.isArray(data)) setExistingCampaigns(data.filter((c) => c.scheduledAt));
+    });
   }, []);
 
   const [form, setForm] = useState({
@@ -111,6 +287,7 @@ export default function NewCampaignPage() {
   const [scheduleDays, setScheduleDays] = useState<number[]>([]);
   const [scheduleTime, setScheduleTime] = useState("10:00");
   const [scheduleStartDate, setScheduleStartDate] = useState("");
+  const [existingCampaigns, setExistingCampaigns] = useState<{ scheduledAt: string; title: string }[]>([]);
 
   const selectedBusiness = BUSINESSES.find((b) => b.id === form.businessId)!;
 
@@ -407,89 +584,20 @@ export default function NewCampaignPage() {
 
         {/* Step 3: Schedule */}
         {step === "schedule" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="space-y-5">
-              {/* Post preview summary */}
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <div className="text-xs text-gray-500 mb-2">הפוסט</div>
-                <pre className="whitespace-pre-wrap text-sm font-sans text-gray-900 max-h-40 overflow-y-auto">{form.content}</pre>
-              </div>
-
-              {/* Days selector */}
-              <div>
-                <label className="block text-sm text-gray-700 mb-2">ימי פרסום (בחר כמה שרוצה)</label>
-                <div className="flex flex-wrap gap-2">
-                  {DAY_NAMES.map((day, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setScheduleDays((prev) => prev.includes(i) ? prev.filter((d) => d !== i) : [...prev, i])}
-                      className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${scheduleDays.includes(i) ? "bg-blue-600 text-white" : "bg-white border border-gray-300 text-gray-700 hover:border-blue-400"}`}
-                    >
-                      {day}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Time */}
-              <div>
-                <label className="block text-sm text-gray-700 mb-1">שעת פרסום</label>
-                <input
-                  type="time"
-                  className="w-full bg-white border border-gray-300 rounded-xl p-3 text-gray-900"
-                  value={scheduleTime}
-                  onChange={(e) => setScheduleTime(e.target.value)}
-                />
-              </div>
-
-              {/* Start date */}
-              {scheduleDays.length > 0 && (
-                <div>
-                  <label className="block text-sm text-gray-700 mb-1">החל מתאריך</label>
-                  <input
-                    type="date"
-                    className="w-full bg-white border border-gray-300 rounded-xl p-3 text-gray-900"
-                    value={scheduleStartDate}
-                    onChange={(e) => setScheduleStartDate(e.target.value)}
-                    min={new Date().toISOString().split("T")[0]}
-                  />
-                </div>
-              )}
-
-              {scheduleDays.length === 0 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-700">
-                  לא נבחרו ימים - הקמפיין יישלח לאישור ויפורסם מיד לאחר אישור
-                </div>
-              )}
-
-              {scheduleDays.length > 0 && (
-                <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-700">
-                  יווצרו {scheduleDays.length} קמפיינים - אחד לכל יום שנבחר
-                </div>
-              )}
-
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-sm text-yellow-700">
-                הקמפיין ייצא לאישור לפני פרסום. תקבל הודעה במייל ובוואטסאפ.
-              </div>
-
-              <div className="flex gap-3">
-                <button onClick={() => setStep("templates")} className="flex-1 bg-gray-200 hover:bg-gray-300 rounded-xl p-3 transition-colors">חזרה</button>
-                <button
-                  onClick={saveCampaign}
-                  disabled={loading || (scheduleDays.length > 0 && !scheduleStartDate)}
-                  className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-xl p-3 font-semibold transition-colors"
-                >
-                  {loading ? "שומר..." : "✓ שמור קמפיין"}
-                </button>
-              </div>
-            </div>
-
-            {/* Preview */}
-            <div className="lg:sticky lg:top-8 lg:self-start">
-              <div className="text-sm text-gray-500 mb-3 font-medium">תצוגה מקדימה</div>
-              <FacebookPreview content={form.content} whatsappLink={form.whatsappLink} imagePreviews={imagePreviews} />
-            </div>
-          </div>
+          <ScheduleStep
+            form={form}
+            imagePreviews={imagePreviews}
+            scheduleDays={scheduleDays}
+            setScheduleDays={setScheduleDays}
+            scheduleTime={scheduleTime}
+            setScheduleTime={setScheduleTime}
+            scheduleStartDate={scheduleStartDate}
+            setScheduleStartDate={setScheduleStartDate}
+            existingCampaigns={existingCampaigns}
+            loading={loading}
+            onBack={() => setStep("templates")}
+            onSave={saveCampaign}
+          />
         )}
       </div>
     </main>
