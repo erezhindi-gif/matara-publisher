@@ -36,14 +36,14 @@ export default function ProfilesPage() {
   const [form, setForm] = useState({ name: "", fbUsername: "", edgeProfile: "Default", businessId: "recruitment", dailyLimit: 150, whatsappPhone: "" });
   const [businessFilter, setBusinessFilterState] = useState("all");
   const [waStatus, setWaStatus] = useState<Record<string, { status: string; qrDataUrl: string | null }>>({});
-  const [waQrProfile, setWaQrProfile] = useState<string | null>(null);
+  const [serverOnline, setServerOnline] = useState<boolean | null>(null);
 
   useEffect(() => {
     const fetchWaStatus = () => {
       fetch("http://localhost:3333/whatsapp-status")
         .then((r) => r.json())
-        .then(setWaStatus)
-        .catch(() => {});
+        .then((data) => { setWaStatus(data); setServerOnline(true); })
+        .catch(() => setServerOnline(false));
     };
     fetchWaStatus();
     const interval = setInterval(fetchWaStatus, 3000);
@@ -51,7 +51,10 @@ export default function ProfilesPage() {
   }, []);
 
   async function connectWhatsApp(profileId: string) {
-    setWaQrProfile(profileId);
+    if (!serverOnline) {
+      alert("השרת המקומי לא פועל! פתח חלון שחור והרץ: node local-server.js");
+      return;
+    }
     await fetch("http://localhost:3333/whatsapp-connect", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -138,6 +141,18 @@ export default function ProfilesPage() {
             <div className="text-xs text-gray-500 mt-1">פרסומים היום</div>
           </div>
         </div>
+
+        {/* Server status */}
+        {serverOnline === false && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4 text-sm text-red-700">
+            ⚠️ השרת המקומי לא פועל - חיבור וואטסאפ לא זמין. פתח טרמינל והרץ: <code className="bg-red-100 px-1 rounded">node local-server.js</code>
+          </div>
+        )}
+        {serverOnline === true && (
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-3 mb-4 text-sm text-green-700">
+            ✅ השרת המקומי פעיל - וואטסאפ זמין
+          </div>
+        )}
 
         {/* Info */}
         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6 text-sm text-blue-700">
