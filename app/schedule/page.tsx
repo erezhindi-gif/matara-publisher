@@ -8,7 +8,13 @@ type Campaign = {
   title: string;
   status: string;
   scheduledAt: string | null;
+  templateIds: string;
   business: { name: string; type: string };
+};
+
+type Template = {
+  id: string;
+  groups: { id: string }[];
 };
 
 const DAY_NAMES = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
@@ -40,12 +46,30 @@ function fmt(d: Date) {
   return `${d.getDate()}/${d.getMonth() + 1}`;
 }
 
-function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+function fmtTime(d: Date) {
+  return d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+}
+
+function fmtTimeStr(iso: string) {
+  return fmtTime(new Date(iso));
+}
+
+function getEndTime(campaign: Campaign, templates: Template[]): Date | null {
+  if (!campaign.scheduledAt) return null;
+  try {
+    const ids: string[] = JSON.parse(campaign.templateIds || "[]");
+    const groups = ids.reduce((sum, tid) => {
+      const t = templates.find((t) => t.id === tid);
+      return sum + (t?.groups.length || 0);
+    }, 0);
+    const durationMs = Math.max(groups, 1) * 60 * 1000;
+    return new Date(new Date(campaign.scheduledAt).getTime() + durationMs);
+  } catch { return null; }
 }
 
 export default function SchedulePage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"week" | "list">("week");
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
@@ -53,7 +77,10 @@ export default function SchedulePage() {
   const [editDate, setEditDate] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { fetchCampaigns(); }, []);
+  useEffect(() => {
+    fetchCampaigns();
+    fetch("/api/templates").then((r) => r.json()).then((data) => setTemplates(Array.isArray(data) ? data : []));
+  }, []);
 
   function fetchCampaigns() {
     fetch("/api/campaigns")
@@ -178,9 +205,12 @@ export default function SchedulePage() {
                         const s = STATUS[c.status] || STATUS.draft;
                         return (
                           <Link key={c.id} href={`/campaigns/${c.id}`} className={`block rounded-lg p-2 ${s.bg} border border-opacity-50 hover:opacity-80 transition-opacity`} style={{ borderColor: "currentColor" }}>
-                            <div className="flex items-center gap-1.5 mb-0.5">
+                            <div className="flex items-center gap-1 mb-0.5">
                               <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.dot}`} />
-                              <span className="text-xs font-semibold text-gray-700">{fmtTime(c.scheduledAt!)}</span>
+                              <span className="text-xs font-semibold text-blue-700">
+                                {fmtTime(new Date(c.scheduledAt!))}
+                                {(() => { const e = getEndTime(c, templates); return e ? `–${fmtTime(e)}` : ""; })()}
+                              </span>
                             </div>
                             <div className="text-xs text-gray-800 line-clamp-2 leading-tight">{c.title}</div>
                             <div className={`text-xs mt-0.5 ${s.text}`}>{s.label}</div>
@@ -239,7 +269,7 @@ export default function SchedulePage() {
                             </div>
                             {/* Time */}
                             <div className="text-lg font-bold text-gray-700 flex-shrink-0 w-14">
-                              {fmtTime(c.scheduledAt!)}
+                              {fmtTimeStr(c.scheduledAt!)}{(() => { const e = getEndTime(c, templates); return e ? `–${fmtTime(e)}` : ""; })()}
                             </div>
                             {/* Status dot */}
                             <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${s.dot}`} />
