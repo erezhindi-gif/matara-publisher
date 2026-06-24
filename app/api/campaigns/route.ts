@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       id: campaign.id,
       title: campaign.title,
       content: campaign.content,
-      business,
+      business: { id: business.id, name: business.name, type: business.type },
       scheduledAt: campaign.scheduledAt,
     });
   } catch (e) {

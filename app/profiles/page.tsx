@@ -12,6 +12,7 @@ type Profile = {
   dailyLimit: number;
   postsToday: number;
   isActive: boolean;
+  whatsappPhone: string | null;
   business: { name: string; type: string };
 };
 
@@ -32,7 +33,7 @@ export default function ProfilesPage() {
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: "", fbUsername: "", edgeProfile: "Default", businessId: "recruitment", dailyLimit: 150 });
+  const [form, setForm] = useState({ name: "", fbUsername: "", edgeProfile: "Default", businessId: "recruitment", dailyLimit: 150, whatsappPhone: "" });
   const [businessFilter, setBusinessFilterState] = useState("all");
   const [waStatus, setWaStatus] = useState<Record<string, { status: string; qrDataUrl: string | null }>>({});
   const [waQrProfile, setWaQrProfile] = useState<string | null>(null);
@@ -82,7 +83,7 @@ export default function ProfilesPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
-    setForm({ name: "", fbUsername: "", edgeProfile: "Default", businessId: "recruitment", dailyLimit: 150 });
+    setForm({ name: "", fbUsername: "", edgeProfile: "Default", businessId: "recruitment", dailyLimit: 150, whatsappPhone: "" });
     setShowNew(false);
     setSaving(false);
     fetchProfiles();
@@ -175,6 +176,17 @@ export default function ProfilesPage() {
                 <input className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900" type="number" max={300} value={form.dailyLimit} onChange={(e) => setForm({ ...form, dailyLimit: parseInt(e.target.value) || 150 })} />
                 <p className="text-xs text-gray-400 mt-1">מקסימום 300 ביום לפי מגבלת פייסבוק</p>
               </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">מספר וואטסאפ לאישורים</label>
+                <input
+                  className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900"
+                  placeholder="050-0000000"
+                  value={form.whatsappPhone}
+                  onChange={(e) => setForm({ ...form, whatsappPhone: e.target.value })}
+                  dir="ltr"
+                />
+                <p className="text-xs text-gray-400 mt-1">ההודעה תישלח למספר זה כשקמפיין מחכה לאישור</p>
+              </div>
               <div className="flex gap-3 pt-1">
                 <button onClick={() => setShowNew(false)} className="flex-1 bg-gray-100 hover:bg-gray-200 rounded-xl p-3 text-sm transition-colors">ביטול</button>
                 <button onClick={createProfile} disabled={!form.name.trim() || !form.fbUsername.trim() || saving} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-xl p-3 text-sm font-semibold transition-colors">
@@ -208,6 +220,7 @@ export default function ProfilesPage() {
                   </div>
                   <div className="text-sm text-gray-600">@{p.fbUsername}</div>
                   <div className="text-xs text-gray-400 mt-0.5">{p.business.name}</div>
+                  {p.whatsappPhone && <div className="text-xs text-green-600 mt-0.5">📱 {p.whatsappPhone}</div>}
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => toggleActive(p)} className={`text-xs rounded-lg px-3 py-1.5 transition-colors ${p.isActive ? "bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-600" : "bg-green-50 hover:bg-green-100 text-green-600"}`}>

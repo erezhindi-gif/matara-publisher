@@ -24,11 +24,12 @@ model Profile {
   edgeProfile  String            @default("Default")
   business     Business          @relation(fields: [businessId], references: [id])
   businessId   String
-  isActive     Boolean           @default(true)
-  dailyLimit   Int               @default(150)
-  postsToday   Int               @default(0)
-  lastReset    DateTime          @default(now())
-  campaigns    CampaignProfile[]
+  isActive      Boolean           @default(true)
+  dailyLimit    Int               @default(150)
+  postsToday    Int               @default(0)
+  lastReset     DateTime          @default(now())
+  whatsappPhone String?
+  campaigns     CampaignProfile[]
 }
 
 model GroupTemplate {
