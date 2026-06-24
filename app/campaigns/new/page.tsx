@@ -68,7 +68,7 @@ const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7:00-20:00
 
 function ScheduleStep({
   form, imagePreviews, scheduleDays, setScheduleDays, scheduleTime, setScheduleTime,
-  scheduleStartDate, setScheduleStartDate, existingCampaigns, loading, onBack, onSave,
+  scheduleStartDate, setScheduleStartDate, existingCampaigns, templates, selectedTemplates, loading, onBack, onSave,
 }: {
   form: { content: string; whatsappLink: string };
   imagePreviews: string[];
@@ -78,32 +78,74 @@ function ScheduleStep({
   setScheduleTime: (t: string) => void;
   scheduleStartDate: string;
   setScheduleStartDate: (d: string) => void;
-  existingCampaigns: { scheduledAt: string; title: string }[];
+  existingCampaigns: { scheduledAt: string; title: string; templateIds: string }[];
+  templates: Template[];
+  selectedTemplates: string[];
   loading: boolean;
   onBack: () => void;
   onSave: () => void;
 }) {
-  const selectedHour = parseInt(scheduleTime.split(":")[0]);
+  // How many groups in selected templates (for THIS campaign)
+  const myGroupCount = selectedTemplates.reduce((sum, tid) => {
+    const t = templates.find((t) => t.id === tid);
+    return sum + (t?.groups.length || 0);
+  }, 0);
+  // Duration in minutes: avg 60s per group
+  const myDurationMin = Math.max(myGroupCount, 1);
 
-  // Get busy hours for the selected date (or today if no date)
+  // Helper: get group count from templateIds string
+  function groupsFromTemplateIds(templateIdsStr: string): number {
+    try {
+      const ids: string[] = JSON.parse(templateIdsStr || "[]");
+      return ids.reduce((sum, tid) => {
+        const t = templates.find((t) => t.id === tid);
+        return sum + (t?.groups.length || 0);
+      }, 0);
+    } catch { return 0; }
+  }
+
+  const [selH, selM] = scheduleTime.split(":").map(Number);
+  const selectedHour = selH;
+  const selectedMinutes = selH * 60 + selM; // minutes since midnight
+  const myEndMinutes = selectedMinutes + myDurationMin;
+
+  // Get busy ranges for the selected date
   const refDate = scheduleStartDate ? new Date(scheduleStartDate) : new Date();
-  const busyHours = existingCampaigns
-    .filter((c) => {
-      const d = new Date(c.scheduledAt);
-      return d.toDateString() === refDate.toDateString();
-    })
-    .map((c) => ({ hour: new Date(c.scheduledAt).getHours(), title: c.title }));
+  const busyRanges = existingCampaigns
+    .filter((c) => new Date(c.scheduledAt).toDateString() === refDate.toDateString())
+    .map((c) => {
+      const start = new Date(c.scheduledAt);
+      const startMin = start.getHours() * 60 + start.getMinutes();
+      const groups = groupsFromTemplateIds(c.templateIds);
+      const durationMin = Math.max(groups, 5);
+      return { startMin, endMin: startMin + durationMin, title: c.title };
+    });
 
-  const isBusy = (h: number) => busyHours.some((b) => Math.abs(b.hour - h) < 2);
-  const conflict = isBusy(selectedHour);
+  // Check if a given hour slot overlaps any busy range
+  function isBusy(h: number): boolean {
+    const hStart = h * 60;
+    const hEnd = hStart + 60;
+    return busyRanges.some((r) => r.startMin < hEnd && r.endMin > hStart);
+  }
+
+  // Check if OUR selected time conflicts
+  const conflict = busyRanges.some((r) => selectedMinutes < r.endMin && myEndMinutes > r.startMin);
 
   function suggestFreeHour() {
-    for (const h of [9, 10, 11, 12, 13, 14, 15, 16, 17, 18]) {
-      if (!isBusy(h)) {
+    for (const h of [8,9,10,11,12,13,14,15,16,17,18,19]) {
+      const hStartMin = h * 60;
+      const hEndMin = hStartMin + myDurationMin;
+      const free = !busyRanges.some((r) => hStartMin < r.endMin && hEndMin > r.startMin);
+      if (free) {
         setScheduleTime(`${String(h).padStart(2, "0")}:00`);
         return;
       }
     }
+  }
+
+  function fmtRange(startMin: number, endMin: number) {
+    const fmt = (m: number) => `${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;
+    return `${fmt(startMin)}–${fmt(endMin)}`;
   }
 
   return (
@@ -157,7 +199,7 @@ function ScheduleStep({
                 <button
                   key={h}
                   onClick={() => setScheduleTime(`${String(h).padStart(2, "0")}:00`)}
-                  title={busy ? busyHours.find((b) => Math.abs(b.hour - h) < 2)?.title : "פנוי"}
+                  title={busy ? (busyRanges.find((r) => r.startMin < (h+1)*60 && r.endMin > h*60)?.title ?? "תפוס") : "פנוי"}
                   className={`flex-1 min-w-[36px] text-xs py-2 rounded transition-all font-medium ${
                     selected
                       ? busy ? "bg-red-500 text-white" : "bg-blue-600 text-white"
@@ -176,10 +218,18 @@ function ScheduleStep({
             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-gray-100 inline-block" /> פנוי</span>
           </div>
 
+          {/* My campaign duration estimate */}
+          {myGroupCount > 0 && (
+            <div className="text-xs text-gray-500 mb-2">
+              הקמפיין שלך: {myGroupCount} קבוצות · משך משוער ~{myDurationMin} דקות
+              <span className="text-blue-600 font-medium"> ({scheduleTime}–{(() => { const e = myEndMinutes; return `${String(Math.floor(e/60)).padStart(2,"0")}:${String(e%60).padStart(2,"0")}`; })()})</span>
+            </div>
+          )}
+
           {/* Conflict warning */}
           {conflict && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700 mb-3">
-              ⚠️ יש קמפיין אחר קרוב לשעה {scheduleTime}. פייסבוק עלול לחסום. לחץ &quot;הצע שעה פנויה&quot; לבחירה בטוחה.
+              ⚠️ התנגשות! קמפיין קיים פועל בטווח הזמן הזה. פייסבוק עלול לחסום. לחץ &quot;הצע שעה פנויה&quot;.
             </div>
           )}
 
@@ -222,12 +272,14 @@ function ScheduleStep({
       <div className="lg:sticky lg:top-8 lg:self-start">
         <div className="text-sm text-gray-500 mb-3 font-medium">תצוגה מקדימה</div>
         <FacebookPreview content={form.content} whatsappLink={form.whatsappLink} imagePreviews={imagePreviews} />
-        {busyHours.length > 0 && (
+        {busyRanges.length > 0 && (
           <div className="mt-4 bg-white border border-gray-200 rounded-2xl p-4">
             <div className="text-xs font-medium text-gray-500 mb-2">קמפיינים מתוזמנים ביום זה:</div>
-            {busyHours.map((b, i) => (
-              <div key={i} className="text-xs text-gray-700 py-1 border-b border-gray-100 last:border-0">
-                🕐 {String(b.hour).padStart(2, "0")}:00 · {b.title}
+            {busyRanges.map((b, i) => (
+              <div key={i} className={`text-xs py-1.5 border-b border-gray-100 last:border-0 flex items-center gap-2 ${conflict && selectedMinutes < b.endMin && myEndMinutes > b.startMin ? "text-red-600" : "text-gray-700"}`}>
+                <span className="font-medium">{fmtRange(b.startMin, b.endMin)}</span>
+                <span className="text-gray-400">·</span>
+                <span className="truncate">{b.title}</span>
               </div>
             ))}
           </div>
@@ -287,7 +339,7 @@ export default function NewCampaignPage() {
   const [scheduleDays, setScheduleDays] = useState<number[]>([]);
   const [scheduleTime, setScheduleTime] = useState("10:00");
   const [scheduleStartDate, setScheduleStartDate] = useState("");
-  const [existingCampaigns, setExistingCampaigns] = useState<{ scheduledAt: string; title: string }[]>([]);
+  const [existingCampaigns, setExistingCampaigns] = useState<{ scheduledAt: string; title: string; templateIds: string }[]>([]);
 
   const selectedBusiness = BUSINESSES.find((b) => b.id === form.businessId)!;
 
@@ -594,6 +646,8 @@ export default function NewCampaignPage() {
             scheduleStartDate={scheduleStartDate}
             setScheduleStartDate={setScheduleStartDate}
             existingCampaigns={existingCampaigns}
+            templates={templates}
+            selectedTemplates={selectedTemplates}
             loading={loading}
             onBack={() => setStep("templates")}
             onSave={saveCampaign}
