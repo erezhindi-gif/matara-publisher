@@ -6,6 +6,11 @@ const EMAILS_BY_BUSINESS: Record<string, string[]> = {
   recruitment: ["noa@matarahr.co.il", "erezhindi@gmail.com"],
   carpentry: ["erezhindi@gmail.com"],
 };
+
+const WHATSAPP_BY_BUSINESS: Record<string, string[]> = {
+  recruitment: ["972507100129", "972502808180"],
+  carpentry: ["972502808180"],
+};
 const BASE_URL = "https://matara-publisher.vercel.app";
 
 export async function sendApprovalEmail(campaign: {
@@ -38,6 +43,15 @@ export async function sendApprovalEmail(campaign: {
            style="display: inline-block; background: #16a34a; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px; margin-top: 8px;">
           לצפייה ואישור הקמפיין
         </a>
+
+        <div style="margin-top: 16px;">
+          ${(WHATSAPP_BY_BUSINESS[campaign.business.type] || []).map(phone =>
+            `<a href="https://wa.me/${phone}?text=${encodeURIComponent(`קמפיין חדש לאישור: ${campaign.title}\n${approveUrl}`)}"
+               style="display: inline-block; background: #25D366; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px; margin-left: 8px;">
+              אשר בוואטסאפ
+            </a>`
+          ).join("")}
+        </div>
       </div>
     </div>
   `;
