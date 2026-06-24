@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Business {
+  id         String          @id @default(cuid())
+  name       String
+  type       String
+  createdAt  DateTime        @default(now())
+  profiles   Profile[]
+  campaigns  Campaign[]
+  templates  GroupTemplate[]
+}
+
+model Profile {
+  id          String            @id @default(cuid())
+  name        String
+  fbUsername  String
+  business    Business          @relation(fields: [businessId], references: [id])
+  businessId  String
+  isActive    Boolean           @default(true)
+  dailyLimit  Int               @default(150)
+  postsToday  Int               @default(0)
+  lastReset   DateTime          @default(now())
+  campaigns   CampaignProfile[]
+}
+
+model GroupTemplate {
+  id         String    @id @default(cuid())
+  name       String
+  business   Business  @relation(fields: [businessId], references: [id])
+  businessId String
+  groups     Group[]
+}
+
+model Group {
+  id          String        @id @default(cuid())
+  fbGroupId   String        @unique
+  name        String
+  memberCount Int?
+  template    GroupTemplate @relation(fields: [templateId], references: [id])
+  templateId  String
+}
+
+model Campaign {
+  id           String            @id @default(cuid())
+  title        String
+  content      String
+  whatsappLink String?
+  emailLink    String?
+  imageUrl     String?
+  status       String            @default("draft")
+  business     Business          @relation(fields: [businessId], references: [id])
+  businessId   String
+  templateIds  String
+  scheduledAt  DateTime?
+  createdAt    DateTime          @default(now())
+  posts        Post[]
+  profiles     CampaignProfile[]
+}
+
+model CampaignProfile {
+  id         String   @id @default(cuid())
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  campaignId String
+  profile    Profile  @relation(fields: [profileId], references: [id])
+  profileId  String
+}
+
+model ContactLink {
+  id         String   @id @default(cuid())
+  label      String
+  type       String   // "whatsapp" | "email"
+  value      String
+  businessId String
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Post {
+  id          String    @id @default(cuid())
+  campaign    Campaign  @relation(fields: [campaignId], references: [id])
+  campaignId  String
+  fbGroupId   String
+  groupName   String
+  status      String    @default("pending")
+  publishedAt DateTime?
+  error       String?
+  createdAt   DateTime  @default(now())
+}
