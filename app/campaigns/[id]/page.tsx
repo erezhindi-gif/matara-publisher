@@ -63,6 +63,7 @@ export default function CampaignDetailPage() {
   const [editImages, setEditImages] = useState<File[]>([]);
   const [editImagePreviews, setEditImagePreviews] = useState<string[]>([]);
   const [editTemplateIds, setEditTemplateIds] = useState<string[]>([]);
+  const [keepImageUrls, setKeepImageUrls] = useState<string[]>([]);
 
   function handleEditImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
@@ -108,12 +109,13 @@ export default function CampaignDetailPage() {
     setEditTime("10:00");
     setEditWeeks(4);
     try { setEditTemplateIds(JSON.parse((campaign as Campaign & { templateIds?: string }).templateIds || "[]")); } catch { setEditTemplateIds([]); }
+    setKeepImageUrls(campaign.imageUrls || []);
     setMode("edit");
   }
 
   async function saveEdit() {
     setSaving(true);
-    let newImageUrls: string[] = campaign?.imageUrls || [];
+    let newImageUrls: string[] = keepImageUrls;
     if (editImages.length > 0) {
       const fd = new FormData();
       editImages.forEach((img) => fd.append("files", img));
@@ -393,12 +395,17 @@ export default function CampaignDetailPage() {
 
             <div className="bg-white border border-gray-200 rounded-2xl p-5">
               <label className="block text-sm text-gray-500 mb-2">תמונות</label>
-              {campaign.imageUrls?.length > 0 && (
+              {keepImageUrls.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3">
-                  {campaign.imageUrls.map((url, i) => (
-                    <img key={i} src={url} className="w-20 h-20 object-cover rounded-lg border border-gray-200" />
+                  {keepImageUrls.map((url, i) => (
+                    <div key={i} className="relative">
+                      <img src={url} className="w-20 h-20 object-cover rounded-lg border border-gray-200" />
+                      <button
+                        onClick={() => setKeepImageUrls(prev => prev.filter((_, idx) => idx !== i))}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center hover:bg-red-600"
+                      >✕</button>
+                    </div>
                   ))}
-                  <div className="text-xs text-gray-400 w-full">תמונות קיימות (לא ניתן להסיר כרגע)</div>
                 </div>
               )}
               <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">

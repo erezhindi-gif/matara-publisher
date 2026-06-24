@@ -8,6 +8,7 @@ const NAV = [
   { href: "/profiles",   icon: "👤", label: "פרופילי פייסבוק" },
   { href: "/templates",  icon: "◧", label: "תבניות לקבוצות" },
   { href: "/schedule",   icon: "◷", label: "לוח תזמונים" },
+  { href: "/analytics",  icon: "📊", label: "אנליטיקס" },
   { href: "/sync",       icon: "↻", label: "סנכרון קבוצות" },
   { href: "/settings",   icon: "⚙", label: "הגדרות" },
 ];
