@@ -13,6 +13,7 @@ const path = require("path");
 const os = require("os");
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const qrcode = require("qrcode-terminal");
+const QRCode = require("qrcode");
 
 const PORT = 3333;
 const API_BASE = "https://matara-publisher.vercel.app";
@@ -25,52 +26,65 @@ const SKIP_IDS = new Set([
   "archived", "suggested", "local", "explore", "buy", "sell",
 ]);
 
-// ====== וואטסאפ - כמה סשנים לפי עסק ======
-// כל עסק מחובר למספר וואטסאפ שונה
-// businessType → { phoneNumbers: [...], client }
+// ====== וואטסאפ - סשן לכל פרופיל ======
+// profileId → { client, status, qrDataUrl, phoneNumber }
 const WA_SESSIONS = {};
 let isRunning = false;
 
-function initWhatsApp(businessType) {
-  if (WA_SESSIONS[businessType]) return; // כבר מאותחל
+function initWhatsApp(profileId, phoneNumber) {
+  if (WA_SESSIONS[profileId]?.status === "connected") return;
 
-  console.log(`\n[וואטסאפ] מאתחל סשן עבור: ${businessType}`);
+  console.log(`\n[וואטסאפ] מאתחל סשן עבור פרופיל: ${profileId}`);
+
+  // נקה סשן קיים
+  if (WA_SESSIONS[profileId]?.client) {
+    try { WA_SESSIONS[profileId].client.destroy(); } catch {}
+  }
+
+  WA_SESSIONS[profileId] = { status: "connecting", qrDataUrl: null, phoneNumber };
 
   const client = new Client({
-    authStrategy: new LocalAuth({ clientId: `matara-${businessType}` }),
+    authStrategy: new LocalAuth({ clientId: `matara-${profileId}` }),
     puppeteer: { executablePath: EDGE_PATH, headless: true, args: ["--no-sandbox"] },
   });
 
-  client.on("qr", (qr) => {
-    console.log(`\n[וואטסאפ] סרוק קוד QR עבור "${businessType}" עם הטלפון של העסק:`);
+  client.on("qr", async (qr) => {
+    console.log(`[וואטסאפ] QR מוכן לפרופיל: ${profileId}`);
     qrcode.generate(qr, { small: true });
+    try {
+      const dataUrl = await QRCode.toDataURL(qr, { width: 300 });
+      WA_SESSIONS[profileId].qrDataUrl = dataUrl;
+      WA_SESSIONS[profileId].status = "qr_ready";
+    } catch {}
   });
 
   client.on("ready", () => {
-    console.log(`[וואטסאפ] מחובר! עסק: ${businessType}`);
+    console.log(`[וואטסאפ] מחובר! פרופיל: ${profileId}`);
+    WA_SESSIONS[profileId].status = "connected";
+    WA_SESSIONS[profileId].qrDataUrl = null;
   });
 
   client.on("disconnected", () => {
-    console.log(`[וואטסאפ] התנתק: ${businessType} - מנסה מחדש...`);
-    delete WA_SESSIONS[businessType];
+    console.log(`[וואטסאפ] התנתק: ${profileId}`);
+    WA_SESSIONS[profileId].status = "disconnected";
+    WA_SESSIONS[profileId].client = null;
   });
 
   client.initialize();
-  WA_SESSIONS[businessType] = client;
+  WA_SESSIONS[profileId].client = client;
 }
 
-async function sendWhatsApp(businessType, phoneNumbers, message) {
-  const client = WA_SESSIONS[businessType];
-  if (!client) {
-    console.log(`[וואטסאפ] לא מאותחל עבור ${businessType}`);
+async function sendWhatsApp(profileId, phoneNumbers, message) {
+  const session = WA_SESSIONS[profileId];
+  if (!session || session.status !== "connected") {
+    console.log(`[וואטסאפ] פרופיל ${profileId} לא מחובר`);
     return;
   }
 
   for (const phone of phoneNumbers) {
     try {
-      // המר מספר לפורמט וואטסאפ (972XXXXXXXXX@c.us)
       const formatted = phone.replace(/\D/g, "").replace(/^0/, "972") + "@c.us";
-      await client.sendMessage(formatted, message);
+      await session.client.sendMessage(formatted, message);
       console.log(`[וואטסאפ] נשלח ל-${phone}`);
     } catch (err) {
       console.error(`[וואטסאפ] שגיאה בשליחה ל-${phone}:`, err.message);
@@ -266,6 +280,35 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // סטטוס וואטסאפ לכל הפרופילים
+  if (req.url === "/whatsapp-status" && req.method === "GET") {
+    const status = {};
+    for (const [id, s] of Object.entries(WA_SESSIONS)) {
+      status[id] = { status: s.status, qrDataUrl: s.qrDataUrl };
+    }
+    res.writeHead(200);
+    res.end(JSON.stringify(status));
+    return;
+  }
+
+  // חיבור / חיבור מחדש לפרופיל
+  if (req.url === "/whatsapp-connect" && req.method === "POST") {
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      try {
+        const { profileId, phoneNumber } = JSON.parse(body || "{}");
+        initWhatsApp(profileId, phoneNumber);
+        res.writeHead(200);
+        res.end(JSON.stringify({ ok: true }));
+      } catch (err) {
+        res.writeHead(500);
+        res.end(JSON.stringify({ ok: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
   // שליחת הודעת וואטסאפ
   if (req.url === "/send-whatsapp" && req.method === "POST") {
     let body = "";
@@ -310,9 +353,5 @@ server.listen(PORT, () => {
   console.log("=== שרת מקומי של מטרה Publisher ===");
   console.log(`פועל על פורט ${PORT}`);
   console.log("השאר חלון זה פתוח כדי שהאתר יוכל לתקשר עם המחשב שלך");
-  console.log("\n[וואטסאפ] מאתחל סשנים אוטומטית...");
-  // אתחל סשנים לכל העסקים הידועים
-  initWhatsApp("recruitment");
-  initWhatsApp("carpentry");
-  console.log("[וואטסאפ] בדוק קודי QR למעלה אם צריך חיבור ראשוני\n");
+  console.log("[וואטסאפ] השתמש בדף פרופילי פייסבוק לחיבור וואטסאפ לכל פרופיל\n");
 });

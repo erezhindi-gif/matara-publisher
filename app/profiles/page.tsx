@@ -34,6 +34,29 @@ export default function ProfilesPage() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", fbUsername: "", edgeProfile: "Default", businessId: "recruitment", dailyLimit: 150 });
   const [businessFilter, setBusinessFilterState] = useState("all");
+  const [waStatus, setWaStatus] = useState<Record<string, { status: string; qrDataUrl: string | null }>>({});
+  const [waQrProfile, setWaQrProfile] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchWaStatus = () => {
+      fetch("http://localhost:3333/whatsapp-status")
+        .then((r) => r.json())
+        .then(setWaStatus)
+        .catch(() => {});
+    };
+    fetchWaStatus();
+    const interval = setInterval(fetchWaStatus, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  async function connectWhatsApp(profileId: string) {
+    setWaQrProfile(profileId);
+    await fetch("http://localhost:3333/whatsapp-connect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profileId }),
+    }).catch(() => {});
+  }
 
   useEffect(() => {
     setBusinessFilterState(getBusinessFilter());
@@ -193,10 +216,36 @@ export default function ProfilesPage() {
                   <button onClick={() => deleteProfile(p.id)} className="text-xs bg-red-50 hover:bg-red-100 text-red-600 rounded-lg px-3 py-1.5 transition-colors">מחק</button>
                 </div>
               </div>
-              <div className="border-t border-gray-100 pt-3 flex gap-4 text-xs text-gray-500">
-                <span>Edge: <span className="font-medium text-gray-700">{p.edgeProfile}</span></span>
-                <span>מגבלה: <span className="font-medium text-gray-700">{p.dailyLimit}</span>/יום</span>
-                <span>היום: <span className={`font-medium ${(p.postsToday || 0) > p.dailyLimit * 0.8 ? "text-red-600" : "text-gray-700"}`}>{p.postsToday || 0}</span></span>
+              <div className="border-t border-gray-100 pt-3 flex items-center justify-between">
+                <div className="flex gap-4 text-xs text-gray-500">
+                  <span>Edge: <span className="font-medium text-gray-700">{p.edgeProfile}</span></span>
+                  <span>מגבלה: <span className="font-medium text-gray-700">{p.dailyLimit}</span>/יום</span>
+                  <span>היום: <span className={`font-medium ${(p.postsToday || 0) > p.dailyLimit * 0.8 ? "text-red-600" : "text-gray-700"}`}>{p.postsToday || 0}</span></span>
+                </div>
+                {/* וואטסאפ */}
+                {(() => {
+                  const wa = waStatus[p.id];
+                  const status = wa?.status;
+                  if (status === "connected") return (
+                    <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                      <span className="w-2 h-2 bg-green-500 rounded-full inline-block" /> וואטסאפ מחובר
+                    </span>
+                  );
+                  if (status === "qr_ready" && wa?.qrDataUrl) return (
+                    <div className="flex flex-col items-center gap-1">
+                      <img src={wa.qrDataUrl} className="w-24 h-24 rounded-lg border border-gray-200" />
+                      <span className="text-xs text-gray-500">סרוק עם הטלפון</span>
+                    </div>
+                  );
+                  if (status === "connecting") return (
+                    <span className="text-xs text-yellow-600">מתחבר...</span>
+                  );
+                  return (
+                    <button onClick={() => connectWhatsApp(p.id)} className="flex items-center gap-1.5 text-xs bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-lg px-3 py-1.5 transition-colors">
+                      📱 חבר וואטסאפ
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           ))}
