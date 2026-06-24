@@ -26,7 +26,7 @@ type Template = {
   groups: { id: string }[];
 };
 
-function FacebookPreview({ content, whatsappLink }: { content: string; whatsappLink: string }) {
+function FacebookPreview({ content, whatsappLink, imagePreviews }: { content: string; whatsappLink: string; imagePreviews: string[] }) {
   return (
     <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
       <div className="p-4 border-b border-gray-100">
@@ -45,6 +45,13 @@ function FacebookPreview({ content, whatsappLink }: { content: string; whatsappL
         {whatsappLink && (
           <div className="mt-3 pt-3 border-t border-gray-100">
             <span className="text-green-600 text-sm">📱 {whatsappLink}</span>
+          </div>
+        )}
+        {imagePreviews.length > 0 && (
+          <div className={`mt-3 grid gap-1 ${imagePreviews.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
+            {imagePreviews.map((src, i) => (
+              <img key={i} src={src} className="w-full object-cover rounded-lg max-h-48" />
+            ))}
           </div>
         )}
       </div>
@@ -348,7 +355,7 @@ export default function NewCampaignPage() {
             {/* Preview */}
             <div className="lg:sticky lg:top-8 lg:self-start">
               <div className="text-sm text-gray-500 mb-3 font-medium">תצוגה מקדימה</div>
-              <FacebookPreview content={form.content} whatsappLink={form.whatsappLink} />
+              <FacebookPreview content={form.content} whatsappLink={form.whatsappLink} imagePreviews={imagePreviews} />
             </div>
           </div>
         )}
@@ -480,7 +487,7 @@ export default function NewCampaignPage() {
             {/* Preview */}
             <div className="lg:sticky lg:top-8 lg:self-start">
               <div className="text-sm text-gray-500 mb-3 font-medium">תצוגה מקדימה</div>
-              <FacebookPreview content={form.content} whatsappLink={form.whatsappLink} />
+              <FacebookPreview content={form.content} whatsappLink={form.whatsappLink} imagePreviews={imagePreviews} />
             </div>
           </div>
         )}

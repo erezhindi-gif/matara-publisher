@@ -14,6 +14,7 @@ type Campaign = {
   scheduledAt: string | null;
   createdAt: string;
   business: { id: string; name: string; type: string };
+  imageUrls: string[];
   posts: { id: string; groupName: string; status: string; publishedAt: string | null }[];
 };
 
@@ -59,6 +60,24 @@ export default function CampaignDetailPage() {
   const [editDays, setEditDays] = useState<number[]>([]);
   const [editTime, setEditTime] = useState("10:00");
   const [editWeeks, setEditWeeks] = useState(4);
+  const [editImages, setEditImages] = useState<File[]>([]);
+  const [editImagePreviews, setEditImagePreviews] = useState<string[]>([]);
+
+  function handleEditImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setEditImages((prev) => [...prev, ...files]);
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => setEditImagePreviews((prev) => [...prev, ev.target?.result as string]);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function removeEditImage(i: number) {
+    setEditImages((prev) => prev.filter((_, idx) => idx !== i));
+    setEditImagePreviews((prev) => prev.filter((_, idx) => idx !== i));
+  }
 
   // Duplicate state
   const [dupTemplates, setDupTemplates] = useState<string[]>([]);
@@ -92,8 +111,17 @@ export default function CampaignDetailPage() {
 
   async function saveEdit() {
     setSaving(true);
+    let newImageUrls: string[] = campaign?.imageUrls || [];
+    if (editImages.length > 0) {
+      const fd = new FormData();
+      editImages.forEach((img) => fd.append("files", img));
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      newImageUrls = [...newImageUrls, ...(data.urls || [])];
+    }
     const body: Record<string, unknown> = {
       content: editContent,
+      imageUrls: newImageUrls,
     };
     if (editScheduledAt) {
       body.scheduledAt = new Date(editScheduledAt).toISOString();
@@ -356,6 +384,33 @@ export default function CampaignDetailPage() {
                       יוצר {editDays.length * (editWeeks - 1)} קמפיינים נוספים
                     </div>
                   )}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-2xl p-5">
+              <label className="block text-sm text-gray-500 mb-2">תמונות</label>
+              {campaign.imageUrls?.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {campaign.imageUrls.map((url, i) => (
+                    <img key={i} src={url} className="w-20 h-20 object-cover rounded-lg border border-gray-200" />
+                  ))}
+                  <div className="text-xs text-gray-400 w-full">תמונות קיימות (לא ניתן להסיר כרגע)</div>
+                </div>
+              )}
+              <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                <span className="text-xl mb-1">🖼️</span>
+                <span className="text-sm text-gray-500">הוסף תמונות נוספות</span>
+                <input type="file" multiple accept="image/*" className="hidden" onChange={handleEditImageSelect} />
+              </label>
+              {editImagePreviews.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {editImagePreviews.map((src, i) => (
+                    <div key={i} className="relative">
+                      <img src={src} className="w-20 h-20 object-cover rounded-lg border border-gray-200" />
+                      <button onClick={() => removeEditImage(i)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">✕</button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
