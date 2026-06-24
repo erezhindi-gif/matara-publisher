@@ -11,6 +11,8 @@ const puppeteer = require("puppeteer-core");
 const { execSync, exec } = require("child_process");
 const path = require("path");
 const os = require("os");
+const { Client, LocalAuth } = require("whatsapp-web.js");
+const qrcode = require("qrcode-terminal");
 
 const PORT = 3333;
 const API_BASE = "https://matara-publisher.vercel.app";
@@ -23,7 +25,58 @@ const SKIP_IDS = new Set([
   "archived", "suggested", "local", "explore", "buy", "sell",
 ]);
 
+// ====== וואטסאפ - כמה סשנים לפי עסק ======
+// כל עסק מחובר למספר וואטסאפ שונה
+// businessType → { phoneNumbers: [...], client }
+const WA_SESSIONS = {};
 let isRunning = false;
+
+function initWhatsApp(businessType) {
+  if (WA_SESSIONS[businessType]) return; // כבר מאותחל
+
+  console.log(`\n[וואטסאפ] מאתחל סשן עבור: ${businessType}`);
+
+  const client = new Client({
+    authStrategy: new LocalAuth({ clientId: `matara-${businessType}` }),
+    puppeteer: { executablePath: EDGE_PATH, headless: true, args: ["--no-sandbox"] },
+  });
+
+  client.on("qr", (qr) => {
+    console.log(`\n[וואטסאפ] סרוק קוד QR עבור "${businessType}" עם הטלפון של העסק:`);
+    qrcode.generate(qr, { small: true });
+  });
+
+  client.on("ready", () => {
+    console.log(`[וואטסאפ] מחובר! עסק: ${businessType}`);
+  });
+
+  client.on("disconnected", () => {
+    console.log(`[וואטסאפ] התנתק: ${businessType} - מנסה מחדש...`);
+    delete WA_SESSIONS[businessType];
+  });
+
+  client.initialize();
+  WA_SESSIONS[businessType] = client;
+}
+
+async function sendWhatsApp(businessType, phoneNumbers, message) {
+  const client = WA_SESSIONS[businessType];
+  if (!client) {
+    console.log(`[וואטסאפ] לא מאותחל עבור ${businessType}`);
+    return;
+  }
+
+  for (const phone of phoneNumbers) {
+    try {
+      // המר מספר לפורמט וואטסאפ (972XXXXXXXXX@c.us)
+      const formatted = phone.replace(/\D/g, "").replace(/^0/, "972") + "@c.us";
+      await client.sendMessage(formatted, message);
+      console.log(`[וואטסאפ] נשלח ל-${phone}`);
+    } catch (err) {
+      console.error(`[וואטסאפ] שגיאה בשליחה ל-${phone}:`, err.message);
+    }
+  }
+}
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -213,6 +266,42 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // שליחת הודעת וואטסאפ
+  if (req.url === "/send-whatsapp" && req.method === "POST") {
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", async () => {
+      try {
+        const { businessType, phoneNumbers, message } = JSON.parse(body || "{}");
+        await sendWhatsApp(businessType, phoneNumbers, message);
+        res.writeHead(200);
+        res.end(JSON.stringify({ ok: true }));
+      } catch (err) {
+        res.writeHead(500);
+        res.end(JSON.stringify({ ok: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // אתחול סשן וואטסאפ עסק
+  if (req.url === "/init-whatsapp" && req.method === "POST") {
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      try {
+        const { businessType } = JSON.parse(body || "{}");
+        initWhatsApp(businessType);
+        res.writeHead(200);
+        res.end(JSON.stringify({ ok: true, message: `מאתחל סשן עבור ${businessType} - בדוק את הטרמינל לסריקת קוד QR` }));
+      } catch (err) {
+        res.writeHead(500);
+        res.end(JSON.stringify({ ok: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
   res.writeHead(404);
   res.end(JSON.stringify({ error: "Not found" }));
 });
@@ -220,5 +309,10 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log("=== שרת מקומי של מטרה Publisher ===");
   console.log(`פועל על פורט ${PORT}`);
-  console.log("השאר חלון זה פתוח כדי שהאתר יוכל לתקשר עם המחשב שלך\n");
+  console.log("השאר חלון זה פתוח כדי שהאתר יוכל לתקשר עם המחשב שלך");
+  console.log("\n[וואטסאפ] מאתחל סשנים אוטומטית...");
+  // אתחל סשנים לכל העסקים הידועים
+  initWhatsApp("recruitment");
+  initWhatsApp("carpentry");
+  console.log("[וואטסאפ] בדוק קודי QR למעלה אם צריך חיבור ראשוני\n");
 });

@@ -8,9 +8,10 @@ const EMAILS_BY_BUSINESS: Record<string, string[]> = {
 };
 
 const WHATSAPP_BY_BUSINESS: Record<string, string[]> = {
-  recruitment: ["972507100129", "972502808180"],
-  carpentry: ["972502808180"],
+  recruitment: ["0507100129", "0502808180"],
+  carpentry: ["0502808180"],
 };
+const LOCAL_SERVER = "http://localhost:3333";
 const BASE_URL = "https://matara-publisher.vercel.app";
 
 export async function sendApprovalEmail(campaign: {
@@ -62,4 +63,20 @@ export async function sendApprovalEmail(campaign: {
     subject: `קמפיין חדש ממתין לאישור: ${campaign.title}`,
     html,
   });
+
+  // שלח הודעת וואטסאפ דרך השרת המקומי
+  const phones = WHATSAPP_BY_BUSINESS[campaign.business.type] || [];
+  if (phones.length > 0) {
+    const waMessage = `📢 *קמפיין חדש ממתין לאישור*\n\n*${campaign.title}*\n${campaign.business.name}\n${campaign.scheduledAt ? `📅 ${new Date(campaign.scheduledAt).toLocaleString("he-IL")}` : ""}\n\n🔗 ${approveUrl}`;
+    try {
+      await fetch(`${LOCAL_SERVER}/send-whatsapp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ businessType: campaign.business.type, phoneNumbers: phones, message: waMessage }),
+        signal: AbortSignal.timeout(5000),
+      });
+    } catch {
+      // השרת המקומי לא פעיל - רק המייל נשלח
+    }
+  }
 }
