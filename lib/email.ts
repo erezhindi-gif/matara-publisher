@@ -6,7 +6,7 @@ const EMAILS_BY_BUSINESS: Record<string, string[]> = {
   recruitment: ["noa@matarahr.co.il", "erezhindi@gmail.com"],
   carpentry: ["erezhindi@gmail.com"],
 };
-const BASE_URL = process.env.NEXTAUTH_URL || "http://localhost:3000";
+const BASE_URL = "https://matara-publisher.vercel.app";
 
 export async function sendApprovalEmail(campaign: {
   id: string;

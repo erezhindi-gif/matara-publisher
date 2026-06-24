@@ -79,7 +79,7 @@ export default function NewCampaignPage() {
           content: editedContent,
           whatsappLink: form.whatsappLink,
           emailLink: form.emailLink,
-          scheduledAt: scheduledAt || null,
+          scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
           templateIds: selectedTemplates,
         }),
       });
