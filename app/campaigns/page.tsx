@@ -10,6 +10,7 @@ type Campaign = {
   status: string;
   createdAt: string;
   scheduledAt: string | null;
+  templateIds: string;
   business: { name: string; type: string };
   posts: { status: string }[];
 };
@@ -104,6 +105,8 @@ export default function CampaignsPage() {
               const statusInfo = STATUS_LABELS[c.status] || { label: c.status, color: "text-gray-600", bg: "bg-gray-100" };
               const published = c.posts.filter((p) => p.status === "published").length;
               const total = c.posts.length;
+              let templateCount = 0;
+              try { templateCount = JSON.parse(c.templateIds || "[]").length; } catch { templateCount = 0; }
               const scheduledDate = c.scheduledAt ? new Date(c.scheduledAt) : null;
 
               return (
@@ -150,8 +153,10 @@ export default function CampaignsPage() {
                       )}
                       <div className="text-xs text-gray-400">
                         {total > 0
-                          ? <span>{total} קבוצות{published > 0 ? ` · ${published} פורסמו` : ""}</span>
-                          : <span className="text-orange-500">טרם הוקצו קבוצות</span>
+                          ? <span>{total} קבוצות · {published} פורסמו</span>
+                          : templateCount > 0
+                            ? <span className="text-gray-500">{templateCount} תבניות</span>
+                            : <span className="text-orange-500">טרם הוקצו קבוצות</span>
                         }
                       </div>
                     </div>
