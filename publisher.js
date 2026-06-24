@@ -8,6 +8,9 @@
 const puppeteer = require("puppeteer-core");
 const path = require("path");
 const os = require("os");
+const fs = require("fs");
+const https = require("https");
+const http = require("http");
 
 // כתובת האתר שלך ב-Vercel
 const API_BASE = "https://matara-publisher.vercel.app";
@@ -33,6 +36,40 @@ function randomDelay(minSec, maxSec) {
   // Occasionally (10% chance) take a longer break - like a human distracted
   const longBreak = Math.random() < 0.1 ? (20 + Math.random() * 40) : 0;
   return sleep((sec + longBreak) * 1000);
+}
+
+// הורדת תמונות לתיקייה זמנית
+async function downloadImages(imageUrls) {
+  if (!imageUrls || imageUrls.length === 0) return [];
+  const tmpDir = path.join(os.tmpdir(), "matara-publisher");
+  if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+
+  const localPaths = [];
+  for (const url of imageUrls) {
+    const ext = url.split(".").pop().split("?")[0] || "jpg";
+    const filename = `img-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const localPath = path.join(tmpDir, filename);
+
+    await new Promise((resolve, reject) => {
+      const protocol = url.startsWith("https") ? https : http;
+      const file = fs.createWriteStream(localPath);
+      protocol.get(url, (res) => {
+        res.pipe(file);
+        file.on("finish", () => { file.close(); resolve(); });
+      }).on("error", reject);
+    });
+
+    localPaths.push(localPath);
+    console.log(`  הורדתי תמונה: ${filename}`);
+  }
+  return localPaths;
+}
+
+// מחיקת תמונות זמניות אחרי פרסום
+function cleanupImages(localPaths) {
+  for (const p of localPaths) {
+    try { fs.unlinkSync(p); } catch { /* ignore */ }
+  }
 }
 
 async function fetchApprovedCampaigns() {
@@ -62,7 +99,7 @@ async function updatePostStatus(campaignId, groupName, status, error = null) {
   });
 }
 
-async function postToFacebookGroup(page, groupName, content) {
+async function postToFacebookGroup(page, groupName, content, localImagePaths = []) {
   try {
     console.log(`  מחפש קבוצה: ${groupName}`);
 
@@ -100,6 +137,26 @@ async function postToFacebookGroup(page, groupName, content) {
     // כתיבת התוכן
     await page.keyboard.type(content, { delay: 30 });
     await sleep(2000);
+
+    // העלאת תמונות אם יש
+    if (localImagePaths.length > 0) {
+      // לחיצה על כפתור תמונה/וידאו
+      const photoBtn = await page.$('[aria-label="תמונה/וידאו"], [aria-label="Photo/video"], [data-testid="photo-video-button"]');
+      if (photoBtn) {
+        await photoBtn.click();
+        await sleep(2000);
+      }
+
+      // מציאת שדה העלאת קובץ
+      const fileInput = await page.$('input[type="file"]');
+      if (fileInput) {
+        await fileInput.uploadFile(...localImagePaths);
+        await sleep(4000); // המתן לטעינת התמונות
+        console.log(`  העלתי ${localImagePaths.length} תמונות`);
+      } else {
+        console.warn("  לא נמצא שדה העלאת תמונה - ממשיך בלי תמונה");
+      }
+    }
 
     // לחיצה על כפתור פרסום
     const publishBtn = await page.$('[aria-label="פרסם"], [aria-label="Post"]');
@@ -176,27 +233,36 @@ async function processCampaign(campaign, profiles) {
     const groups = selectedTemplates.flatMap((t) => t.groups);
     console.log(`סה"כ ${groups.length} קבוצות לפרסום`);
 
+    // הורד תמונות פעם אחת לפני הלולאה
+    let localImagePaths = [];
+    if (campaign.imageUrls && campaign.imageUrls.length > 0) {
+      console.log(`מוריד ${campaign.imageUrls.length} תמונות...`);
+      localImagePaths = await downloadImages(campaign.imageUrls);
+    }
+
     let published = 0;
     let failed = 0;
 
     for (const group of groups) {
       try {
-        await postToFacebookGroup(page, group.name, campaign.content);
+        await postToFacebookGroup(page, group.name, campaign.content, localImagePaths);
         await updatePostStatus(campaign.id, group.name, "published");
         published++;
         console.log(`  התקדמות: ${published}/${groups.length}`);
 
-        // המתנה רנדומלית בין פרסומים
+        // המתנה טבעית בין פרסומים
         if (published < groups.length) {
-          const delay = Math.floor(Math.random() * (DELAY_BETWEEN_POSTS_MAX - DELAY_BETWEEN_POSTS_MIN) + DELAY_BETWEEN_POSTS_MIN);
-          console.log(`  ממתין ${delay} שניות...`);
-          await sleep(delay * 1000);
+          console.log(`  ממתין...`);
+          await randomDelay(DELAY_BETWEEN_POSTS_MIN, DELAY_BETWEEN_POSTS_MAX);
         }
       } catch (err) {
         await updatePostStatus(campaign.id, group.name, "failed", err.message);
         failed++;
       }
     }
+
+    // מחק תמונות זמניות
+    cleanupImages(localImagePaths);
 
     // עדכן סטטוס סופי
     await updateCampaignStatus(campaign.id, "done");
