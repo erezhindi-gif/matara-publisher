@@ -16,7 +16,7 @@ export default function Sidebar() {
   const path = usePathname();
 
   return (
-    <aside className="w-56 min-h-screen bg-gray-900 text-white flex flex-col flex-shrink-0">
+    <aside className="w-56 min-h-screen bg-gray-900 text-white flex flex-col flex-shrink-0" dir="ltr">
       {/* Logo */}
       <div className="px-5 py-6 border-b border-gray-700">
         <div className="text-lg font-bold text-white tracking-wide">Matara</div>

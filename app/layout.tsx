@@ -19,12 +19,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="he" dir="rtl" className={`${geistSans.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-row bg-gray-50">
-        <main className="flex-1 min-h-screen overflow-y-auto">
+    <html lang="he" className={`${geistSans.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-row bg-gray-50" dir="rtl">
+        <Sidebar />
+        <main className="flex-1 min-h-screen overflow-y-auto" dir="rtl">
           {children}
         </main>
-        <Sidebar />
       </body>
     </html>
   );
