@@ -28,10 +28,16 @@ export default function Home() {
             <p className="text-gray-400 text-sm">ניהול תבניות פרסום לפי אזור ותחום</p>
           </Link>
 
+          <Link href="/profiles" className="bg-gray-900 border border-gray-800 rounded-2xl p-6 hover:border-blue-500 transition-all">
+            <div className="text-3xl mb-3">👤</div>
+            <h2 className="text-xl font-semibold mb-1">פרופילי פייסבוק</h2>
+            <p className="text-gray-400 text-sm">ניהול חשבונות פייסבוק לפרסום</p>
+          </Link>
+
           <Link href="/settings" className="bg-gray-900 border border-gray-800 rounded-2xl p-6 hover:border-blue-500 transition-all">
             <div className="text-3xl mb-3">⚙️</div>
             <h2 className="text-xl font-semibold mb-1">הגדרות</h2>
-            <p className="text-gray-400 text-sm">פרופילים, עסקים ומכסות</p>
+            <p className="text-gray-400 text-sm">קישורי וואטסאפ ומייל</p>
           </Link>
         </div>
 

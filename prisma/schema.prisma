@@ -18,16 +18,17 @@ model Business {
 }
 
 model Profile {
-  id          String            @id @default(cuid())
-  name        String
-  fbUsername  String
-  business    Business          @relation(fields: [businessId], references: [id])
-  businessId  String
-  isActive    Boolean           @default(true)
-  dailyLimit  Int               @default(150)
-  postsToday  Int               @default(0)
-  lastReset   DateTime          @default(now())
-  campaigns   CampaignProfile[]
+  id           String            @id @default(cuid())
+  name         String
+  fbUsername   String
+  edgeProfile  String            @default("Default")
+  business     Business          @relation(fields: [businessId], references: [id])
+  businessId   String
+  isActive     Boolean           @default(true)
+  dailyLimit   Int               @default(150)
+  postsToday   Int               @default(0)
+  lastReset    DateTime          @default(now())
+  campaigns    CampaignProfile[]
 }
 
 model GroupTemplate {
@@ -92,4 +93,6 @@ model Post {
   publishedAt DateTime?
   error       String?
   createdAt   DateTime  @default(now())
+
+  @@unique([campaignId, groupName])
 }
