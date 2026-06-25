@@ -79,7 +79,7 @@ function ScheduleStep({
   setScheduleTime: (t: string) => void;
   scheduleStartDate: string;
   setScheduleStartDate: (d: string) => void;
-  existingCampaigns: { scheduledAt: string; title: string; templateIds: string }[];
+  existingCampaigns: { scheduledAt: string; title: string; templateIds: string; status: string; posts: { status: string }[] }[];
   templates: Template[];
   selectedTemplates: string[];
   loading: boolean;
@@ -112,6 +112,17 @@ function ScheduleStep({
   const selectedMinutes = selH * 60 + selM; // minutes since midnight
   const myEndMinutes = selectedMinutes + myDurationMin;
 
+  // פוסטים שפורסמו בפועל לפי תאריך
+  function publishedPostsOnDate(date: Date): number {
+    return existingCampaigns
+      .filter((c) => new Date(c.scheduledAt).toDateString() === date.toDateString())
+      .reduce((sum, c) => sum + (c.posts?.filter(p => p.status === "published").length || groupsFromTemplateIds(c.templateIds)), 0);
+  }
+
+  function isDayFull(date: Date): boolean {
+    return publishedPostsOnDate(date) >= 300;
+  }
+
   // Get busy ranges for the selected date
   const refDate = scheduleStartDate ? new Date(scheduleStartDate) : new Date();
   const busyRanges = existingCampaigns
@@ -120,7 +131,7 @@ function ScheduleStep({
       const start = new Date(c.scheduledAt);
       const startMin = start.getHours() * 60 + start.getMinutes();
       const groups = groupsFromTemplateIds(c.templateIds);
-      const durationMin = Math.ceil(Math.max(groups, 1) * 1.5); // 90s worst case
+      const durationMin = Math.ceil(Math.max(groups, 1) * 1.5);
       return { startMin, endMin: startMin + durationMin, title: c.title };
     });
 
@@ -170,15 +181,30 @@ function ScheduleStep({
         <div>
           <label className="block text-sm text-gray-700 mb-2">או בחר ימי פרסום קבועים</label>
           <div className="flex flex-wrap gap-2">
-            {DAY_NAMES.map((day, i) => (
-              <button
-                key={i}
-                onClick={() => setScheduleDays((prev) => prev.includes(i) ? prev.filter((d) => d !== i) : [...prev, i])}
-                className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${scheduleDays.includes(i) ? "bg-blue-600 text-white" : "bg-white border border-gray-300 text-gray-700 hover:border-blue-400"}`}
-              >
-                {day}
-              </button>
-            ))}
+            {DAY_NAMES.map((day, i) => {
+              // בדוק אם היום הקרוב של יום זה מלא (300 פוסטים)
+              const nextDate = new Date(scheduleStartDate || new Date());
+              const diff = (i - nextDate.getDay() + 7) % 7;
+              nextDate.setDate(nextDate.getDate() + diff);
+              const full = isDayFull(nextDate);
+              const selected = scheduleDays.includes(i);
+              return (
+                <div key={i} className="relative">
+                  <button
+                    onClick={() => !full && setScheduleDays((prev) => prev.includes(i) ? prev.filter((d) => d !== i) : [...prev, i])}
+                    disabled={full}
+                    title={full ? "היום מלא - 300 פוסטים כבר תוזמנו" : ""}
+                    className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                      full ? "bg-red-100 text-red-400 border border-red-200 cursor-not-allowed" :
+                      selected ? "bg-blue-600 text-white" : "bg-white border border-gray-300 text-gray-700 hover:border-blue-400"
+                    }`}
+                  >
+                    {day}
+                    {full && <span className="text-xs block">מלא</span>}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -218,9 +244,22 @@ function ScheduleStep({
 
               const dayConflict = dayBusyRanges.some(r => startMin < r.endMin && endMin > r.startMin);
 
+              // בדיקת 300 פוסטים ביום
+              const dayNextDate = new Date(scheduleStartDate || new Date());
+              const dayDiff = (dayIdx - dayNextDate.getDay() + 7) % 7;
+              dayNextDate.setDate(dayNextDate.getDate() + dayDiff);
+              const dayFull = isDayFull(dayNextDate);
+              const publishedCount = publishedPostsOnDate(dayNextDate);
+
               return (
                 <div key={dayIdx} className="bg-white border border-gray-200 rounded-2xl p-4">
-                  <div className="font-medium text-sm text-gray-700 mb-3">{DAY_NAMES[dayIdx]}</div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="font-medium text-sm text-gray-700">{DAY_NAMES[dayIdx]}</div>
+                    <div className={`text-xs px-2 py-0.5 rounded-full ${dayFull ? "bg-red-100 text-red-600" : publishedCount > 200 ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"}`}>
+                      {publishedCount}/300 פוסטים
+                    </div>
+                  </div>
+                  {dayFull && <div className="bg-red-50 border border-red-200 rounded-xl p-2 text-xs text-red-700 mb-3">🚫 היום מלא - הגעת ל-300 פוסטים</div>}
 
                   {/* טבלת שעות */}
                   <div className="flex gap-0.5 mb-2 overflow-x-auto pb-1">
@@ -358,7 +397,9 @@ export default function NewCampaignPage() {
     fetch("/api/settings").then((r) => r.json()).then(setContactLinks);
     fetch("/api/templates").then((r) => r.json()).then(setTemplates);
     fetch("/api/campaigns").then((r) => r.json()).then((data) => {
-      if (Array.isArray(data)) setExistingCampaigns(data.filter((c) => c.scheduledAt));
+      if (Array.isArray(data)) setExistingCampaigns(
+        data.filter((c) => c.scheduledAt && ["approved", "publishing", "done"].includes(c.status))
+      );
     });
   }, []);
 
@@ -396,7 +437,7 @@ export default function NewCampaignPage() {
   const [scheduleTime, setScheduleTime] = useState("10:00");
   const [scheduleStartDate, setScheduleStartDate] = useState("");
   const [dayTimes, setDayTimes] = useState<Record<number, string>>({});
-  const [existingCampaigns, setExistingCampaigns] = useState<{ scheduledAt: string; title: string; templateIds: string }[]>([]);
+  const [existingCampaigns, setExistingCampaigns] = useState<{ scheduledAt: string; title: string; templateIds: string; status: string; posts: { status: string }[] }[]>([]);
 
   const selectedBusiness = BUSINESSES.find((b) => b.id === form.businessId)!;
 
