@@ -89,22 +89,7 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   const url = page.url();
   if (url.includes("login") || url.includes("checkpoint")) throw new Error("נדרש אימות פייסבוק");
 
-  // צלם צילום מסך לדיבוג
-  try {
-    const shotPath = `C:\\matara-screenshot-${Date.now()}.png`;
-    await page.screenshot({ path: shotPath, fullPage: false });
-    log(`[PUBLISH] screenshot: ${shotPath}`);
-  } catch (e) { log(`[PUBLISH] screenshot failed: ${e.message}`); }
-
-  log(`[PUBLISH] current URL after goto: ${page.url()}`);
-
-  // הדפס את כל ה-aria-labels כדי לדעת מה יש בדף
-  const ariaLabels = await page.evaluate(() => {
-    return [...document.querySelectorAll('[aria-label]')]
-      .map(el => `${el.tagName}[role=${el.getAttribute('role')}]: "${el.getAttribute('aria-label')}"`)
-      .slice(0, 40);
-  });
-  log('[DEBUG] aria-labels on page:\n' + ariaLabels.join('\n'));
+  log(`[PUBLISH] current URL: ${page.url()}`);
 
   // גלול למעלה וסגור פופ-אפים
   await page.keyboard.press('Escape');
@@ -183,16 +168,6 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
     const fileInput = await page.$('input[type="file"]');
     if (fileInput) { await fileInput.uploadFile(...localImagePaths); await new Promise(r => setTimeout(r, 4000)); }
   }
-
-  // לוג כל הכפתורים הזמינים אחרי הכתיבה
-  const allBtns = await page.evaluate(() => {
-    return [...document.querySelectorAll('[role="button"]')]
-      .filter(b => !b.closest('[role="article"]'))
-      .map(b => `"${b.textContent.trim().substring(0, 30)}" aria="${b.getAttribute('aria-label') || ''}"`)
-      .filter(s => s.length > 5)
-      .slice(0, 20);
-  });
-  log('[DEBUG] available buttons after typing:\n' + allBtns.join('\n'));
 
   // לחץ פרסם - נסה כמה selectors
   const postBtnSelectors = [
