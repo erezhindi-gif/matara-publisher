@@ -171,18 +171,50 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
       log(`  [BG] Aa button found: ${!!aaEl}`);
       if (aaEl) {
         await aaEl.click();
-        await new Promise(r => setTimeout(r, 2000));
-        // לחץ על הרקע לפי אינדקס (1-based) - כפתורים בתוך פאנל הרקע
-        const bgBtns = await page.$$('[role="button"] img[src*="SATP"], [role="button"][style*="background-image"], div[role="dialog"] li [role="button"]');
-        log(`  [BG] found ${bgBtns.length} background buttons`);
-        if (bgBtns.length > 0 && bgBtns[backgroundIndex - 1]) {
-          await bgBtns[backgroundIndex - 1].click();
+        await new Promise(r => setTimeout(r, 2500));
+
+        // צלם לראות מה נפתח
+        try { await page.screenshot({ path: `C:\\matara-bg-debug.png` }); } catch {}
+
+        // לוג DOM - מה יש בדיאלוג אחרי לחיצה על Aa
+        const domInfo = await page.evaluate(() => {
+          const dialog = document.querySelector('[role="dialog"]');
+          if (!dialog) return 'NO DIALOG';
+          const btns = [...dialog.querySelectorAll('[role="button"]')];
+          return btns.slice(0, 20).map(b => {
+            const style = b.getAttribute('style') || '';
+            const ariaLabel = b.getAttribute('aria-label') || '';
+            const img = b.querySelector('img');
+            const imgSrc = img ? img.src.slice(-50) : '';
+            return `btn: label="${ariaLabel}" style="${style.slice(0,60)}" img="${imgSrc}"`;
+          }).join('\n');
+        });
+        log(`  [BG-DOM]:\n${domInfo}`);
+
+        // נסה סלקטורים שונים
+        let bgBtns = await page.$$('[role="dialog"] [role="button"][style*="background"]');
+        log(`  [BG] selector1 (style*background): ${bgBtns.length}`);
+
+        if (bgBtns.length === 0) {
+          bgBtns = await page.$$('[role="dialog"] [role="listitem"] [role="button"]');
+          log(`  [BG] selector2 (listitem button): ${bgBtns.length}`);
+        }
+        if (bgBtns.length === 0) {
+          bgBtns = await page.$$('[role="dialog"] ul [role="button"]');
+          log(`  [BG] selector3 (ul button): ${bgBtns.length}`);
+        }
+        if (bgBtns.length === 0) {
+          bgBtns = await page.$$('[role="dialog"] [role="button"] img');
+          log(`  [BG] selector4 (img in button): ${bgBtns.length}`);
+        }
+
+        if (bgBtns.length > 0) {
+          const idx = Math.min(backgroundIndex - 1, bgBtns.length - 1);
+          await bgBtns[idx].click();
           await new Promise(r => setTimeout(r, 1000));
-          log(`  [OK] background ${backgroundIndex} applied`);
-        } else if (bgBtns.length > 0) {
-          await bgBtns[0].click();
-          await new Promise(r => setTimeout(r, 1000));
-          log(`  [OK] background first applied (index ${backgroundIndex} out of ${bgBtns.length})`);
+          log(`  [OK] background clicked index ${idx} of ${bgBtns.length}`);
+        } else {
+          log(`  [WARN] no background buttons found after Aa click`);
         }
       }
     } catch (e) { log('  [WARN] background not applied: ' + e.message); }
