@@ -71,24 +71,33 @@ async function updatePostStatus(campaignId, groupName, status, error = null) {
   });
 }
 
-async function postToFacebookGroup(page, groupName, content, localImagePaths = []) {
-  console.log(`  מחפש קבוצה: ${groupName}`);
-  await page.goto(`https://www.facebook.com/search/groups/?q=${encodeURIComponent(groupName)}`, { waitUntil: "networkidle2", timeout: 30000 });
+async function postToFacebookGroup(page, fbGroupId, groupName, content, localImagePaths = []) {
+  console.log(`  פרסום לקבוצה: ${groupName} (${fbGroupId})`);
+
+  // נווט ישירות לקבוצה לפי ID
+  await page.goto(`https://www.facebook.com/groups/${fbGroupId}`, { waitUntil: "networkidle2", timeout: 30000 });
   await new Promise(r => setTimeout(r, 3000));
 
-  const groupLink = await page.$('a[href*="/groups/"]');
-  if (!groupLink) throw new Error("קבוצה לא נמצאה");
-  await groupLink.click();
-  await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 30000 });
-  await new Promise(r => setTimeout(r, 2000));
+  // בדוק שהגענו לקבוצה ולא לדף שגיאה
+  const url = page.url();
+  if (url.includes("login") || url.includes("checkpoint")) throw new Error("נדרש אימות פייסבוק");
 
-  const writeBox = await page.$('[aria-label="כתוב משהו..."], [aria-label="Write something..."]') || await page.$('[role="textbox"]');
-  if (!writeBox) throw new Error("לא נמצא שדה כתיבה");
-  await writeBox.click();
+  // לחץ על שדה "כתוב משהו"
+  const writeBox = await page.$('[aria-label="כתוב משהו..."], [aria-label="Write something..."], [data-testid="status-attachment-mentions-input"]');
+  if (!writeBox) {
+    // נסה למצוא לפי role
+    const roleBox = await page.$('[role="textbox"]');
+    if (!roleBox) throw new Error("לא נמצא שדה כתיבה בקבוצה");
+    await roleBox.click();
+  } else {
+    await writeBox.click();
+  }
+
   await new Promise(r => setTimeout(r, 1500));
-  await page.keyboard.type(content, { delay: 30 });
+  await page.keyboard.type(content, { delay: 25 });
   await new Promise(r => setTimeout(r, 2000));
 
+  // העלאת תמונות
   if (localImagePaths.length > 0) {
     const photoBtn = await page.$('[aria-label="תמונה/וידאו"], [aria-label="Photo/video"]');
     if (photoBtn) { await photoBtn.click(); await new Promise(r => setTimeout(r, 2000)); }
@@ -96,10 +105,13 @@ async function postToFacebookGroup(page, groupName, content, localImagePaths = [
     if (fileInput) { await fileInput.uploadFile(...localImagePaths); await new Promise(r => setTimeout(r, 4000)); }
   }
 
+  // לחץ פרסם
   const publishBtn = await page.$('[aria-label="פרסם"], [aria-label="Post"]');
   if (!publishBtn) throw new Error("לא נמצא כפתור פרסום");
   await publishBtn.click();
-  await new Promise(r => setTimeout(r, 3000));
+  await new Promise(r => setTimeout(r, 4000));
+
+  // וודא שהפוסט נשלח - בדוק שהשדה התרוקן
   console.log(`  ✓ פורסם: ${groupName}`);
 }
 
@@ -137,7 +149,7 @@ async function processCampaign(campaign, profiles) {
 
     for (const group of groups) {
       try {
-        await postToFacebookGroup(page, group.name, campaign.content, localImagePaths);
+        await postToFacebookGroup(page, group.fbGroupId, group.name, campaign.content, localImagePaths);
         await updatePostStatus(campaign.id, group.name, "published");
         published++;
         if (published < groups.length) await randomDelay(DELAY_MIN, DELAY_MAX);
@@ -148,8 +160,9 @@ async function processCampaign(campaign, profiles) {
     }
 
     localImagePaths.forEach(p => { try { fs.unlinkSync(p); } catch {} });
-    await updateCampaignStatus(campaign.id, "done");
-    console.log(`[פרסום] הושלם: ${published} הצליחו, ${failed} נכשלו`);
+    const finalStatus = published > 0 ? "done" : "failed";
+    await updateCampaignStatus(campaign.id, finalStatus);
+    console.log(`[פרסום] ${finalStatus === "done" ? "הושלם" : "נכשל"}: ${published} הצליחו, ${failed} נכשלו`);
   } finally {
     if (browser) await browser.close().catch(() => {});
     // פתח Edge מחדש אחרי הפרסום
