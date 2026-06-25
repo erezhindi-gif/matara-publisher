@@ -82,37 +82,39 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   const url = page.url();
   if (url.includes("login") || url.includes("checkpoint")) throw new Error("נדרש אימות פייסבוק");
 
-  // לחץ על כפתור "מה בא לך לשתף" כדי לפתוח את הכתיבה
-  const openBtn = await page.$('[aria-label="צור פוסט"], [aria-label="Create a post"], [data-testid="status-attachment-mentions-input"]');
-  if (openBtn) { await openBtn.click(); await new Promise(r => setTimeout(r, 2000)); }
-
-  // נסה למצוא את תיבת הכתיבה עם מספר selectors
-  const selectors = [
-    '[aria-label="כתוב משהו..."]',
-    '[aria-label="Write something..."]',
+  // לחץ על כפתור "צור פוסט" / "מה בא לך לשתף" כדי לפתוח את חלון הכתיבה
+  const createPostSelectors = [
+    '[aria-label="צור פוסט"]',
+    '[aria-label="Create a post"]',
     '[aria-label="מה בא לך לשתף?"]',
     '[aria-label="What\'s on your mind?"]',
-    '[role="textbox"]',
-    '[contenteditable="true"]',
   ];
+  for (const sel of createPostSelectors) {
+    const btn = await page.$(sel);
+    if (btn) { console.log(`  לחיצה על: ${sel}`); await btn.click(); await new Promise(r => setTimeout(r, 2500)); break; }
+  }
 
+  // חכה לחלון הכתיבה להיפתח - מחפש textbox בתוך dialog או modal
+  await new Promise(r => setTimeout(r, 1500));
+
+  // מצא את שדה הכתיבה בתוך החלון שנפתח
   let writeBox = null;
-  for (const sel of selectors) {
+  const boxSelectors = [
+    'div[role="dialog"] [role="textbox"]',
+    'div[role="dialog"] [contenteditable="true"]',
+    '[role="textbox"][aria-label]',
+    'form [role="textbox"]',
+  ];
+  for (const sel of boxSelectors) {
     writeBox = await page.$(sel);
     if (writeBox) { console.log(`  נמצא שדה כתיבה: ${sel}`); break; }
   }
 
-  if (!writeBox) {
-    // נסה ללחוץ על האזור המרכזי של הדף ואז לחפש שוב
-    await page.click('body');
-    await new Promise(r => setTimeout(r, 1000));
-    writeBox = await page.$('[role="textbox"]') || await page.$('[contenteditable="true"]');
-    if (!writeBox) throw new Error("לא נמצא שדה כתיבה בקבוצה");
-  }
+  if (!writeBox) throw new Error("לא נמצא חלון כתיבה - ייתכן שהכפתור לא נלחץ");
 
   await writeBox.click();
-  await new Promise(r => setTimeout(r, 1500));
-  await page.keyboard.type(content, { delay: 25 });
+  await new Promise(r => setTimeout(r, 1000));
+  await page.keyboard.type(content, { delay: 30 });
   await new Promise(r => setTimeout(r, 2000));
 
   // העלאת תמונות
@@ -123,8 +125,18 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
     if (fileInput) { await fileInput.uploadFile(...localImagePaths); await new Promise(r => setTimeout(r, 4000)); }
   }
 
-  // לחץ פרסם
-  const publishBtn = await page.$('[aria-label="פרסם"], [aria-label="Post"]');
+  // לחץ פרסם - חפש בתוך ה-dialog
+  const postBtnSelectors = [
+    'div[role="dialog"] [aria-label="פרסם"]',
+    'div[role="dialog"] [aria-label="Post"]',
+    '[aria-label="פרסם"]',
+    '[aria-label="Post"]',
+  ];
+  let publishBtn = null;
+  for (const sel of postBtnSelectors) {
+    publishBtn = await page.$(sel);
+    if (publishBtn) { console.log(`  נמצא כפתור פרסם: ${sel}`); break; }
+  }
   if (!publishBtn) throw new Error("לא נמצא כפתור פרסום");
   await publishBtn.click();
   await new Promise(r => setTimeout(r, 4000));
