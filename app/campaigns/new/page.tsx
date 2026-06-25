@@ -198,34 +198,65 @@ function ScheduleStep({
 
         {/* שעה לכל יום בנפרד */}
         {scheduleDays.length > 0 && (
-          <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-3">
+          <div className="space-y-3">
             <label className="text-sm font-medium text-gray-700">שעת פרסום לכל יום</label>
             {scheduleDays.sort((a,b)=>a-b).map((dayIdx) => {
               const timeStr = dayTimes[dayIdx] || scheduleTime;
-              const [h, m] = timeStr.split(":").map(Number);
-              const startMin = h * 60 + m;
+              const [selH] = timeStr.split(":").map(Number);
+              const startMin = selH * 60 + parseInt(timeStr.split(":")[1]);
               const endMin = startMin + myDurationMin;
-              // בדיקת התנגשות עם קמפיינים קיימים באותו יום שבוע
-              const dayConflict = existingCampaigns.some((c) => {
-                const cd = new Date(c.scheduledAt);
-                if (cd.getDay() !== dayIdx) return false;
-                const cs = cd.getHours() * 60 + cd.getMinutes();
-                const ce = cs + Math.ceil(Math.max(groupsFromTemplateIds(c.templateIds), 1) * 1.5);
-                return startMin < ce && endMin > cs;
-              });
+
+              // שעות עמוסות ביום זה
+              const dayBusyRanges = existingCampaigns
+                .filter((c) => new Date(c.scheduledAt).getDay() === dayIdx)
+                .map((c) => {
+                  const cd = new Date(c.scheduledAt);
+                  const cs = cd.getHours() * 60 + cd.getMinutes();
+                  const ce = cs + Math.ceil(Math.max(groupsFromTemplateIds(c.templateIds), 1) * 1.5);
+                  return { startMin: cs, endMin: ce, title: c.title };
+                });
+
+              const dayConflict = dayBusyRanges.some(r => startMin < r.endMin && endMin > r.startMin);
+
               return (
-                <div key={dayIdx}>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-gray-600 w-12 text-right">{DAY_NAMES[dayIdx]}</span>
-                    <input
-                      type="time"
-                      className={`flex-1 border rounded-xl p-2 text-gray-900 bg-white ${dayConflict ? "border-red-400 bg-red-50" : "border-gray-300"}`}
-                      value={timeStr}
-                      onChange={(e) => setDayTimes((prev) => ({ ...prev, [dayIdx]: e.target.value }))}
-                    />
+                <div key={dayIdx} className="bg-white border border-gray-200 rounded-2xl p-4">
+                  <div className="font-medium text-sm text-gray-700 mb-3">{DAY_NAMES[dayIdx]}</div>
+
+                  {/* טבלת שעות */}
+                  <div className="flex gap-0.5 mb-2 overflow-x-auto pb-1">
+                    {HOURS.map((h) => {
+                      const hStart = h * 60, hEnd = hStart + 60;
+                      const busy = dayBusyRanges.some(r => r.startMin < hEnd && r.endMin > hStart);
+                      const selected = h === selH;
+                      return (
+                        <button
+                          key={h}
+                          onClick={() => setDayTimes((prev) => ({ ...prev, [dayIdx]: `${String(h).padStart(2,"0")}:00` }))}
+                          title={busy ? (dayBusyRanges.find(r => r.startMin < hEnd && r.endMin > hStart)?.title ?? "תפוס") : "פנוי"}
+                          className={`flex-1 min-w-[30px] text-xs py-2 rounded transition-all font-medium ${
+                            selected
+                              ? busy ? "bg-red-500 text-white" : "bg-blue-600 text-white"
+                              : busy ? "bg-red-100 text-red-600 hover:bg-red-200" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          }`}
+                        >{h}</button>
+                      );
+                    })}
                   </div>
+
+                  <div className="flex items-center gap-3 mb-2 text-xs text-gray-500">
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-600 inline-block" /> נבחר</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100 border border-red-300 inline-block" /> תפוס</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-gray-100 inline-block" /> פנוי</span>
+                  </div>
+
+                  <input
+                    type="time"
+                    className={`w-full border rounded-xl p-2 text-gray-900 bg-white text-sm ${dayConflict ? "border-red-400 bg-red-50" : "border-gray-300"}`}
+                    value={timeStr}
+                    onChange={(e) => setDayTimes((prev) => ({ ...prev, [dayIdx]: e.target.value }))}
+                  />
                   {dayConflict && (
-                    <p className="text-xs text-red-600 mt-1 mr-16">⚠️ התנגשות עם קמפיין קיים ביום זה</p>
+                    <p className="text-xs text-red-600 mt-1">⚠️ התנגשות עם קמפיין קיים ביום זה</p>
                   )}
                 </div>
               );
