@@ -89,9 +89,14 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   const url = page.url();
   if (url.includes("login") || url.includes("checkpoint")) throw new Error("נדרש אימות פייסבוק");
 
-  // צלם צילום מסך לפני לחיצה
-  await page.screenshot({ path: "C:\\matara-screenshot.png", fullPage: false });
-  log("[PUBLISH] screenshot saved to C:\\matara-screenshot.png");
+  // צלם צילום מסך לדיבוג
+  try {
+    const shotPath = `C:\\matara-screenshot-${Date.now()}.png`;
+    await page.screenshot({ path: shotPath, fullPage: false });
+    log(`[PUBLISH] screenshot: ${shotPath}`);
+  } catch (e) { log(`[PUBLISH] screenshot failed: ${e.message}`); }
+
+  log(`[PUBLISH] current URL after goto: ${page.url()}`);
 
   // לחץ על כפתור "צור פוסט" / "מה בא לך לשתף" כדי לפתוח את חלון הכתיבה
   const createPostSelectors = [
