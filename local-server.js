@@ -115,14 +115,17 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   // לחץ על "צור פוסט" לפי טקסט
   const createResult = await page.evaluate(() => {
     const texts = ['מה בא לך לשתף', 'Write something', 'צור פוסט', 'Create a post', 'כתוב משהו'];
-    const els = document.querySelectorAll('[role="button"], div[tabindex="0"], [contenteditable]');
+    const els = document.querySelectorAll('[role="button"], div[tabindex="0"]');
     for (const el of els) {
+      const rect = el.getBoundingClientRect();
+      // רק אלמנטים בחלק העליון של המסך (לא תגובות בפיד)
+      if (rect.top < 0 || rect.top > 450) continue;
       const text = (el.textContent || '').trim();
       const label = el.getAttribute('aria-label') || '';
       for (const t of texts) {
         if (text.includes(t) || label.includes(t)) {
           el.click();
-          return `found by text: "${text.substring(0, 40)}" / label: "${label}"`;
+          return `Y=${Math.round(rect.top)}: "${text.substring(0, 40)}" / label="${label}"`;
         }
       }
     }
@@ -131,6 +134,8 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   if (createResult) {
     log(`  [CLICK] create-post: ${createResult}`);
     await new Promise(r => setTimeout(r, 2500));
+  } else {
+    log("  [WARN] create-post NOT found in top 450px");
   }
 
   // חכה לחלון הכתיבה להיפתח - מחפש textbox בתוך dialog או modal
