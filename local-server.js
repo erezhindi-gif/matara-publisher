@@ -78,7 +78,7 @@ async function updatePostStatus(campaignId, groupName, status, error = null) {
   });
 }
 
-async function postToFacebookGroup(page, fbGroupId, groupName, content, localImagePaths = []) {
+async function postToFacebookGroup(page, fbGroupId, groupName, content, localImagePaths = [], backgroundIndex = null) {
   console.log(`  פרסום לקבוצה: ${groupName} (${fbGroupId})`);
 
   // נווט ישירות לקבוצה לפי ID
@@ -156,21 +156,23 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
 
   if (!writeBox) throw new Error("ERROR: textbox not found");
 
-  // אם אין תמונה - לחץ על "Aa" להוספת רקע צבעוני
-  if (localImagePaths.length === 0) {
+  // אם נבחר רקע - לחץ על "Aa" ובחר לפי אינדקס
+  if (localImagePaths.length === 0 && backgroundIndex) {
     try {
-      const aaBtn = await page.$('[aria-label="רקע"], [aria-label="Background"], [aria-label="Aa"]')
-        || await page.evaluateHandle(() => {
-          return [...document.querySelectorAll('[role="button"]')]
-            .find(b => b.textContent.trim() === 'Aa') || null;
-        }).then(h => h.asElement() ? h : null);
-      if (aaBtn) {
-        await aaBtn.click();
-        await new Promise(r => setTimeout(r, 1500));
-        // בחר את הרקע השני (צבעוני)
-        const bgOptions = await page.$$('[aria-label*="רקע"], [aria-label*="background"], [aria-label*="Background"]');
-        if (bgOptions.length > 1) { await bgOptions[1].click(); await new Promise(r => setTimeout(r, 500)); }
-        log('  [OK] background applied');
+      const aaBtn = await page.evaluateHandle(() =>
+        [...document.querySelectorAll('[role="button"]')].find(b => b.textContent.trim() === 'Aa') || null
+      );
+      const aaEl = aaBtn ? await aaBtn.asElement() : null;
+      if (aaEl) {
+        await aaEl.click();
+        await new Promise(r => setTimeout(r, 2000));
+        // לחץ על הרקע לפי אינדקס (1-based)
+        const bgBtns = await page.$$('div[role="dialog"] [role="button"] img, div[role="dialog"] [style*="background"]');
+        if (bgBtns[backgroundIndex - 1]) {
+          await bgBtns[backgroundIndex - 1].click();
+          await new Promise(r => setTimeout(r, 1000));
+          log(`  [OK] background ${backgroundIndex} applied`);
+        }
       }
     } catch (e) { log('  [WARN] background not applied: ' + e.message); }
   }
@@ -281,7 +283,7 @@ async function processCampaign(campaign, profiles) {
     for (const group of groups) {
       log(`[PUBLISH] posting to group: ${group.name} (${group.fbGroupId})`);
       try {
-        await postToFacebookGroup(page, group.fbGroupId, group.name, campaign.content, localImagePaths);
+        await postToFacebookGroup(page, group.fbGroupId, group.name, campaign.content, localImagePaths, campaign.backgroundIndex || null);
         await updatePostStatus(campaign.id, group.name, "published");
         published++;
         log(`[PUBLISH] SUCCESS: ${group.name}`);

@@ -59,9 +59,10 @@ model Campaign {
   status       String            @default("draft")
   business     Business          @relation(fields: [businessId], references: [id])
   businessId   String
-  templateIds  String
-  groupIds     String    @default("[]")
-  scheduledAt  DateTime?
+  templateIds      String
+  groupIds         String    @default("[]")
+  backgroundIndex  Int?
+  scheduledAt      DateTime?
   createdAt    DateTime          @default(now())
   posts        Post[]
   profiles     CampaignProfile[]
