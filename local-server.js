@@ -19,6 +19,13 @@ const QRCode = require("qrcode");
 
 const PORT = 3333;
 const API_BASE = "https://matara-publisher.vercel.app";
+const LOG_FILE = "C:\\matara-logs.txt";
+
+function log(msg) {
+  const line = `[${new Date().toLocaleTimeString("he-IL")}] ${msg}`;
+  console.log(line);
+  try { fs.appendFileSync(LOG_FILE, line + "\n"); } catch {}
+}
 const EDGE_PATH = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 const EDGE_USER_DATA = "C:\\matara-edge-profile";
 
@@ -146,15 +153,15 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
 }
 
 async function processCampaign(campaign, profiles) {
-  console.log(`\n[PUBLISH] campaign: ${campaign.title}`);
+  log(`[PUBLISH] START campaign: ${campaign.title} (${campaign.id})`);
   const profile = profiles.find(p => p.businessId === campaign.businessId && p.isActive);
-  if (!profile) { console.error("[PUBLISH] ERROR: no active profile found for businessId=" + campaign.businessId); return; }
-  console.log("[PUBLISH] profile found, killing old Edge...");
+  if (!profile) { log("[PUBLISH] ERROR: no active profile for businessId=" + campaign.businessId); return; }
+  log("[PUBLISH] profile OK, killing old Edge...");
 
   let browser;
   try {
     try { execSync(`wmic process where "name='msedge.exe' and commandline like '%matara-edge-profile%'" delete`, { timeout: 5000 }); } catch {}
-    console.log("[PUBLISH] launching Edge...");
+    log("[PUBLISH] launching Edge...");
     await new Promise(r => setTimeout(r, 1000));
 
     browser = await puppeteer.launch({
@@ -163,13 +170,13 @@ async function processCampaign(campaign, profiles) {
       args: ["--no-first-run", "--no-default-browser-check", "--no-sandbox"],
       headless: false,
     });
-    console.log("[PUBLISH] Edge launched, opening Facebook...");
+    log("[PUBLISH] Edge launched, opening Facebook...");
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 800 });
     await page.goto("https://www.facebook.com", { waitUntil: "networkidle2" });
     await new Promise(r => setTimeout(r, 2000));
-    if (page.url().includes("login")) { console.error("[PUBLISH] ERROR: not logged into Facebook"); await browser.close(); return; }
-    console.log("[PUBLISH] logged into Facebook OK");
+    if (page.url().includes("login")) { log("[PUBLISH] ERROR: not logged into Facebook"); await browser.close(); return; }
+    log("[PUBLISH] Facebook OK, logged in");
 
     await updateCampaignStatus(campaign.id, "publishing");
 
@@ -179,25 +186,26 @@ async function processCampaign(campaign, profiles) {
 
     let groups;
     if (groupIds.length > 0) {
-      // בחירת קבוצות ידנית - מצא לפי fbGroupId
       const allGroups = allTemplates.flatMap(t => t.groups);
       groups = allGroups.filter(g => groupIds.includes(g.fbGroupId));
     } else {
-      // לפי תבניות
       groups = allTemplates.filter(t => templateIds.includes(t.id)).flatMap(t => t.groups);
     }
-    console.log(`[פרסום] ${groups.length} קבוצות`);
+    log(`[PUBLISH] ${groups.length} groups to post`);
 
     const localImagePaths = campaign.imageUrls?.length > 0 ? await downloadImages(campaign.imageUrls) : [];
     let published = 0, failed = 0;
 
     for (const group of groups) {
+      log(`[PUBLISH] posting to group: ${group.name} (${group.fbGroupId})`);
       try {
         await postToFacebookGroup(page, group.fbGroupId, group.name, campaign.content, localImagePaths);
         await updatePostStatus(campaign.id, group.name, "published");
         published++;
+        log(`[PUBLISH] SUCCESS: ${group.name}`);
         if (published < groups.length) await randomDelay(DELAY_MIN, DELAY_MAX);
       } catch (err) {
+        log(`[PUBLISH] FAILED: ${group.name} - ${err.message}`);
         await updatePostStatus(campaign.id, group.name, "failed", err.message);
         failed++;
       }
@@ -206,7 +214,7 @@ async function processCampaign(campaign, profiles) {
     localImagePaths.forEach(p => { try { fs.unlinkSync(p); } catch {} });
     const finalStatus = published > 0 ? "done" : "failed";
     await updateCampaignStatus(campaign.id, finalStatus);
-    console.log(`[פרסום] ${finalStatus === "done" ? "הושלם" : "נכשל"}: ${published} הצליחו, ${failed} נכשלו`);
+    log(`[PUBLISH] DONE: ${published} success, ${failed} failed => status=${finalStatus}`);
   } finally {
     if (browser) await browser.close().catch(() => {});
   }
