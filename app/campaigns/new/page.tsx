@@ -95,7 +95,7 @@ const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7:00-20:00
 function ScheduleStep({
   form, imagePreviews, scheduleDays, setScheduleDays, scheduleTime, setScheduleTime,
   scheduleStartDate, setScheduleStartDate, existingCampaigns, templates, selectedTemplates, loading, onBack, onSave,
-  dayTimes, setDayTimes,
+  dayTimes, setDayTimes, backgroundIndex,
 }: {
   form: { content: string; whatsappLink: string };
   imagePreviews: string[];
@@ -113,6 +113,7 @@ function ScheduleStep({
   onSave: () => void;
   dayTimes: Record<number, string>;
   setDayTimes: (fn: (prev: Record<number, string>) => Record<number, string>) => void;
+  backgroundIndex: number | null;
 }) {
   // How many groups in selected templates (for THIS campaign)
   const myGroupCount = selectedTemplates.reduce((sum, tid) => {
@@ -887,6 +888,7 @@ export default function NewCampaignPage() {
             onSave={saveCampaign}
             dayTimes={dayTimes}
             setDayTimes={setDayTimes}
+            backgroundIndex={backgroundIndex}
           />
         )}
       </div>
