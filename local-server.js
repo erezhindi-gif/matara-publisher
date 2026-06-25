@@ -98,6 +98,14 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
 
   log(`[PUBLISH] current URL after goto: ${page.url()}`);
 
+  // הדפס את כל ה-aria-labels כדי לדעת מה יש בדף
+  const ariaLabels = await page.evaluate(() => {
+    return [...document.querySelectorAll('[aria-label]')]
+      .map(el => `${el.tagName}[role=${el.getAttribute('role')}]: "${el.getAttribute('aria-label')}"`)
+      .slice(0, 40);
+  });
+  log('[DEBUG] aria-labels on page:\n' + ariaLabels.join('\n'));
+
   // לחץ על כפתור "צור פוסט" / "מה בא לך לשתף" כדי לפתוח את חלון הכתיבה
   const createPostSelectors = [
     '[aria-label="צור פוסט"]',
