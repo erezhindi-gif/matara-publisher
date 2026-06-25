@@ -20,7 +20,7 @@ const QRCode = require("qrcode");
 const PORT = 3333;
 const API_BASE = "https://matara-publisher.vercel.app";
 const EDGE_PATH = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
-const EDGE_USER_DATA = path.join(os.homedir(), "AppData", "Local", "Microsoft", "Edge", "User Data");
+const EDGE_USER_DATA = "C:\\matara-edge-profile";
 
 const SKIP_IDS = new Set([
   "feed", "discover", "create", "joins", "membership", "requests",
@@ -122,13 +122,10 @@ async function processCampaign(campaign, profiles) {
 
   let browser;
   try {
-    // סגור Edge אם פתוח
-    try { execSync("taskkill /F /IM msedge.exe 2>nul"); await new Promise(r => setTimeout(r, 2000)); } catch {}
-
     browser = await puppeteer.launch({
       executablePath: EDGE_PATH,
       userDataDir: EDGE_USER_DATA,
-      args: [`--profile-directory=${profile.edgeProfile}`, "--no-first-run", "--no-default-browser-check"],
+      args: ["--no-first-run", "--no-default-browser-check", "--no-sandbox"],
       headless: false,
     });
     const page = await browser.newPage();
@@ -175,8 +172,6 @@ async function processCampaign(campaign, profiles) {
     console.log(`[פרסום] ${finalStatus === "done" ? "הושלם" : "נכשל"}: ${published} הצליחו, ${failed} נכשלו`);
   } finally {
     if (browser) await browser.close().catch(() => {});
-    // פתח Edge מחדש אחרי הפרסום
-    setTimeout(() => exec(`"${EDGE_PATH}"`), 2000);
   }
 }
 
