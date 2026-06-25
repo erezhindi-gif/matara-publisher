@@ -146,15 +146,16 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
 }
 
 async function processCampaign(campaign, profiles) {
-  console.log(`\n[פרסום] קמפיין: ${campaign.title}`);
+  console.log(`\n[PUBLISH] campaign: ${campaign.title}`);
   const profile = profiles.find(p => p.businessId === campaign.businessId && p.isActive);
-  if (!profile) { console.error("[פרסום] לא נמצא פרופיל פעיל"); return; }
+  if (!profile) { console.error("[PUBLISH] ERROR: no active profile found for businessId=" + campaign.businessId); return; }
+  console.log("[PUBLISH] profile found, killing old Edge...");
 
   let browser;
   try {
-    // סגור רק את הפרוצס של הפרופיל הנפרד שלנו
-    try { execSync(`taskkill /F /FI "WINDOWTITLE eq *matara*" 2>nul`, { timeout: 3000 }); } catch {}
-    try { execSync(`wmic process where "name='msedge.exe' and commandline like '%matara-edge-profile%'" delete`, { timeout: 5000 }); await new Promise(r => setTimeout(r, 1500)); } catch {}
+    try { execSync(`wmic process where "name='msedge.exe' and commandline like '%matara-edge-profile%'" delete`, { timeout: 5000 }); } catch {}
+    console.log("[PUBLISH] launching Edge...");
+    await new Promise(r => setTimeout(r, 1000));
 
     browser = await puppeteer.launch({
       executablePath: EDGE_PATH,
@@ -162,11 +163,13 @@ async function processCampaign(campaign, profiles) {
       args: ["--no-first-run", "--no-default-browser-check", "--no-sandbox"],
       headless: false,
     });
+    console.log("[PUBLISH] Edge launched, opening Facebook...");
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 800 });
     await page.goto("https://www.facebook.com", { waitUntil: "networkidle2" });
     await new Promise(r => setTimeout(r, 2000));
-    if (page.url().includes("login")) { console.error("[פרסום] לא מחובר לפייסבוק"); await browser.close(); return; }
+    if (page.url().includes("login")) { console.error("[PUBLISH] ERROR: not logged into Facebook"); await browser.close(); return; }
+    console.log("[PUBLISH] logged into Facebook OK");
 
     await updateCampaignStatus(campaign.id, "publishing");
 
