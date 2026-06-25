@@ -89,6 +89,10 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   const url = page.url();
   if (url.includes("login") || url.includes("checkpoint")) throw new Error("נדרש אימות פייסבוק");
 
+  // צלם צילום מסך לפני לחיצה
+  await page.screenshot({ path: "C:\\matara-screenshot.png", fullPage: false });
+  log("[PUBLISH] screenshot saved to C:\\matara-screenshot.png");
+
   // לחץ על כפתור "צור פוסט" / "מה בא לך לשתף" כדי לפתוח את חלון הכתיבה
   const createPostSelectors = [
     '[aria-label="צור פוסט"]',
@@ -96,10 +100,12 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
     '[aria-label="מה בא לך לשתף?"]',
     '[aria-label="What\'s on your mind?"]',
   ];
+  let createPostClicked = false;
   for (const sel of createPostSelectors) {
     const btn = await page.$(sel);
-    if (btn) { console.log(`  [CLICK] create-post button found: ${sel}`); await btn.click(); await new Promise(r => setTimeout(r, 2500)); break; }
+    if (btn) { log(`  [CLICK] create-post button found: ${sel}`); await btn.click(); await new Promise(r => setTimeout(r, 2500)); createPostClicked = true; break; }
   }
+  if (!createPostClicked) log("  [WARN] create-post button NOT found - will try textbox directly");
 
   // חכה לחלון הכתיבה להיפתח - מחפש textbox בתוך dialog או modal
   await new Promise(r => setTimeout(r, 1500));
