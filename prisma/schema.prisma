@@ -60,6 +60,7 @@ model Campaign {
   business     Business          @relation(fields: [businessId], references: [id])
   businessId   String
   templateIds  String
+  groupIds     String    @default("[]")
   scheduledAt  DateTime?
   createdAt    DateTime          @default(now())
   posts        Post[]

@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
       imageUrls: body.imageUrls || [],
       businessId: business.id,
       templateIds: JSON.stringify(body.templateIds || []),
+      groupIds: JSON.stringify(body.groupIds || []),
       scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
       status: "pending_approval",
     },

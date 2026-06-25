@@ -139,9 +139,19 @@ async function processCampaign(campaign, profiles) {
 
     await updateCampaignStatus(campaign.id, "publishing");
 
+    const groupIds = JSON.parse(campaign.groupIds || "[]");
     const templateIds = JSON.parse(campaign.templateIds || "[]");
     const allTemplates = await fetch(`${API_BASE}/api/templates`).then(r => r.json());
-    const groups = allTemplates.filter(t => templateIds.includes(t.id)).flatMap(t => t.groups);
+
+    let groups;
+    if (groupIds.length > 0) {
+      // בחירת קבוצות ידנית - מצא לפי fbGroupId
+      const allGroups = allTemplates.flatMap(t => t.groups);
+      groups = allGroups.filter(g => groupIds.includes(g.fbGroupId));
+    } else {
+      // לפי תבניות
+      groups = allTemplates.filter(t => templateIds.includes(t.id)).flatMap(t => t.groups);
+    }
     console.log(`[פרסום] ${groups.length} קבוצות`);
 
     const localImagePaths = campaign.imageUrls?.length > 0 ? await downloadImages(campaign.imageUrls) : [];

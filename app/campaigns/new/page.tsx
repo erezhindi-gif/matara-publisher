@@ -398,10 +398,24 @@ export default function NewCampaignPage() {
   const [contactLinks, setContactLinks] = useState<ContactLink[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
+  const [templateMode, setTemplateMode] = useState<"template" | "groups">("template");
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  const [allGroups, setAllGroups] = useState<{ id: string; fbGroupId: string; name: string; memberCount: number | null }[]>([]);
 
   useEffect(() => {
     fetch("/api/settings").then((r) => r.json()).then(setContactLinks);
-    fetch("/api/templates").then((r) => r.json()).then(setTemplates);
+    fetch("/api/templates").then((r) => r.json()).then((data) => {
+      setTemplates(data);
+      // אסוף את כל הקבוצות מכל התבניות
+      const seen = new Set<string>();
+      const groups: { id: string; fbGroupId: string; name: string; memberCount: number | null }[] = [];
+      for (const t of data) {
+        for (const g of t.groups as { id: string; fbGroupId: string; name: string; memberCount: number | null }[]) {
+          if (!seen.has(g.fbGroupId)) { seen.add(g.fbGroupId); groups.push(g); }
+        }
+      }
+      setAllGroups(groups);
+    });
     fetch("/api/campaigns").then((r) => r.json()).then((data) => {
       if (Array.isArray(data)) setExistingCampaigns(
         data.filter((c) => c.scheduledAt && ["approved", "publishing", "done"].includes(c.status))
@@ -521,7 +535,8 @@ export default function NewCampaignPage() {
             emailLink: form.emailLink,
             imageUrls,
             scheduledAt,
-            templateIds: selectedTemplates,
+            templateIds: templateMode === "template" ? selectedTemplates : [],
+            groupIds: templateMode === "groups" ? selectedGroupIds : [],
           }),
         });
       }
@@ -694,43 +709,90 @@ export default function NewCampaignPage() {
           </div>
         )}
 
-        {/* Step 2: Templates */}
+        {/* Step 2: Templates / Groups */}
         {step === "templates" && (
           <div className="max-w-2xl space-y-5">
-            <p className="text-gray-700">בחר תבניות קבוצות לפרסום:</p>
+            {/* טאבים */}
+            <div className="flex bg-gray-100 rounded-xl p-1">
+              <button
+                onClick={() => setTemplateMode("template")}
+                className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${templateMode === "template" ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
+              >תבנית קבוצות</button>
+              <button
+                onClick={() => setTemplateMode("groups")}
+                className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${templateMode === "groups" ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
+              >בחירת קבוצות ידנית</button>
+            </div>
 
-            {templates.filter((t) => t.businessId === form.businessId).length === 0 ? (
-              <div className="text-center text-gray-500 bg-white rounded-2xl p-8 border border-gray-200">
-                <p>אין תבניות לעסק זה עדיין</p>
-                <a href="/templates" target="_blank" className="text-blue-500 hover:underline text-sm mt-2 inline-block">צור תבנית חדשה</a>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {templates.filter((t) => t.businessId === form.businessId).map((t) => (
-                  <div
-                    key={t.id}
-                    onClick={() => setSelectedTemplates((prev) => prev.includes(t.id) ? prev.filter((id) => id !== t.id) : [...prev, t.id])}
-                    className={`border rounded-xl p-4 cursor-pointer transition-all ${selectedTemplates.includes(t.id) ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white hover:border-gray-400"}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">{t.name}</div>
-                        <div className="text-xs text-gray-500">{t.groups.length} קבוצות</div>
+            {/* מצב תבנית */}
+            {templateMode === "template" && (
+              <>
+                <p className="text-gray-700">בחר תבניות קבוצות לפרסום:</p>
+                {templates.filter((t) => t.businessId === form.businessId).length === 0 ? (
+                  <div className="text-center text-gray-500 bg-white rounded-2xl p-8 border border-gray-200">
+                    <p>אין תבניות לעסק זה עדיין</p>
+                    <a href="/templates" target="_blank" className="text-blue-500 hover:underline text-sm mt-2 inline-block">צור תבנית חדשה</a>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {templates.filter((t) => t.businessId === form.businessId).map((t) => (
+                      <div
+                        key={t.id}
+                        onClick={() => setSelectedTemplates((prev) => prev.includes(t.id) ? prev.filter((id) => id !== t.id) : [...prev, t.id])}
+                        className={`border rounded-xl p-4 cursor-pointer transition-all ${selectedTemplates.includes(t.id) ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white hover:border-gray-400"}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{t.name}</div>
+                            <div className="text-xs text-gray-500">{t.groups.length} קבוצות</div>
+                          </div>
+                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${selectedTemplates.includes(t.id) ? "border-blue-500 bg-blue-500" : "border-gray-400"}`}>
+                            {selectedTemplates.includes(t.id) && <span className="text-white text-xs">✓</span>}
+                          </div>
+                        </div>
                       </div>
-                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${selectedTemplates.includes(t.id) ? "border-blue-500 bg-blue-500" : "border-gray-400"}`}>
-                        {selectedTemplates.includes(t.id) && <span className="text-white text-xs">✓</span>}
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* מצב קבוצות ידנית */}
+            {templateMode === "groups" && (
+              <>
+                <p className="text-gray-700">בחר קבוצות לפרסום חד-פעמי:</p>
+                {selectedGroupIds.length > 0 && (
+                  <div className="text-sm text-blue-600 font-medium">{selectedGroupIds.length} קבוצות נבחרו</div>
+                )}
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {allGroups.length === 0 ? (
+                    <div className="text-center text-gray-500 bg-white rounded-2xl p-8 border border-gray-200">
+                      אין קבוצות - <a href="/templates" target="_blank" className="text-blue-500 hover:underline">הוסף קבוצות לתבנית</a>
+                    </div>
+                  ) : allGroups.map((g) => (
+                    <div
+                      key={g.fbGroupId}
+                      onClick={() => setSelectedGroupIds((prev) => prev.includes(g.fbGroupId) ? prev.filter((id) => id !== g.fbGroupId) : [...prev, g.fbGroupId])}
+                      className={`border rounded-xl p-3 cursor-pointer transition-all flex items-center gap-3 ${selectedGroupIds.includes(g.fbGroupId) ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white hover:border-gray-400"}`}
+                    >
+                      <div className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center ${selectedGroupIds.includes(g.fbGroupId) ? "border-blue-500 bg-blue-500" : "border-gray-400"}`}>
+                        {selectedGroupIds.includes(g.fbGroupId) && <span className="text-white text-xs">✓</span>}
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium">{g.name}</div>
+                        {g.memberCount && <div className="text-xs text-gray-500">{g.memberCount.toLocaleString()} חברים</div>}
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </>
             )}
 
             <div className="flex gap-3">
               <button onClick={() => setStep("form")} className="flex-1 bg-gray-200 hover:bg-gray-300 rounded-xl p-3 transition-colors">חזרה</button>
               <button
                 onClick={() => setStep("schedule")}
-                disabled={selectedTemplates.length === 0}
+                disabled={templateMode === "template" ? selectedTemplates.length === 0 : selectedGroupIds.length === 0}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-400 text-white rounded-xl p-3 font-semibold transition-colors"
               >
                 המשך לתזמון →
