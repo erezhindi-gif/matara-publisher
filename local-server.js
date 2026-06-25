@@ -91,7 +91,7 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   ];
   for (const sel of createPostSelectors) {
     const btn = await page.$(sel);
-    if (btn) { console.log(`  לחיצה על: ${sel}`); await btn.click(); await new Promise(r => setTimeout(r, 2500)); break; }
+    if (btn) { console.log(`  [CLICK] create-post button found: ${sel}`); await btn.click(); await new Promise(r => setTimeout(r, 2500)); break; }
   }
 
   // חכה לחלון הכתיבה להיפתח - מחפש textbox בתוך dialog או modal
@@ -107,10 +107,10 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   ];
   for (const sel of boxSelectors) {
     writeBox = await page.$(sel);
-    if (writeBox) { console.log(`  נמצא שדה כתיבה: ${sel}`); break; }
+    if (writeBox) { console.log(`  [OK] textbox found: ${sel}`); break; }
   }
 
-  if (!writeBox) throw new Error("לא נמצא חלון כתיבה - ייתכן שהכפתור לא נלחץ");
+  if (!writeBox) throw new Error("ERROR: textbox not found - create-post button may not have been clicked");
 
   await writeBox.click();
   await new Promise(r => setTimeout(r, 1000));
@@ -135,9 +135,9 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   let publishBtn = null;
   for (const sel of postBtnSelectors) {
     publishBtn = await page.$(sel);
-    if (publishBtn) { console.log(`  נמצא כפתור פרסם: ${sel}`); break; }
+    if (publishBtn) { console.log(`  [OK] post button found: ${sel}`); break; }
   }
-  if (!publishBtn) throw new Error("לא נמצא כפתור פרסום");
+  if (!publishBtn) throw new Error("ERROR: post button not found");
   await publishBtn.click();
   await new Promise(r => setTimeout(r, 4000));
 
