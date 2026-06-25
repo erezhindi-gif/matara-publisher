@@ -200,17 +200,36 @@ function ScheduleStep({
         {scheduleDays.length > 0 && (
           <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-3">
             <label className="text-sm font-medium text-gray-700">שעת פרסום לכל יום</label>
-            {scheduleDays.sort((a,b)=>a-b).map((dayIdx) => (
-              <div key={dayIdx} className="flex items-center gap-3">
-                <span className="text-sm text-gray-600 w-12 text-right">{DAY_NAMES[dayIdx]}</span>
-                <input
-                  type="time"
-                  className="flex-1 border border-gray-300 rounded-xl p-2 text-gray-900 bg-white"
-                  value={dayTimes[dayIdx] || scheduleTime}
-                  onChange={(e) => setDayTimes((prev) => ({ ...prev, [dayIdx]: e.target.value }))}
-                />
-              </div>
-            ))}
+            {scheduleDays.sort((a,b)=>a-b).map((dayIdx) => {
+              const timeStr = dayTimes[dayIdx] || scheduleTime;
+              const [h, m] = timeStr.split(":").map(Number);
+              const startMin = h * 60 + m;
+              const endMin = startMin + myDurationMin;
+              // בדיקת התנגשות עם קמפיינים קיימים באותו יום שבוע
+              const dayConflict = existingCampaigns.some((c) => {
+                const cd = new Date(c.scheduledAt);
+                if (cd.getDay() !== dayIdx) return false;
+                const cs = cd.getHours() * 60 + cd.getMinutes();
+                const ce = cs + Math.ceil(Math.max(groupsFromTemplateIds(c.templateIds), 1) * 1.5);
+                return startMin < ce && endMin > cs;
+              });
+              return (
+                <div key={dayIdx}>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-gray-600 w-12 text-right">{DAY_NAMES[dayIdx]}</span>
+                    <input
+                      type="time"
+                      className={`flex-1 border rounded-xl p-2 text-gray-900 bg-white ${dayConflict ? "border-red-400 bg-red-50" : "border-gray-300"}`}
+                      value={timeStr}
+                      onChange={(e) => setDayTimes((prev) => ({ ...prev, [dayIdx]: e.target.value }))}
+                    />
+                  </div>
+                  {dayConflict && (
+                    <p className="text-xs text-red-600 mt-1 mr-16">⚠️ התנגשות עם קמפיין קיים ביום זה</p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
