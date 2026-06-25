@@ -22,7 +22,7 @@ type Template = {
   id: string;
   name: string;
   businessId: string;
-  groups: { id: string }[];
+  groups: { id: string; fbGroupId: string; name: string; memberCount: number | null }[];
 };
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -109,10 +109,20 @@ export default function CampaignDetailPage() {
 
   // Duplicate state
   const [dupTemplates, setDupTemplates] = useState<string[]>([]);
+  const [dupGroupIds, setDupGroupIds] = useState<string[]>([]);
+  const [dupMode, setDupMode] = useState<"template" | "groups">("template");
+  const [dupContent, setDupContent] = useState("");
+  const [dupScheduledAt, setDupScheduledAt] = useState("");
+  const [allGroups, setAllGroups] = useState<{ id: string; fbGroupId: string; name: string; memberCount: number | null }[]>([]);
 
   useEffect(() => {
     fetchCampaign();
-    fetch("/api/templates").then((r) => r.json()).then(setTemplates);
+    fetch("/api/templates").then((r) => r.json()).then((data) => {
+      setTemplates(Array.isArray(data) ? data : []);
+      const groups = (Array.isArray(data) ? data : []).flatMap((t: Template & { groups: { id: string; fbGroupId: string; name: string; memberCount: number | null }[] }) => t.groups);
+      const unique = groups.filter((g, i, arr) => arr.findIndex(x => x.id === g.id) === i);
+      setAllGroups(unique);
+    });
   }, [id]);
 
   function fetchCampaign() {
@@ -195,7 +205,9 @@ export default function CampaignDetailPage() {
   }
 
   async function duplicateCampaign() {
-    if (!campaign || dupTemplates.length === 0) return;
+    if (!campaign) return;
+    if (dupMode === "template" && dupTemplates.length === 0) return;
+    if (dupMode === "groups" && dupGroupIds.length === 0) return;
     setSaving(true);
     await fetch("/api/campaigns", {
       method: "POST",
@@ -203,16 +215,28 @@ export default function CampaignDetailPage() {
       body: JSON.stringify({
         businessId: campaign.business.id,
         title: campaign.title,
-        content: campaign.content,
+        content: dupContent || campaign.content,
         whatsappLink: campaign.whatsappLink,
         emailLink: campaign.emailLink,
-        scheduledAt: campaign.scheduledAt,
-        templateIds: dupTemplates,
+        imageUrls: campaign.imageUrls,
+        scheduledAt: dupScheduledAt ? new Date(dupScheduledAt).toISOString() : campaign.scheduledAt,
+        templateIds: dupMode === "template" ? dupTemplates : [],
+        groupIds: dupMode === "groups" ? dupGroupIds : [],
       }),
     });
     setSaving(false);
     setMode("view");
-    alert("הקמפיין שוכפל לתבניות הנבחרות");
+    alert("הקמפיין שוכפל בהצלחה");
+  }
+
+  function startDuplicate() {
+    if (!campaign) return;
+    setDupContent(campaign.content || "");
+    setDupScheduledAt(campaign.scheduledAt ? toLocalDatetime(campaign.scheduledAt) : "");
+    setDupTemplates([]);
+    setDupGroupIds([]);
+    setDupMode("template");
+    setMode("duplicate");
   }
 
   async function deleteCampaign() {
@@ -249,7 +273,7 @@ export default function CampaignDetailPage() {
           {mode === "view" && (
             <div className="flex gap-2">
               <button onClick={startEdit} className="text-sm bg-white border border-gray-300 hover:border-gray-400 rounded-xl px-4 py-2 transition-colors">✏️ ערוך</button>
-              <button onClick={() => setMode("duplicate")} className="text-sm bg-white border border-gray-300 hover:border-gray-400 rounded-xl px-4 py-2 transition-colors">📋 שכפל</button>
+              <button onClick={startDuplicate} className="text-sm bg-white border border-gray-300 hover:border-gray-400 rounded-xl px-4 py-2 transition-colors">📋 שכפל</button>
               <button onClick={deleteCampaign} className="text-sm bg-white border border-red-300 hover:bg-red-50 text-red-600 rounded-xl px-4 py-2 transition-colors">🗑️</button>
             </div>
           )}
@@ -507,12 +531,47 @@ export default function CampaignDetailPage() {
         {/* DUPLICATE MODE */}
         {mode === "duplicate" && (
           <div className="space-y-5">
+            {/* Content */}
             <div className="bg-white border border-gray-200 rounded-2xl p-5">
-              <div className="text-sm font-medium mb-3">בחר תבניות לשכפול</div>
-              {businessTemplates.length === 0 ? (
-                <div className="text-sm text-gray-500">אין תבניות לעסק זה</div>
-              ) : (
+              <label className="block text-sm text-gray-500 mb-2">תוכן הפוסט</label>
+              <textarea
+                className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900 text-sm min-h-[160px]"
+                value={dupContent}
+                onChange={(e) => setDupContent(e.target.value)}
+              />
+            </div>
+
+            {/* Date/time */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-5">
+              <label className="block text-sm text-gray-500 mb-2">תאריך ושעה</label>
+              <input
+                type="datetime-local"
+                className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900"
+                value={dupScheduledAt}
+                onChange={(e) => setDupScheduledAt(e.target.value)}
+              />
+            </div>
+
+            {/* Groups / Templates */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-5">
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => setDupMode("template")}
+                  className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${dupMode === "template" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                >
+                  תבניות
+                </button>
+                <button
+                  onClick={() => setDupMode("groups")}
+                  className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${dupMode === "groups" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                >
+                  קבוצות בודדות
+                </button>
+              </div>
+
+              {dupMode === "template" ? (
                 <div className="space-y-2">
+                  {businessTemplates.length === 0 && <div className="text-sm text-gray-400">אין תבניות לעסק זה</div>}
                   {businessTemplates.map((t) => (
                     <label key={t.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100">
                       <input
@@ -521,19 +580,46 @@ export default function CampaignDetailPage() {
                         onChange={(e) => setDupTemplates(d => e.target.checked ? [...d, t.id] : d.filter(x => x !== t.id))}
                         className="w-4 h-4"
                       />
-                      <div>
+                      <div className="flex-1">
                         <div className="text-sm font-medium">{t.name}</div>
                         <div className="text-xs text-gray-500">{t.groups.length} קבוצות</div>
                       </div>
                     </label>
                   ))}
                 </div>
+              ) : (
+                <div className="space-y-1.5 max-h-72 overflow-y-auto">
+                  {allGroups.length === 0 && <div className="text-sm text-gray-400">אין קבוצות</div>}
+                  {allGroups.map((g) => (
+                    <label key={g.id} className="flex items-center gap-3 p-2.5 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100">
+                      <input
+                        type="checkbox"
+                        checked={dupGroupIds.includes(g.id)}
+                        onChange={(e) => setDupGroupIds(d => e.target.checked ? [...d, g.id] : d.filter(x => x !== g.id))}
+                        className="w-4 h-4"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm truncate">{g.name}</div>
+                        {g.memberCount && <div className="text-xs text-gray-400">{g.memberCount.toLocaleString()} חברים</div>}
+                      </div>
+                    </label>
+                  ))}
+                </div>
               )}
+
+              <div className="mt-3 text-xs text-gray-400">
+                {dupMode === "template" ? `${dupTemplates.length} תבניות נבחרו` : `${dupGroupIds.length} קבוצות נבחרו`}
+              </div>
             </div>
+
             <div className="flex gap-3">
               <button onClick={() => setMode("view")} className="flex-1 bg-gray-100 hover:bg-gray-200 rounded-xl p-3 transition-colors">ביטול</button>
-              <button onClick={duplicateCampaign} disabled={saving || dupTemplates.length === 0} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-xl p-3 font-semibold transition-colors">
-                {saving ? "משכפל..." : `שכפל ל-${dupTemplates.length} תבניות`}
+              <button
+                onClick={duplicateCampaign}
+                disabled={saving || (dupMode === "template" ? dupTemplates.length === 0 : dupGroupIds.length === 0)}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-xl p-3 font-semibold transition-colors"
+              >
+                {saving ? "משכפל..." : "שכפל קמפיין"}
               </button>
             </div>
           </div>
