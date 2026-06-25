@@ -132,7 +132,13 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
     if (fileInput) { await fileInput.uploadFile(...localImagePaths); await new Promise(r => setTimeout(r, 4000)); }
   }
 
-  // לחץ פרסם - חפש בתוך ה-dialog
+  // סגור פופ-אפ של פייסבוק אם קיים
+  try {
+    const noThanks = await page.$('[aria-label="לא עכשיו"], [aria-label="Not Now"]');
+    if (noThanks) { await noThanks.click(); await new Promise(r => setTimeout(r, 1000)); }
+  } catch {}
+
+  // לחץ פרסם - נסה כמה selectors
   const postBtnSelectors = [
     'div[role="dialog"] [aria-label="פרסם"]',
     'div[role="dialog"] [aria-label="Post"]',
@@ -144,6 +150,20 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
     publishBtn = await page.$(sel);
     if (publishBtn) { console.log(`  [OK] post button found: ${sel}`); break; }
   }
+
+  // fallback: חפש כפתור עם טקסט "פרסם" או "Post"
+  if (!publishBtn) {
+    publishBtn = await page.evaluateHandle(() => {
+      const btns = Array.from(document.querySelectorAll('div[role="dialog"] [role="button"], [role="button"]'));
+      return btns.find(b => b.textContent.trim() === "פרסם" || b.textContent.trim() === "Post") || null;
+    });
+    if (publishBtn && (await publishBtn.asElement())) {
+      console.log("  [OK] post button found by text content");
+    } else {
+      publishBtn = null;
+    }
+  }
+
   if (!publishBtn) throw new Error("ERROR: post button not found");
   await publishBtn.click();
   await new Promise(r => setTimeout(r, 4000));
