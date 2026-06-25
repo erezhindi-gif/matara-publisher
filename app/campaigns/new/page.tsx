@@ -252,14 +252,19 @@ function ScheduleStep({
               const publishedCount = publishedPostsOnDate(dayNextDate);
 
               return (
-                <div key={dayIdx} className="bg-white border border-gray-200 rounded-2xl p-4">
+                <div key={dayIdx} className={`rounded-2xl p-4 border ${dayFull ? "bg-red-50 border-red-300" : "bg-white border-gray-200"}`}>
                   <div className="flex items-center justify-between mb-3">
                     <div className="font-medium text-sm text-gray-700">{DAY_NAMES[dayIdx]}</div>
-                    <div className={`text-xs px-2 py-0.5 rounded-full ${dayFull ? "bg-red-100 text-red-600" : publishedCount > 200 ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"}`}>
+                    <div className={`text-xs px-2 py-0.5 rounded-full ${dayFull ? "bg-red-200 text-red-700 font-bold" : publishedCount > 200 ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"}`}>
                       {publishedCount}/300 פוסטים
                     </div>
                   </div>
-                  {dayFull && <div className="bg-red-50 border border-red-200 rounded-xl p-2 text-xs text-red-700 mb-3">🚫 היום מלא - הגעת ל-300 פוסטים</div>}
+                  {dayFull && (
+                    <div className="text-center py-4 text-red-600 font-medium text-sm">
+                      🚫 היום חסום - הגעת למגבלת 300 פוסטים
+                    </div>
+                  )}
+                  {!dayFull && (<>
 
                   {/* טבלת שעות */}
                   <div className="flex gap-0.5 mb-2 overflow-x-auto pb-1">
@@ -297,6 +302,7 @@ function ScheduleStep({
                   {dayConflict && (
                     <p className="text-xs text-red-600 mt-1">⚠️ התנגשות עם קמפיין קיים ביום זה</p>
                   )}
+                </>)}
                 </div>
               );
             })}
@@ -356,7 +362,7 @@ function ScheduleStep({
           <button onClick={onBack} className="flex-1 bg-gray-200 hover:bg-gray-300 rounded-xl p-3 transition-colors">חזרה</button>
           <button
             onClick={onSave}
-            disabled={loading || (scheduleDays.length > 0 && !scheduleStartDate)}
+            disabled={loading || (scheduleDays.length > 0 && !scheduleStartDate) || scheduleDays.some(d => { const nd = new Date(scheduleStartDate || new Date()); nd.setDate(nd.getDate() + (d - nd.getDay() + 7) % 7); return isDayFull(nd); })}
             className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-xl p-3 font-semibold transition-colors"
           >
             {loading ? "שומר..." : "✓ שמור קמפיין"}
