@@ -114,18 +114,31 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
 
   // לחץ על "צור פוסט" לפי טקסט
   const createResult = await page.evaluate(() => {
-    const texts = ['מה בא לך לשתף', 'Write something', 'צור פוסט', 'Create a post', 'כתוב משהו'];
-    const els = document.querySelectorAll('[role="button"], div[tabindex="0"]');
+    const texts = ['כאן כותבים', 'מה בא לך לשתף', 'Write something', 'צור פוסט', 'Create a post', 'כתוב משהו'];
+
+    // חפש גם ב-placeholder attributes
+    const placeholderEls = document.querySelectorAll('[placeholder]');
+    for (const el of placeholderEls) {
+      if (el.closest('[role="article"]')) continue;
+      const ph = el.getAttribute('placeholder') || '';
+      if (texts.some(t => ph.includes(t))) {
+        const rect = el.getBoundingClientRect();
+        el.click();
+        return `placeholder: "${ph}"`;
+      }
+    }
+
+    // חפש ב-contenteditable ו-buttons
+    const els = document.querySelectorAll('[role="button"], div[tabindex="0"], [contenteditable]');
     for (const el of els) {
-      // דלג על אלמנטים בתוך פוסטים קיימים (תגובות)
-      if (el.closest('[role="article"]') || el.closest('[role="feed"] [role="article"]')) continue;
+      if (el.closest('[role="article"]')) continue;
       const text = (el.textContent || '').trim();
       const label = el.getAttribute('aria-label') || '';
       for (const t of texts) {
         if (text.includes(t) || label.includes(t)) {
           const rect = el.getBoundingClientRect();
           el.click();
-          return `Y=${Math.round(rect.top)}: "${text.substring(0, 40)}" / label="${label}"`;
+          return `Y=${Math.round(rect.top)}: "${text.substring(0, 40)}"`;
         }
       }
     }
@@ -142,9 +155,20 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   await new Promise(r => setTimeout(r, 2000));
 
   let writeBox = await page.$('div[role="dialog"] [role="textbox"]')
-    || await page.$('div[role="dialog"] [contenteditable="true"]');
+    || await page.$('div[role="dialog"] [contenteditable="true"]')
+    || await page.$('[placeholder="כאן כותבים..."]')
+    || await page.$('[placeholder="Write something..."]');
 
-  if (!writeBox) throw new Error("ERROR: textbox not found inside dialog");
+  // fallback - חפש textbox שלא בתוך article
+  if (!writeBox) {
+    const boxes = await page.$$('[role="textbox"], [contenteditable="true"]');
+    for (const box of boxes) {
+      const isInArticle = await page.evaluate(el => !!el.closest('[role="article"]'), box);
+      if (!isInArticle) { writeBox = box; break; }
+    }
+  }
+
+  if (!writeBox) throw new Error("ERROR: textbox not found");
 
   await writeBox.click();
   await new Promise(r => setTimeout(r, 1000));
@@ -178,14 +202,18 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
     if (publishBtn) { console.log(`  [OK] post button found: ${sel}`); break; }
   }
 
-  // fallback: חפש כפתור עם טקסט "פרסם" או "Post"
+  // fallback: חפש כפתור עם טקסט "פרסם" / "Post" / "שתף" שלא בתוך article
   if (!publishBtn) {
     publishBtn = await page.evaluateHandle(() => {
-      const btns = Array.from(document.querySelectorAll('div[role="dialog"] [role="button"], [role="button"]'));
-      return btns.find(b => b.textContent.trim() === "פרסם" || b.textContent.trim() === "Post") || null;
+      const btns = Array.from(document.querySelectorAll('[role="button"]'));
+      return btns.find(b => {
+        if (b.closest('[role="article"]')) return false;
+        const t = b.textContent.trim();
+        return t === "פרסם" || t === "Post" || t === "שתף";
+      }) || null;
     });
     if (publishBtn && (await publishBtn.asElement())) {
-      console.log("  [OK] post button found by text content");
+      log("  [OK] post button found by text");
     } else {
       publishBtn = null;
     }
