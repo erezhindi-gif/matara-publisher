@@ -156,6 +156,7 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
 
   let writeBox = await page.$('div[role="dialog"] [role="textbox"]')
     || await page.$('div[role="dialog"] [contenteditable="true"]')
+    || await page.$('[placeholder="יצירת פוסט ציבורי..."]')
     || await page.$('[placeholder="כאן כותבים..."]')
     || await page.$('[placeholder="Write something..."]');
 
@@ -195,8 +196,10 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
 
   // לחץ פרסם - נסה כמה selectors
   const postBtnSelectors = [
+    'div[role="dialog"] [aria-label="פרסום"]',
     'div[role="dialog"] [aria-label="פרסם"]',
     'div[role="dialog"] [aria-label="Post"]',
+    '[aria-label="פרסום"]',
     '[aria-label="פרסם"]',
     '[aria-label="Post"]',
   ];
@@ -213,7 +216,7 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
       return btns.find(b => {
         if (b.closest('[role="article"]')) return false;
         const t = b.textContent.trim();
-        return t === "פרסם" || t === "Post" || t === "שתף";
+        return t === "פרסם" || t === "פרסום" || t === "Post" || t === "שתף";
       }) || null;
     });
     if (publishBtn && (await publishBtn.asElement())) {
