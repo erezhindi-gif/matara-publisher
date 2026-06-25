@@ -159,19 +159,30 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   // אם נבחר רקע - לחץ על "Aa" ובחר לפי אינדקס
   if (localImagePaths.length === 0 && backgroundIndex) {
     try {
-      const aaBtn = await page.evaluateHandle(() =>
-        [...document.querySelectorAll('[role="button"]')].find(b => b.textContent.trim() === 'Aa') || null
-      );
-      const aaEl = aaBtn ? await aaBtn.asElement() : null;
+      // מצא כפתור Aa לפי תמונה או טקסט
+      const aaEl = await page.$('img[src*="SATP_Aa_square"]')
+        .then(img => img ? page.evaluateHandle(el => el.closest('[role="button"]'), img) : null)
+        .then(h => (h && h.asElement) ? h.asElement() : null)
+        .catch(() => null)
+        || await page.evaluateHandle(() =>
+          [...document.querySelectorAll('[role="button"]')].find(b => b.textContent.trim() === 'Aa') || null
+        ).then(h => h && h.asElement ? h.asElement() : null).catch(() => null);
+
+      log(`  [BG] Aa button found: ${!!aaEl}`);
       if (aaEl) {
         await aaEl.click();
         await new Promise(r => setTimeout(r, 2000));
-        // לחץ על הרקע לפי אינדקס (1-based)
-        const bgBtns = await page.$$('div[role="dialog"] [role="button"] img, div[role="dialog"] [style*="background"]');
-        if (bgBtns[backgroundIndex - 1]) {
+        // לחץ על הרקע לפי אינדקס (1-based) - כפתורים בתוך פאנל הרקע
+        const bgBtns = await page.$$('[role="button"] img[src*="SATP"], [role="button"][style*="background-image"], div[role="dialog"] li [role="button"]');
+        log(`  [BG] found ${bgBtns.length} background buttons`);
+        if (bgBtns.length > 0 && bgBtns[backgroundIndex - 1]) {
           await bgBtns[backgroundIndex - 1].click();
           await new Promise(r => setTimeout(r, 1000));
           log(`  [OK] background ${backgroundIndex} applied`);
+        } else if (bgBtns.length > 0) {
+          await bgBtns[0].click();
+          await new Promise(r => setTimeout(r, 1000));
+          log(`  [OK] background first applied (index ${backgroundIndex} out of ${bgBtns.length})`);
         }
       }
     } catch (e) { log('  [WARN] background not applied: ' + e.message); }

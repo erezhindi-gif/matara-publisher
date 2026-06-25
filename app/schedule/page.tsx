@@ -10,7 +10,9 @@ type Campaign = {
   status: string;
   scheduledAt: string | null;
   templateIds: string;
+  groupIds: string;
   business: { name: string; type: string };
+  posts: { status: string; groupName: string }[];
 };
 
 type Template = {
@@ -55,15 +57,24 @@ function fmtTimeStr(iso: string) {
   return fmtTime(new Date(iso));
 }
 
-function getEndTime(campaign: Campaign, templates: Template[]): Date | null {
-  if (!campaign.scheduledAt) return null;
+function getGroupCount(campaign: Campaign, templates: Template[]): number {
   try {
     const ids: string[] = JSON.parse(campaign.templateIds || "[]");
-    const groups = ids.reduce((sum, tid) => {
+    const fromTemplates = ids.reduce((sum, tid) => {
       const t = templates.find((t) => t.id === tid);
       return sum + (t?.groups.length || 0);
     }, 0);
-    const durationMs = Math.max(groups, 1) * 90 * 1000; // 90s max delay per group (worst case)
+    if (fromTemplates > 0) return fromTemplates;
+    const gids: string[] = JSON.parse(campaign.groupIds || "[]");
+    return gids.length;
+  } catch { return 0; }
+}
+
+function getEndTime(campaign: Campaign, templates: Template[]): Date | null {
+  if (!campaign.scheduledAt) return null;
+  try {
+    const groups = getGroupCount(campaign, templates);
+    const durationMs = Math.max(groups, 1) * 90 * 1000;
     return new Date(new Date(campaign.scheduledAt).getTime() + durationMs);
   } catch { return null; }
 }
@@ -89,6 +100,9 @@ export default function SchedulePage() {
   useEffect(() => {
     fetchCampaigns();
     fetch("/api/templates").then((r) => r.json()).then((data) => setTemplates(Array.isArray(data) ? data : []));
+    // רענון אוטומטי כל 15 שניות
+    const interval = setInterval(fetchCampaigns, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   function fetchCampaigns() {
@@ -216,6 +230,8 @@ export default function SchedulePage() {
                       )}
                       {dayCampaigns.map((c) => {
                         const s = STATUS[c.status] || STATUS.draft;
+                        const totalGroups = getGroupCount(c, templates);
+                        const publishedGroups = c.posts?.filter(p => p.status === "published").length || 0;
                         return (
                           <Link key={c.id} href={`/campaigns/${c.id}`} className={`block rounded-lg p-2 ${s.bg} border border-opacity-50 hover:opacity-80 transition-opacity`} style={{ borderColor: "currentColor" }}>
                             <div className="flex items-center gap-1 mb-0.5">
@@ -226,7 +242,14 @@ export default function SchedulePage() {
                               </span>
                             </div>
                             <div className="text-xs text-gray-800 line-clamp-2 leading-tight">{c.title}</div>
-                            <div className={`text-xs mt-0.5 ${s.text}`}>{s.label}</div>
+                            <div className="flex items-center justify-between mt-0.5">
+                              <span className={`text-xs ${s.text}`}>{s.label}</span>
+                              {totalGroups > 0 && (
+                                <span className="text-xs text-gray-500">
+                                  {c.status === "done" ? `${publishedGroups}/${totalGroups}` : totalGroups} קב׳
+                                </span>
+                              )}
+                            </div>
                           </Link>
                         );
                       })}
