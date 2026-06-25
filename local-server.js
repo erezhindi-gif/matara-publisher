@@ -19,7 +19,7 @@ const QRCode = require("qrcode");
 
 const PORT = 3333;
 const API_BASE = "https://matara-publisher.vercel.app";
-const LOG_FILE = "C:\\matara-logs.txt";
+const LOG_FILE = "C:\\Projects\\matara-publisher\\matara-logs.txt";
 
 function log(msg) {
   const line = `[${new Date().toLocaleTimeString("he-IL")}] ${msg}`;
@@ -176,45 +176,54 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
         // צלם לראות מה נפתח
         try { await page.screenshot({ path: `C:\\matara-bg-debug.png` }); } catch {}
 
-        // לוג DOM - מה יש בדיאלוג אחרי לחיצה על Aa
-        const domInfo = await page.evaluate(() => {
+        // מצא את כפתורי הרקע לפי computed background-color (הם צבעוניים)
+        const bgHandle = await page.evaluateHandle((bgIdx) => {
           const dialog = document.querySelector('[role="dialog"]');
-          if (!dialog) return 'NO DIALOG';
-          const btns = [...dialog.querySelectorAll('[role="button"]')];
-          return btns.slice(0, 20).map(b => {
-            const style = b.getAttribute('style') || '';
-            const ariaLabel = b.getAttribute('aria-label') || '';
-            const img = b.querySelector('img');
-            const imgSrc = img ? img.src.slice(-50) : '';
-            return `btn: label="${ariaLabel}" style="${style.slice(0,60)}" img="${imgSrc}"`;
-          }).join('\n');
-        });
-        log(`  [BG-DOM]:\n${domInfo}`);
+          if (!dialog) return null;
+          // כל הכפתורים בדיאלוג עם background-color שאינו שקוף/לבן/אפור
+          const allBtns = [...dialog.querySelectorAll('[role="button"]')];
+          const colorBtns = allBtns.filter(b => {
+            const bg = window.getComputedStyle(b).backgroundColor;
+            if (!bg || bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent') return false;
+            // סנן כפתורים לבנים/אפורים/שקופים
+            const match = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+            if (!match) return false;
+            const [r, g, b2] = [+match[1], +match[2], +match[3]];
+            // רק אם הצבע "ייחודי" - לא שחור/לבן/אפור
+            const isGray = Math.abs(r - g) < 15 && Math.abs(g - b2) < 15;
+            return !isGray || r < 50; // שחור כן, אפור בינוני לא
+          });
+          // גם חפש לפי inline style עם background
+          const styleBtns = allBtns.filter(b => {
+            const s = b.getAttribute('style') || '';
+            return s.includes('background') && !colorBtns.includes(b);
+          });
+          const combined = [...colorBtns, ...styleBtns];
+          return combined[bgIdx - 1] || combined[0] || null;
+        }, backgroundIndex);
 
-        // נסה סלקטורים שונים
-        let bgBtns = await page.$$('[role="dialog"] [role="button"][style*="background"]');
-        log(`  [BG] selector1 (style*background): ${bgBtns.length}`);
+        const bgEl = bgHandle ? await bgHandle.asElement() : null;
+        log(`  [BG] colorful button found: ${!!bgEl}`);
 
-        if (bgBtns.length === 0) {
-          bgBtns = await page.$$('[role="dialog"] [role="listitem"] [role="button"]');
-          log(`  [BG] selector2 (listitem button): ${bgBtns.length}`);
-        }
-        if (bgBtns.length === 0) {
-          bgBtns = await page.$$('[role="dialog"] ul [role="button"]');
-          log(`  [BG] selector3 (ul button): ${bgBtns.length}`);
-        }
-        if (bgBtns.length === 0) {
-          bgBtns = await page.$$('[role="dialog"] [role="button"] img');
-          log(`  [BG] selector4 (img in button): ${bgBtns.length}`);
-        }
-
-        if (bgBtns.length > 0) {
-          const idx = Math.min(backgroundIndex - 1, bgBtns.length - 1);
-          await bgBtns[idx].click();
+        if (bgEl) {
+          await bgEl.click();
           await new Promise(r => setTimeout(r, 1000));
-          log(`  [OK] background clicked index ${idx} of ${bgBtns.length}`);
+          log(`  [OK] background ${backgroundIndex} applied`);
         } else {
-          log(`  [WARN] no background buttons found after Aa click`);
+          // fallback: נסה לחיצה על הכפתור ה-N אחרי כפתור Aa
+          log(`  [BG] trying fallback - click Nth button after Aa`);
+          const clicked = await page.evaluate((bgIdx) => {
+            const dialog = document.querySelector('[role="dialog"]');
+            if (!dialog) return false;
+            const btns = [...dialog.querySelectorAll('[role="button"]')];
+            // מצא את Aa ולחץ N כפתורים אחריו
+            const aaIdx = btns.findIndex(b => b.textContent.trim() === 'Aa' ||
+              b.querySelector('img[src*="SATP_Aa"]'));
+            const target = aaIdx >= 0 ? btns[aaIdx + bgIdx] : btns[bgIdx];
+            if (target) { target.click(); return true; }
+            return false;
+          }, backgroundIndex);
+          log(`  [BG] fallback click: ${clicked}`);
         }
       }
     } catch (e) { log('  [WARN] background not applied: ' + e.message); }
