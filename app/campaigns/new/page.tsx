@@ -156,14 +156,14 @@ function ScheduleStep({
       <div className="space-y-5">
 
         {/* פרסם עכשיו */}
-        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4">
+        <div
+          className={`rounded-2xl p-4 border cursor-pointer transition-all ${scheduleDays.length === 0 ? "bg-orange-100 border-orange-400" : "bg-orange-50 border-orange-200 hover:border-orange-400"}`}
+          onClick={() => setScheduleDays(() => [])}
+        >
           <div className="font-medium text-orange-800 mb-1">⚡ פרסם עכשיו</div>
-          <p className="text-sm text-orange-700 mb-3">לא לבחור ימים - הקמפיין יפורסם מיד לאחר אישור</p>
-          {scheduleDays.length === 0 && (
-            <div className="bg-orange-100 border border-orange-300 rounded-xl p-2 text-sm text-orange-800 font-medium text-center">
-              ✓ מצב פרסום מיידי פעיל
-            </div>
-          )}
+          <p className="text-sm text-orange-700">
+            {scheduleDays.length === 0 ? "✓ מצב פרסום מיידי פעיל - יפורסם מיד לאחר אישור" : "לחץ כאן לביטול הימים ופרסום מיידי"}
+          </p>
         </div>
 
         {/* Days selector */}
@@ -318,9 +318,9 @@ function ScheduleStep({
           <button
             onClick={onSave}
             disabled={loading || (scheduleDays.length > 0 && !scheduleStartDate)}
-            className={`flex-1 ${conflict ? "bg-orange-500 hover:bg-orange-600" : "bg-green-600 hover:bg-green-700"} disabled:bg-gray-300 text-white rounded-xl p-3 font-semibold transition-colors`}
+            className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-xl p-3 font-semibold transition-colors"
           >
-            {loading ? "שומר..." : conflict ? "⚠️ שמור בכל זאת" : "✓ שמור קמפיין"}
+            {loading ? "שומר..." : "✓ שמור קמפיין"}
           </button>
         </div>
       </div>
