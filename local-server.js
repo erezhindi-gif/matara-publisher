@@ -156,6 +156,25 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
 
   if (!writeBox) throw new Error("ERROR: textbox not found");
 
+  // אם אין תמונה - לחץ על "Aa" להוספת רקע צבעוני
+  if (localImagePaths.length === 0) {
+    try {
+      const aaBtn = await page.$('[aria-label="רקע"], [aria-label="Background"], [aria-label="Aa"]')
+        || await page.evaluateHandle(() => {
+          return [...document.querySelectorAll('[role="button"]')]
+            .find(b => b.textContent.trim() === 'Aa') || null;
+        }).then(h => h.asElement() ? h : null);
+      if (aaBtn) {
+        await aaBtn.click();
+        await new Promise(r => setTimeout(r, 1500));
+        // בחר את הרקע השני (צבעוני)
+        const bgOptions = await page.$$('[aria-label*="רקע"], [aria-label*="background"], [aria-label*="Background"]');
+        if (bgOptions.length > 1) { await bgOptions[1].click(); await new Promise(r => setTimeout(r, 500)); }
+        log('  [OK] background applied');
+      }
+    } catch (e) { log('  [WARN] background not applied: ' + e.message); }
+  }
+
   await writeBox.click();
   await new Promise(r => setTimeout(r, 1000));
   await page.keyboard.type(content, { delay: 30 });
