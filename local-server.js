@@ -183,11 +183,15 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
     if (fileInput) { await fileInput.uploadFile(...localImagePaths); await new Promise(r => setTimeout(r, 4000)); }
   }
 
-  // סגור פופ-אפ של פייסבוק אם קיים
-  try {
-    const noThanks = await page.$('[aria-label="לא עכשיו"], [aria-label="Not Now"]');
-    if (noThanks) { await noThanks.click(); await new Promise(r => setTimeout(r, 1000)); }
-  } catch {}
+  // לוג כל הכפתורים הזמינים אחרי הכתיבה
+  const allBtns = await page.evaluate(() => {
+    return [...document.querySelectorAll('[role="button"]')]
+      .filter(b => !b.closest('[role="article"]'))
+      .map(b => `"${b.textContent.trim().substring(0, 30)}" aria="${b.getAttribute('aria-label') || ''}"`)
+      .filter(s => s.length > 5)
+      .slice(0, 20);
+  });
+  log('[DEBUG] available buttons after typing:\n' + allBtns.join('\n'));
 
   // לחץ פרסם - נסה כמה selectors
   const postBtnSelectors = [
