@@ -82,17 +82,35 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   const url = page.url();
   if (url.includes("login") || url.includes("checkpoint")) throw new Error("נדרש אימות פייסבוק");
 
-  // לחץ על שדה "כתוב משהו"
-  const writeBox = await page.$('[aria-label="כתוב משהו..."], [aria-label="Write something..."], [data-testid="status-attachment-mentions-input"]');
-  if (!writeBox) {
-    // נסה למצוא לפי role
-    const roleBox = await page.$('[role="textbox"]');
-    if (!roleBox) throw new Error("לא נמצא שדה כתיבה בקבוצה");
-    await roleBox.click();
-  } else {
-    await writeBox.click();
+  // לחץ על כפתור "מה בא לך לשתף" כדי לפתוח את הכתיבה
+  const openBtn = await page.$('[aria-label="צור פוסט"], [aria-label="Create a post"], [data-testid="status-attachment-mentions-input"]');
+  if (openBtn) { await openBtn.click(); await new Promise(r => setTimeout(r, 2000)); }
+
+  // נסה למצוא את תיבת הכתיבה עם מספר selectors
+  const selectors = [
+    '[aria-label="כתוב משהו..."]',
+    '[aria-label="Write something..."]',
+    '[aria-label="מה בא לך לשתף?"]',
+    '[aria-label="What\'s on your mind?"]',
+    '[role="textbox"]',
+    '[contenteditable="true"]',
+  ];
+
+  let writeBox = null;
+  for (const sel of selectors) {
+    writeBox = await page.$(sel);
+    if (writeBox) { console.log(`  נמצא שדה כתיבה: ${sel}`); break; }
   }
 
+  if (!writeBox) {
+    // נסה ללחוץ על האזור המרכזי של הדף ואז לחפש שוב
+    await page.click('body');
+    await new Promise(r => setTimeout(r, 1000));
+    writeBox = await page.$('[role="textbox"]') || await page.$('[contenteditable="true"]');
+    if (!writeBox) throw new Error("לא נמצא שדה כתיבה בקבוצה");
+  }
+
+  await writeBox.click();
   await new Promise(r => setTimeout(r, 1500));
   await page.keyboard.type(content, { delay: 25 });
   await new Promise(r => setTimeout(r, 2000));
