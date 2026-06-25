@@ -230,8 +230,10 @@ export default function SchedulePage() {
                       )}
                       {dayCampaigns.map((c) => {
                         const s = STATUS[c.status] || STATUS.draft;
-                        const totalGroups = getGroupCount(c, templates);
-                        const publishedGroups = c.posts?.filter(p => p.status === "published").length || 0;
+                        const totalPosts = c.posts?.length || 0;
+                        const publishedPosts = c.posts?.filter(p => p.status === "published").length || 0;
+                        const groupCountFromTemplate = getGroupCount(c, templates);
+                        const totalGroups = totalPosts > 0 ? totalPosts : groupCountFromTemplate;
                         return (
                           <Link key={c.id} href={`/campaigns/${c.id}`} className={`block rounded-lg p-2 ${s.bg} border border-opacity-50 hover:opacity-80 transition-opacity`} style={{ borderColor: "currentColor" }}>
                             <div className="flex items-center gap-1 mb-0.5">
@@ -246,7 +248,7 @@ export default function SchedulePage() {
                               <span className={`text-xs ${s.text}`}>{s.label}</span>
                               {totalGroups > 0 && (
                                 <span className="text-xs text-gray-500">
-                                  {c.status === "done" ? `${publishedGroups}/${totalGroups}` : totalGroups} קב׳
+                                  {c.status === "done" ? `${publishedPosts}/${totalGroups}` : totalGroups} קב׳
                                 </span>
                               )}
                             </div>
