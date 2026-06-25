@@ -11,6 +11,8 @@ const puppeteer = require("puppeteer-core");
 const { execSync, exec } = require("child_process");
 const path = require("path");
 const os = require("os");
+const fs = require("fs");
+const https = require("https");
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const qrcode = require("qrcode-terminal");
 const QRCode = require("qrcode");
@@ -25,6 +27,158 @@ const SKIP_IDS = new Set([
   "search", "notifications", "invite", "category", "updates", "all",
   "archived", "suggested", "local", "explore", "buy", "sell",
 ]);
+
+// ====== פרסום אוטומטי לפייסבוק ======
+const DELAY_MIN = 30, DELAY_MAX = 90;
+let isPublishing = false;
+
+function randomDelay(minSec, maxSec) {
+  const r = (Math.random() + Math.random() + Math.random()) / 3;
+  const longBreak = Math.random() < 0.1 ? (20 + Math.random() * 40) : 0;
+  return new Promise(r2 => setTimeout(r2, (minSec + r * (maxSec - minSec) + longBreak) * 1000));
+}
+
+async function downloadImages(imageUrls) {
+  if (!imageUrls || imageUrls.length === 0) return [];
+  const tmpDir = path.join(os.tmpdir(), "matara-publisher");
+  if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+  const localPaths = [];
+  for (const url of imageUrls) {
+    const ext = url.split(".").pop().split("?")[0] || "jpg";
+    const filename = `img-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const localPath = path.join(tmpDir, filename);
+    await new Promise((resolve, reject) => {
+      const protocol = url.startsWith("https") ? https : http;
+      const file = fs.createWriteStream(localPath);
+      protocol.get(url, (res) => { res.pipe(file); file.on("finish", () => { file.close(); resolve(); }); }).on("error", reject);
+    });
+    localPaths.push(localPath);
+  }
+  return localPaths;
+}
+
+async function updateCampaignStatus(id, status) {
+  await fetch(`${API_BASE}/api/campaigns/${id}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+}
+
+async function updatePostStatus(campaignId, groupName, status, error = null) {
+  await fetch(`${API_BASE}/api/posts`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ campaignId, groupName, status, error }),
+  });
+}
+
+async function postToFacebookGroup(page, groupName, content, localImagePaths = []) {
+  console.log(`  מחפש קבוצה: ${groupName}`);
+  await page.goto(`https://www.facebook.com/search/groups/?q=${encodeURIComponent(groupName)}`, { waitUntil: "networkidle2", timeout: 30000 });
+  await new Promise(r => setTimeout(r, 3000));
+
+  const groupLink = await page.$('a[href*="/groups/"]');
+  if (!groupLink) throw new Error("קבוצה לא נמצאה");
+  await groupLink.click();
+  await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 30000 });
+  await new Promise(r => setTimeout(r, 2000));
+
+  const writeBox = await page.$('[aria-label="כתוב משהו..."], [aria-label="Write something..."]') || await page.$('[role="textbox"]');
+  if (!writeBox) throw new Error("לא נמצא שדה כתיבה");
+  await writeBox.click();
+  await new Promise(r => setTimeout(r, 1500));
+  await page.keyboard.type(content, { delay: 30 });
+  await new Promise(r => setTimeout(r, 2000));
+
+  if (localImagePaths.length > 0) {
+    const photoBtn = await page.$('[aria-label="תמונה/וידאו"], [aria-label="Photo/video"]');
+    if (photoBtn) { await photoBtn.click(); await new Promise(r => setTimeout(r, 2000)); }
+    const fileInput = await page.$('input[type="file"]');
+    if (fileInput) { await fileInput.uploadFile(...localImagePaths); await new Promise(r => setTimeout(r, 4000)); }
+  }
+
+  const publishBtn = await page.$('[aria-label="פרסם"], [aria-label="Post"]');
+  if (!publishBtn) throw new Error("לא נמצא כפתור פרסום");
+  await publishBtn.click();
+  await new Promise(r => setTimeout(r, 3000));
+  console.log(`  ✓ פורסם: ${groupName}`);
+}
+
+async function processCampaign(campaign, profiles) {
+  console.log(`\n[פרסום] קמפיין: ${campaign.title}`);
+  const profile = profiles.find(p => p.businessId === campaign.businessId && p.isActive);
+  if (!profile) { console.error("[פרסום] לא נמצא פרופיל פעיל"); return; }
+
+  let browser;
+  try {
+    browser = await puppeteer.launch({
+      executablePath: EDGE_PATH,
+      userDataDir: EDGE_USER_DATA,
+      args: [`--profile-directory=${profile.edgeProfile}`, "--no-first-run"],
+      headless: false,
+    });
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 800 });
+    await page.goto("https://www.facebook.com", { waitUntil: "networkidle2" });
+    await new Promise(r => setTimeout(r, 2000));
+    if (page.url().includes("login")) { console.error("[פרסום] לא מחובר לפייסבוק"); await browser.close(); return; }
+
+    await updateCampaignStatus(campaign.id, "publishing");
+
+    const templateIds = JSON.parse(campaign.templateIds || "[]");
+    const allTemplates = await fetch(`${API_BASE}/api/templates`).then(r => r.json());
+    const groups = allTemplates.filter(t => templateIds.includes(t.id)).flatMap(t => t.groups);
+    console.log(`[פרסום] ${groups.length} קבוצות`);
+
+    const localImagePaths = campaign.imageUrls?.length > 0 ? await downloadImages(campaign.imageUrls) : [];
+    let published = 0, failed = 0;
+
+    for (const group of groups) {
+      try {
+        await postToFacebookGroup(page, group.name, campaign.content, localImagePaths);
+        await updatePostStatus(campaign.id, group.name, "published");
+        published++;
+        if (published < groups.length) await randomDelay(DELAY_MIN, DELAY_MAX);
+      } catch (err) {
+        await updatePostStatus(campaign.id, group.name, "failed", err.message);
+        failed++;
+      }
+    }
+
+    localImagePaths.forEach(p => { try { fs.unlinkSync(p); } catch {} });
+    await updateCampaignStatus(campaign.id, "done");
+    console.log(`[פרסום] הושלם: ${published} הצליחו, ${failed} נכשלו`);
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+  }
+}
+
+async function publisherLoop() {
+  if (isPublishing) return;
+  isPublishing = true;
+  try {
+    const now = new Date();
+    const campaigns = await fetch(`${API_BASE}/api/campaigns`).then(r => r.json()).catch(() => []);
+    const due = campaigns.filter(c => {
+      if (c.status !== "approved") return false;
+      if (!c.scheduledAt) return true; // ללא תזמון - פרסם מיד
+      const scheduled = new Date(c.scheduledAt);
+      return scheduled <= now; // הגיע הזמן
+    });
+
+    if (due.length > 0) {
+      console.log(`\n[פרסום] נמצאו ${due.length} קמפיינים לפרסום`);
+      const profiles = await fetch(`${API_BASE}/api/profiles`).then(r => r.json()).catch(() => []);
+      for (const campaign of due) {
+        await processCampaign(campaign, profiles);
+        await new Promise(r => setTimeout(r, 5000));
+      }
+    }
+  } catch (err) {
+    console.error("[פרסום] שגיאה:", err.message);
+  } finally {
+    isPublishing = false;
+  }
+}
 
 // ====== וואטסאפ - סשן לכל פרופיל ======
 // profileId → { client, status, qrDataUrl, phoneNumber }
@@ -356,9 +510,27 @@ const server = http.createServer(async (req, res) => {
   res.end(JSON.stringify({ error: "Not found" }));
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log("=== שרת מקומי של מטרה Publisher ===");
   console.log(`פועל על פורט ${PORT}`);
-  console.log("השאר חלון זה פתוח כדי שהאתר יוכל לתקשר עם המחשב שלך");
-  console.log("[וואטסאפ] השתמש בדף פרופילי פייסבוק לחיבור וואטסאפ לכל פרופיל\n");
+  console.log("[פרסום] בודק קמפיינים כל 5 דקות אוטומטית");
+
+  // חבר אוטומטית וואטסאפ לכל פרופיל שיש לו סשן שמור
+  try {
+    const profiles = await fetch(`${API_BASE}/api/profiles`).then(r => r.json()).catch(() => []);
+    const authDir = path.join(__dirname, ".wwebjs_auth");
+    for (const profile of profiles) {
+      const sessionDir = path.join(authDir, `session-matara-${profile.id}`);
+      if (fs.existsSync(sessionDir)) {
+        console.log(`[וואטסאפ] מתחבר אוטומטית לפרופיל: ${profile.name}`);
+        initWhatsApp(profile.id, profile.whatsappPhone);
+      }
+    }
+  } catch (err) {
+    console.error("[וואטסאפ] שגיאה בטעינה אוטומטית:", err.message);
+  }
+
+  // הפעל בדיקה ראשונה אחרי 30 שניות, ואז כל דקה
+  setTimeout(publisherLoop, 30 * 1000);
+  setInterval(publisherLoop, 60 * 1000);
 });
