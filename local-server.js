@@ -106,19 +106,32 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   });
   log('[DEBUG] aria-labels on page:\n' + ariaLabels.join('\n'));
 
-  // לחץ על כפתור "צור פוסט" / "מה בא לך לשתף" כדי לפתוח את חלון הכתיבה
-  const createPostSelectors = [
-    '[aria-label="צור פוסט"]',
-    '[aria-label="Create a post"]',
-    '[aria-label="מה בא לך לשתף?"]',
-    '[aria-label="What\'s on your mind?"]',
-  ];
-  let createPostClicked = false;
-  for (const sel of createPostSelectors) {
-    const btn = await page.$(sel);
-    if (btn) { log(`  [CLICK] create-post button found: ${sel}`); await btn.click(); await new Promise(r => setTimeout(r, 2500)); createPostClicked = true; break; }
+  // גלול למעלה וסגור פופ-אפים
+  await page.keyboard.press('Escape');
+  await new Promise(r => setTimeout(r, 500));
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await new Promise(r => setTimeout(r, 1500));
+
+  // לחץ על "צור פוסט" לפי טקסט
+  const createResult = await page.evaluate(() => {
+    const texts = ['מה בא לך לשתף', 'Write something', 'צור פוסט', 'Create a post', 'כתוב משהו'];
+    const els = document.querySelectorAll('[role="button"], div[tabindex="0"], [contenteditable]');
+    for (const el of els) {
+      const text = (el.textContent || '').trim();
+      const label = el.getAttribute('aria-label') || '';
+      for (const t of texts) {
+        if (text.includes(t) || label.includes(t)) {
+          el.click();
+          return `found by text: "${text.substring(0, 40)}" / label: "${label}"`;
+        }
+      }
+    }
+    return null;
+  });
+  if (createResult) {
+    log(`  [CLICK] create-post: ${createResult}`);
+    await new Promise(r => setTimeout(r, 2500));
   }
-  if (!createPostClicked) log("  [WARN] create-post button NOT found - will try textbox directly");
 
   // חכה לחלון הכתיבה להיפתח - מחפש textbox בתוך dialog או modal
   await new Promise(r => setTimeout(r, 1500));
@@ -206,7 +219,13 @@ async function processCampaign(campaign, profiles) {
     browser = await puppeteer.launch({
       executablePath: EDGE_PATH,
       userDataDir: EDGE_USER_DATA,
-      args: ["--no-first-run", "--no-default-browser-check", "--no-sandbox"],
+      args: [
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--no-sandbox",
+        "--disable-save-password-bubble",
+        "--disable-features=PasswordManagerOnboarding,AutofillEnablePasswordManagerRedesign",
+      ],
       headless: false,
     });
     log("[PUBLISH] Edge launched, opening Facebook...");
