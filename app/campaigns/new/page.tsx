@@ -26,7 +26,27 @@ type Template = {
   groups: { id: string }[];
 };
 
-function FacebookPreview({ content, whatsappLink, imagePreviews }: { content: string; whatsappLink: string; imagePreviews: string[] }) {
+const BG_GRADIENTS: Record<number, string> = {
+  1:  "linear-gradient(135deg,#1a1a2e,#16213e)",
+  2:  "linear-gradient(135deg,#c94b8a,#e8a0b4)",
+  3:  "linear-gradient(135deg,#f5e6d3,#e8d5c0)",
+  4:  "linear-gradient(135deg,#a8d8f0,#7ec8e3)",
+  5:  "linear-gradient(135deg,#d4b4f0,#f0b4d4)",
+  6:  "linear-gradient(135deg,#fff8f0,#ffeedd)",
+  7:  "linear-gradient(135deg,#90ee90,#32cd32)",
+  8:  "linear-gradient(135deg,#dc143c,#8b0000)",
+  9:  "linear-gradient(135deg,#ff7f7f,#ffb6c1,#87ceeb)",
+  10: "linear-gradient(135deg,#b0b0b0,#d3d3d3)",
+  11: "linear-gradient(135deg,#7b2d8b,#4a90d9)",
+  12: "linear-gradient(135deg,#1a0a00,#4a1a00)",
+  13: "linear-gradient(135deg,#ffd700,#ffa500)",
+  14: "linear-gradient(135deg,#90e0d0,#b0f0e0)",
+  15: "linear-gradient(135deg,#c8c8f0,#d8d8ff)",
+};
+
+function FacebookPreview({ content, whatsappLink, imagePreviews, backgroundIndex }: { content: string; whatsappLink: string; imagePreviews: string[]; backgroundIndex?: number | null }) {
+  const bg = backgroundIndex && !imagePreviews.length ? BG_GRADIENTS[backgroundIndex] : null;
+  const isDark = backgroundIndex && [1, 8, 11, 12].includes(backgroundIndex);
   return (
     <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
       <div className="p-4 border-b border-gray-100">
@@ -38,11 +58,17 @@ function FacebookPreview({ content, whatsappLink, imagePreviews }: { content: st
           </div>
         </div>
       </div>
-      <div className="p-4">
-        <pre className="whitespace-pre-wrap font-sans text-sm text-gray-900 leading-relaxed">
+      <div
+        className="p-4"
+        style={bg ? { background: bg, minHeight: "120px", display: "flex", alignItems: "center", justifyContent: "center" } : {}}
+      >
+        <pre
+          className="whitespace-pre-wrap font-sans text-sm leading-relaxed"
+          style={bg ? { color: isDark ? "#fff" : "#000", fontWeight: 600, textAlign: "center" } : { color: "#111827" }}
+        >
           {content || "תוכן הפוסט יופיע כאן..."}
         </pre>
-        {whatsappLink && (
+        {whatsappLink && !bg && (
           <div className="mt-3 pt-3 border-t border-gray-100">
             <span className="text-green-600 text-sm">📱 {whatsappLink}</span>
           </div>
@@ -372,7 +398,7 @@ function ScheduleStep({
 
       <div className="lg:sticky lg:top-8 lg:self-start">
         <div className="text-sm text-gray-500 mb-3 font-medium">תצוגה מקדימה</div>
-        <FacebookPreview content={form.content} whatsappLink={form.whatsappLink} imagePreviews={imagePreviews} />
+        <FacebookPreview content={form.content} whatsappLink={form.whatsappLink} imagePreviews={imagePreviews} backgroundIndex={backgroundIndex} />
         {busyRanges.length > 0 && (
           <div className="mt-4 bg-white border border-gray-200 rounded-2xl p-4">
             <div className="text-xs font-medium text-gray-500 mb-2">קמפיינים מתוזמנים ביום זה:</div>
@@ -745,7 +771,7 @@ export default function NewCampaignPage() {
             {/* Preview */}
             <div className="lg:sticky lg:top-8 lg:self-start">
               <div className="text-sm text-gray-500 mb-3 font-medium">תצוגה מקדימה</div>
-              <FacebookPreview content={form.content} whatsappLink={form.whatsappLink} imagePreviews={imagePreviews} />
+              <FacebookPreview content={form.content} whatsappLink={form.whatsappLink} imagePreviews={imagePreviews} backgroundIndex={backgroundIndex} />
             </div>
           </div>
         )}
