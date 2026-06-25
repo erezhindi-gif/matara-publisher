@@ -110,10 +110,13 @@ async function processCampaign(campaign, profiles) {
 
   let browser;
   try {
+    // סגור Edge אם פתוח
+    try { execSync("taskkill /F /IM msedge.exe 2>nul"); await new Promise(r => setTimeout(r, 2000)); } catch {}
+
     browser = await puppeteer.launch({
       executablePath: EDGE_PATH,
       userDataDir: EDGE_USER_DATA,
-      args: [`--profile-directory=${profile.edgeProfile}`, "--no-first-run"],
+      args: [`--profile-directory=${profile.edgeProfile}`, "--no-first-run", "--no-default-browser-check"],
       headless: false,
     });
     const page = await browser.newPage();
@@ -149,6 +152,8 @@ async function processCampaign(campaign, profiles) {
     console.log(`[פרסום] הושלם: ${published} הצליחו, ${failed} נכשלו`);
   } finally {
     if (browser) await browser.close().catch(() => {});
+    // פתח Edge מחדש אחרי הפרסום
+    setTimeout(() => exec(`"${EDGE_PATH}"`), 2000);
   }
 }
 
