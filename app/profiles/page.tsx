@@ -144,8 +144,21 @@ export default function ProfilesPage() {
 
         {/* Server status */}
         {serverOnline === false && (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4 text-sm text-red-700">
-            ⚠️ השרת המקומי לא פועל - חיבור וואטסאפ לא זמין. פתח טרמינל והרץ: <code className="bg-red-100 px-1 rounded">node local-server.js</code>
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="text-sm text-red-700 font-medium">
+                ⚠️ השרת המקומי לא פועל
+              </div>
+              <button
+                onClick={() => alert('להפעלת השרת:\n\nלחץ כפל על "Matara Server" בשולחן העבודה\n\n— או —\n\nפתח CMD והרץ:\ncd C:\\Projects\\matara-publisher\nnode local-server.js\n\nשמור את החלון פתוח!')}
+                className="flex-shrink-0 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+              >
+                ▶ כיצד להפעיל?
+              </button>
+            </div>
+            <div className="mt-2 text-xs text-red-600">
+              לחץ כפל על <strong>"Matara Server"</strong> בשולחן העבודה (קיצור דרך שנוצר עבורך)
+            </div>
           </div>
         )}
         {serverOnline === true && (
