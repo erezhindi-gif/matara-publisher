@@ -117,13 +117,13 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
     const texts = ['מה בא לך לשתף', 'Write something', 'צור פוסט', 'Create a post', 'כתוב משהו'];
     const els = document.querySelectorAll('[role="button"], div[tabindex="0"]');
     for (const el of els) {
-      const rect = el.getBoundingClientRect();
-      // רק אלמנטים בחלק העליון של המסך (לא תגובות בפיד)
-      if (rect.top < 0 || rect.top > 450) continue;
+      // דלג על אלמנטים בתוך פוסטים קיימים (תגובות)
+      if (el.closest('[role="article"]') || el.closest('[role="feed"] [role="article"]')) continue;
       const text = (el.textContent || '').trim();
       const label = el.getAttribute('aria-label') || '';
       for (const t of texts) {
         if (text.includes(t) || label.includes(t)) {
+          const rect = el.getBoundingClientRect();
           el.click();
           return `Y=${Math.round(rect.top)}: "${text.substring(0, 40)}" / label="${label}"`;
         }
@@ -135,26 +135,16 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
     log(`  [CLICK] create-post: ${createResult}`);
     await new Promise(r => setTimeout(r, 2500));
   } else {
-    log("  [WARN] create-post NOT found in top 450px");
+    throw new Error("ERROR: create-post area not found on group page");
   }
 
-  // חכה לחלון הכתיבה להיפתח - מחפש textbox בתוך dialog או modal
-  await new Promise(r => setTimeout(r, 1500));
+  // חכה לחלון הכתיבה להיפתח - מחפש textbox רק בתוך dialog
+  await new Promise(r => setTimeout(r, 2000));
 
-  // מצא את שדה הכתיבה בתוך החלון שנפתח
-  let writeBox = null;
-  const boxSelectors = [
-    'div[role="dialog"] [role="textbox"]',
-    'div[role="dialog"] [contenteditable="true"]',
-    '[role="textbox"][aria-label]',
-    'form [role="textbox"]',
-  ];
-  for (const sel of boxSelectors) {
-    writeBox = await page.$(sel);
-    if (writeBox) { console.log(`  [OK] textbox found: ${sel}`); break; }
-  }
+  let writeBox = await page.$('div[role="dialog"] [role="textbox"]')
+    || await page.$('div[role="dialog"] [contenteditable="true"]');
 
-  if (!writeBox) throw new Error("ERROR: textbox not found - create-post button may not have been clicked");
+  if (!writeBox) throw new Error("ERROR: textbox not found inside dialog");
 
   await writeBox.click();
   await new Promise(r => setTimeout(r, 1000));
