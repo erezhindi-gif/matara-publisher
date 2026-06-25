@@ -153,7 +153,8 @@ async function processCampaign(campaign, profiles) {
   let browser;
   try {
     // סגור רק את הפרוצס של הפרופיל הנפרד שלנו
-    try { execSync(`wmic process where "name='msedge.exe' and commandline like '%matara-edge-profile%'" delete`); await new Promise(r => setTimeout(r, 2000)); } catch {}
+    try { execSync(`taskkill /F /FI "WINDOWTITLE eq *matara*" 2>nul`, { timeout: 3000 }); } catch {}
+    try { execSync(`wmic process where "name='msedge.exe' and commandline like '%matara-edge-profile%'" delete`, { timeout: 5000 }); await new Promise(r => setTimeout(r, 1500)); } catch {}
 
     browser = await puppeteer.launch({
       executablePath: EDGE_PATH,
