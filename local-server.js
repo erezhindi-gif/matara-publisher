@@ -156,19 +156,12 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
 
   if (!writeBox) throw new Error("ERROR: textbox not found");
 
-  // הקלד תוכן קודם
-  await writeBox.click();
-  await new Promise(r => setTimeout(r, 1000));
-  const fullContent = whatsappUrl ? `${content}\n\n${whatsappUrl}` : content;
-  await page.keyboard.type(fullContent, { delay: 30 });
-  await new Promise(r => setTimeout(r, 2000));
-
-  // רקע - בוטל (פייסבוק לא תומך בכך עם Puppeteer)
-
-  // העלאת תמונות
+  // העלאת תמונות לפני הקלדת הטקסט - כדי שכרטיס הוואטסאפ לא יבטל את התמונה
   if (localImagePaths.length > 0) {
     log(`  [IMG] uploading ${localImagePaths.length} images: ${localImagePaths.join(', ')}`);
     try {
+      await writeBox.click();
+      await new Promise(r => setTimeout(r, 500));
       // חשוף את כל ה-inputs הנסתרים
       await page.evaluate(() => {
         document.querySelectorAll('input[type="file"]').forEach(el => {
@@ -178,14 +171,12 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
           el.removeAttribute('hidden');
         });
       });
-      // uploadFile ישירות ללא לחיצה על כפתור (כך לא נפתח חלון Windows)
       const fileInput = await page.$('input[type="file"][accept*="image"]')
         || await page.$('input[type="file"]');
       log(`  [IMG] file input: ${!!fileInput}`);
       if (fileInput) {
         await fileInput.uploadFile(...localImagePaths);
         log(`  [IMG] uploadFile done`);
-        // הפעל את אירוע ה-change ידנית כדי ש-React/Facebook יזהה את הקובץ
         await page.evaluate(el => {
           el.dispatchEvent(new Event('change', { bubbles: true }));
           el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -197,6 +188,13 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
       log(`  [IMG] ERROR: ${e.message}`);
     }
   }
+
+  // הקלד תוכן אחרי העלאת התמונה
+  await writeBox.click();
+  await new Promise(r => setTimeout(r, 1000));
+  const fullContent = whatsappUrl ? `${content}\n\n${whatsappUrl}` : content;
+  await page.keyboard.type(fullContent, { delay: 30 });
+  await new Promise(r => setTimeout(r, 2000));
 
   // לחץ פרסם - נסה כמה selectors
   const postBtnSelectors = [
