@@ -169,32 +169,27 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   if (localImagePaths.length > 0) {
     log(`  [IMG] uploading ${localImagePaths.length} images: ${localImagePaths.join(', ')}`);
     try {
-      // מצא כפתור תמונה
-      const photoBtn = await page.$('[aria-label="תמונה/וידאו"]')
-        || await page.$('[aria-label="Photo/video"]')
-        || await page.evaluateHandle(() => {
-            const d = document.querySelector('[role="dialog"]');
-            if (!d) return null;
-            return [...d.querySelectorAll('[role="button"]')].find(b => {
-              const l = b.getAttribute('aria-label') || '';
-              return l.includes('תמונה') || l.includes('Photo');
-            }) || null;
-          }).then(h => h && h.asElement ? h.asElement() : null).catch(() => null);
-      log(`  [IMG] photo button: ${!!photoBtn}`);
-
-      if (photoBtn) {
-        // waitForFileChooser מיירט את חלון הקבצים לפני שהוא נפתח
-        const [fileChooser] = await Promise.all([
-          page.waitForFileChooser({ timeout: 5000 }),
-          photoBtn.click(),
-        ]);
-        await fileChooser.accept(localImagePaths);
-        log(`  [IMG] fileChooser accepted`);
-      } else {
-        // fallback: uploadFile ישירות על input
-        const fileInput = await page.$('input[type="file"]');
-        log(`  [IMG] fallback file input: ${!!fileInput}`);
-        if (fileInput) await fileInput.uploadFile(...localImagePaths);
+      // חשוף את כל ה-inputs הנסתרים
+      await page.evaluate(() => {
+        document.querySelectorAll('input[type="file"]').forEach(el => {
+          el.style.display = 'block';
+          el.style.opacity = '1';
+          el.style.visibility = 'visible';
+          el.removeAttribute('hidden');
+        });
+      });
+      // uploadFile ישירות ללא לחיצה על כפתור (כך לא נפתח חלון Windows)
+      const fileInput = await page.$('input[type="file"][accept*="image"]')
+        || await page.$('input[type="file"]');
+      log(`  [IMG] file input: ${!!fileInput}`);
+      if (fileInput) {
+        await fileInput.uploadFile(...localImagePaths);
+        log(`  [IMG] uploadFile done`);
+        // הפעל את אירוע ה-change ידנית כדי ש-React/Facebook יזהה את הקובץ
+        await page.evaluate(el => {
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        }, fileInput);
       }
       await new Promise(r => setTimeout(r, 5000));
       log(`  [IMG] image step complete`);
