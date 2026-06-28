@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 const BUSINESSES = [
   { id: "recruitment", name: "מטרה - גיוס והשמה", type: "recruitment" },
@@ -425,6 +426,9 @@ function ScheduleStep({
 
 export default function NewCampaignPage() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as { role?: string })?.role === "admin";
+  const userBusinessId = (session?.user as { businessId?: string })?.businessId || "recruitment";
   const [step, setStep] = useState<"form" | "templates" | "schedule">("form");
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -458,7 +462,7 @@ export default function NewCampaignPage() {
   }, []);
 
   const [form, setForm] = useState({
-    businessId: "recruitment",
+    businessId: userBusinessId,
     jobTitle: "",
     location: "",
     whatsappLink: "",
@@ -608,16 +612,18 @@ export default function NewCampaignPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Form */}
             <div className="space-y-5">
-              <div>
-                <label className="block text-sm text-gray-700 mb-1">עסק</label>
-                <select
-                  className="w-full bg-white border border-gray-300 rounded-xl p-3 text-gray-900"
-                  value={form.businessId}
-                  onChange={(e) => setForm({ ...form, businessId: e.target.value })}
-                >
-                  {BUSINESSES.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
-              </div>
+              {isAdmin && (
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">עסק</label>
+                  <select
+                    className="w-full bg-white border border-gray-300 rounded-xl p-3 text-gray-900"
+                    value={form.businessId}
+                    onChange={(e) => setForm({ ...form, businessId: e.target.value })}
+                  >
+                    {BUSINESSES.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm text-gray-700 mb-1">

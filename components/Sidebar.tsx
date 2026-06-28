@@ -52,8 +52,8 @@ export default function Sidebar() {
         <div className="text-xs text-gray-400 mt-0.5">Publisher</div>
       </div>
 
-      {/* Business selector */}
-      {businesses.length > 0 && (
+      {/* Business selector - אדמין בלבד */}
+      {(session?.user as { role?: string })?.role === "admin" && businesses.length > 0 && (
         <div className="px-3 py-3 border-b border-gray-700">
           <div className="text-xs text-gray-500 mb-2 px-1">עסק פעיל</div>
           <div className="space-y-1">
