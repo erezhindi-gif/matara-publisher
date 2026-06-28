@@ -22,6 +22,8 @@ export default function Sidebar() {
   const path = usePathname();
   const router = useRouter();
   const { data: session } = useSession();
+
+  if (path === "/login") return null;
   const [business, setBusiness] = useState("all");
   const [businesses, setBusinesses] = useState<Business[]>([]);
 

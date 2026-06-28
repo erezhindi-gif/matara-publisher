@@ -18,7 +18,7 @@ export default function LoginPage() {
     const res = await signIn("credentials", { email, password, redirect: false });
     setLoading(false);
     if (res?.ok) {
-      router.push("/campaigns");
+      window.location.href = "/campaigns";
     } else {
       setError("אימייל או סיסמה שגויים");
     }
