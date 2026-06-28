@@ -304,7 +304,9 @@ async function processCampaign(campaign, profiles) {
       const profile = await fetch(`${API_BASE}/api/profiles`).then(r => r.json()).then(ps => ps[0]).catch(() => null);
       const phone = profile?.whatsappPhone?.replace(/[-\s]/g, '').replace(/^0/, '972');
       if (phone) {
-        whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(campaign.whatsappMessage)}`;
+        // הקישור ללא text= כדי שלא יהיה קידוד URL מכוער
+        // ההודעה מוצגת כטקסט בפוסט לפני הקישור
+        whatsappUrl = `${campaign.whatsappMessage}\nhttps://wa.me/${phone}`;
         log(`[PUBLISH] WhatsApp URL: ${whatsappUrl}`);
       }
     }
