@@ -15,6 +15,7 @@ type Profile = {
   isActive: boolean;
   whatsappPhone: string | null;
   business: { name: string; type: string };
+  userId: string | null;
 };
 
 const BUSINESSES = [

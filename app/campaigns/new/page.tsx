@@ -4,10 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 
-const BUSINESSES = [
-  { id: "recruitment", name: "מטרה - גיוס והשמה", type: "recruitment" },
-  { id: "carpentry", name: "נויה מטבחים", type: "carpentry" },
-];
 
 const DAY_NAMES = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי"];
 
@@ -25,6 +21,13 @@ type Template = {
   name: string;
   businessId: string;
   groups: { id: string }[];
+};
+
+type ProfileOption = {
+  id: string;
+  name: string;
+  businessId: string;
+  userId: string | null;
 };
 
 const BG_GRADIENTS: Record<number, string> = {
@@ -434,6 +437,7 @@ export default function NewCampaignPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [contactLinks, setContactLinks] = useState<ContactLink[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [profileOptions, setProfileOptions] = useState<ProfileOption[]>([]);
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
   const [templateMode, setTemplateMode] = useState<"template" | "groups">("template");
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
@@ -442,6 +446,9 @@ export default function NewCampaignPage() {
 
   useEffect(() => {
     fetch("/api/settings").then((r) => r.json()).then(setContactLinks);
+    fetch("/api/profiles").then((r) => r.json()).then((data) => {
+      if (Array.isArray(data)) setProfileOptions(data);
+    });
     fetch("/api/templates").then((r) => r.json()).then((data) => {
       setTemplates(data);
       // אסוף את כל הקבוצות מכל התבניות
@@ -498,7 +505,8 @@ export default function NewCampaignPage() {
   const [dayTimes, setDayTimes] = useState<Record<number, string>>({});
   const [existingCampaigns, setExistingCampaigns] = useState<{ scheduledAt: string; title: string; templateIds: string; status: string; posts: { status: string }[] }[]>([]);
 
-  const selectedBusiness = BUSINESSES.find((b) => b.id === form.businessId)!;
+  const selectedProfile = profileOptions.find((p) => p.businessId === form.businessId) || profileOptions[0];
+  const selectedBusiness = { type: selectedProfile?.businessId === "recruitment" ? "recruitment" : "carpentry" };
 
   async function generateWithAI() {
     if (!form.jobTitle) return;
@@ -612,15 +620,15 @@ export default function NewCampaignPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Form */}
             <div className="space-y-5">
-              {isAdmin && (
+              {isAdmin && profileOptions.length > 0 && (
                 <div>
-                  <label className="block text-sm text-gray-700 mb-1">עסק</label>
+                  <label className="block text-sm text-gray-700 mb-1">פרופיל</label>
                   <select
                     className="w-full bg-white border border-gray-300 rounded-xl p-3 text-gray-900"
                     value={form.businessId}
                     onChange={(e) => setForm({ ...form, businessId: e.target.value })}
                   >
-                    {BUSINESSES.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    {profileOptions.map((p) => <option key={p.id} value={p.businessId}>{p.name}</option>)}
                   </select>
                 </div>
               )}
