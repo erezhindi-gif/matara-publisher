@@ -156,10 +156,16 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
 
   if (!writeBox) throw new Error("ERROR: textbox not found");
 
-  // אם נבחר רקע - לחץ על "Aa" ובחר לפי אינדקס
+  // הקלד תוכן קודם
+  await writeBox.click();
+  await new Promise(r => setTimeout(r, 1000));
+  const fullContent = whatsappUrl ? `${content}\n\n${whatsappUrl}` : content;
+  await page.keyboard.type(fullContent, { delay: 30 });
+  await new Promise(r => setTimeout(r, 2000));
+
+  // בחר רקע אחרי הקלדה (פייסבוק שומר את הטקסט)
   if (localImagePaths.length === 0 && backgroundIndex) {
     try {
-      // מצא כפתור Aa לפי תמונה או טקסט
       const aaEl = await page.$('img[src*="SATP_Aa_square"]')
         .then(img => img ? page.evaluateHandle(el => el.closest('[role="button"]'), img) : null)
         .then(h => (h && h.asElement) ? h.asElement() : null)
@@ -173,80 +179,31 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
         await aaEl.click();
         await new Promise(r => setTimeout(r, 2500));
 
-        // צלם לראות מה נפתח
-        try { await page.screenshot({ path: `C:\\matara-bg-debug.png` }); } catch {}
-
-        // מצא עיגולי רקע - divים קטנים עגולים עם צבע רקע
         const bgClicked = await page.evaluate((bgIdx) => {
           const dialog = document.querySelector('[role="dialog"]');
           if (!dialog) return 'no dialog';
-          // חפש כל האלמנטים בדיאלוג
           const all = [...dialog.querySelectorAll('*')];
           const circles = all.filter(el => {
-            const cs = window.getComputedStyle(el);
-            const bg = cs.backgroundColor;
-            if (!bg || bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent') return false;
-            const w = el.offsetWidth, h = el.offsetHeight;
-            // עיגולי רקע: בין 20-70px, כמעט ריבוע
-            if (w < 20 || w > 70 || h < 20 || h > 70) return false;
-            if (Math.abs(w - h) > 10) return false;
-            // סנן צבעים אפורים/לבנים - רק צבעים עם saturation גבוה
-            const m = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-            if (!m) return false;
-            const [r, g, b] = [+m[1], +m[2], +m[3]];
-            const max = Math.max(r, g, b), min = Math.min(r, g, b);
-            if (max - min < 30) return false; // אפור/לבן/שחור - saturation נמוך
-            return true;
-          });
-          const allDebug = [...dialog.querySelectorAll('*')].filter(el => {
             const bg = window.getComputedStyle(el).backgroundColor;
             if (!bg || bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent') return false;
             const w = el.offsetWidth, h = el.offsetHeight;
-            return w >= 20 && w <= 70 && h >= 20 && h <= 70 && Math.abs(w-h) <= 10;
-          }).map(el => window.getComputedStyle(el).backgroundColor);
-          if (circles.length === 0) return `no colorful circles. all small squares: [${allDebug.join(', ')}]`;
+            if (w < 20 || w > 70 || h < 20 || h > 70) return false;
+            if (Math.abs(w - h) > 10) return false;
+            const m = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+            if (!m) return false;
+            const [r, g, b] = [+m[1], +m[2], +m[3]];
+            return Math.max(r,g,b) - Math.min(r,g,b) >= 30;
+          });
+          if (circles.length === 0) return `no colorful circles`;
           const target = circles[bgIdx - 1] || circles[0];
           target.click();
-          return `clicked circle ${bgIdx} of ${circles.length} (${window.getComputedStyle(target).backgroundColor}). all: [${circles.map(c=>window.getComputedStyle(c).backgroundColor).join(', ')}]`;
+          return `clicked ${bgIdx} of ${circles.length}: ${window.getComputedStyle(target).backgroundColor}`;
         }, backgroundIndex);
         log(`  [BG] ${bgClicked}`);
-        // המתן לפייסבוק להחליף את תיבת הטקסט לתיבה עם רקע
-        await new Promise(r => setTimeout(r, 2500));
-        // אחרי בחירת רקע פייסבוק מציג תיבת טקסט חדשה עם הרקע הצבעוני
-        // נחפש את כל contenteditable ונבחר את זה שנמצא בתוך האלמנט עם הרקע
-        const bgWriteBox = await page.evaluateHandle(() => {
-          const dialog = document.querySelector('[role="dialog"]');
-          if (!dialog) return null;
-          const boxes = [...dialog.querySelectorAll('[contenteditable="true"]')];
-          // העדף תיבה שהאב שלה יש לו background-image (גרדיאנט פייסבוק)
-          const bgBox = boxes.find(b => {
-            let el = b;
-            for (let i = 0; i < 5; i++) {
-              if (!el) break;
-              const bg = window.getComputedStyle(el).backgroundImage;
-              if (bg && bg !== 'none') return true;
-              el = el.parentElement;
-            }
-            return false;
-          });
-          return bgBox || boxes[0] || null;
-        }).then(h => h && h.asElement ? h.asElement() : null).catch(() => null);
-        if (bgWriteBox) {
-          writeBox = bgWriteBox;
-          log(`  [BG] found background-styled writeBox`);
-        } else {
-          writeBox = await page.$('[role="dialog"] [contenteditable="true"]') || writeBox;
-          log(`  [BG] using fallback writeBox`);
-        }
+        await new Promise(r => setTimeout(r, 1500));
       }
-    } catch (e) { log('  [WARN] background not applied: ' + e.message); }
+    } catch (e) { log('  [WARN] background: ' + e.message); }
   }
-
-  await writeBox.click();
-  await new Promise(r => setTimeout(r, 1000));
-  const fullContent = whatsappUrl ? `${content}\n\n${whatsappUrl}` : content;
-  await page.keyboard.type(fullContent, { delay: 30 });
-  await new Promise(r => setTimeout(r, 2000));
 
   // העלאת תמונות
   if (localImagePaths.length > 0) {
