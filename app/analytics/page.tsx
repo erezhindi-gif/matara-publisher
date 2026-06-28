@@ -11,6 +11,7 @@ type Profile = {
   businessId: string;
   isActive: boolean;
   business: { name: string; type: string };
+  userId: string | null;
 };
 
 type Campaign = {
@@ -21,6 +22,7 @@ type Campaign = {
   scheduledAt: string | null;
   business: { name: string; type: string };
   posts: { status: string; publishedAt: string | null }[];
+  userId: string | null;
 };
 
 const DAYS = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
@@ -53,12 +55,12 @@ export default function AnalyticsPage() {
   // Profiles filtered by current business selection
   const visibleProfiles = businessFilter === "all"
     ? profiles
-    : profiles.filter((p) => p.business.type === businessFilter);
+    : profiles.filter((p) => p.userId === businessFilter);
 
   const selectedProfile = visibleProfiles.find((p) => p.id === filterProfileId);
   const filtered = campaigns.filter((c) => {
-    const matchBusiness = businessFilter === "all" || c.business.type === businessFilter;
-    const matchProfile = filterProfileId === "all" || c.business.type === selectedProfile?.business.type;
+    const matchBusiness = businessFilter === "all" || c.userId === businessFilter;
+    const matchProfile = filterProfileId === "all" || c.userId === selectedProfile?.userId;
     return matchBusiness && matchProfile;
   });
 

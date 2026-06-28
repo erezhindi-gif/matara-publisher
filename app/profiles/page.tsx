@@ -18,10 +18,6 @@ type Profile = {
   userId: string | null;
 };
 
-const BUSINESSES = [
-  { id: "recruitment", name: "מטרה - גיוס והשמה" },
-  { id: "carpentry", name: "נויה מטבחים" },
-];
 
 const EDGE_PROFILES = [
   { value: "Default",   label: "פרופיל ראשי (Default)" },
@@ -220,7 +216,8 @@ export default function ProfilesPage() {
                   <div>
                     <label className="block text-sm text-gray-600 mb-1">עסק</label>
                     <select className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900" value={form.businessId} onChange={(e) => setForm({ ...form, businessId: e.target.value })}>
-                      {BUSINESSES.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                      <option value="carpentry">נויה מטבחים</option>
+                      <option value="recruitment">מטרה - גיוס והשמה</option>
                     </select>
                   </div>
                 )}

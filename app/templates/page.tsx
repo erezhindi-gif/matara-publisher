@@ -12,10 +12,6 @@ type Template = {
   userId: string | null;
 };
 
-const BUSINESSES = [
-  { id: "recruitment", name: "מטרה - גיוס והשמה" },
-  { id: "carpentry", name: "נויה מטבחים" },
-];
 
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -90,9 +86,8 @@ export default function TemplatesPage() {
                   value={newBusiness}
                   onChange={(e) => setNewBusiness(e.target.value)}
                 >
-                  {BUSINESSES.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
+                  <option value="carpentry">נויה מטבחים</option>
+                  <option value="recruitment">מטרה - גיוס והשמה</option>
                 </select>
               </div>
               <div className="flex gap-3">
