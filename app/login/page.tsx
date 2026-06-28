@@ -15,10 +15,15 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
-    const res = await signIn("credentials", { email, password, redirect: false });
+    const res = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+      callbackUrl: "/campaigns",
+    });
     setLoading(false);
-    if (res?.ok) {
-      window.location.href = "/campaigns";
+    if (res?.ok && !res?.error) {
+      window.location.replace(res.url || "/campaigns");
     } else {
       setError("אימייל או סיסמה שגויים");
     }
