@@ -131,7 +131,7 @@ export default function ProfilesPage() {
     fetchProfiles();
   }
 
-  const filtered = businessFilter === "all" ? profiles : profiles.filter((p) => p.business.type === businessFilter);
+  const filtered = businessFilter === "all" ? profiles : profiles.filter((p) => p.userId === businessFilter);
   const active = filtered.filter((p) => p.isActive).length;
   const todayTotal = filtered.reduce((sum, p) => sum + (p.postsToday || 0), 0);
 

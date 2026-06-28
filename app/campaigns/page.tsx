@@ -55,7 +55,7 @@ export default function CampaignsPage() {
   const filtered = campaigns.filter((c) => {
     const matchSearch = !search || c.title.includes(search) || c.content.includes(search);
     const matchStatus = filterStatus === "all" || c.status === filterStatus;
-    const matchBusiness = businessFilter === "all" || c.business.type === businessFilter;
+    const matchBusiness = businessFilter === "all" || c.userId === businessFilter;
     return matchSearch && matchStatus && matchBusiness;
   });
 

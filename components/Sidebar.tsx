@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { getBusinessFilter, setBusinessFilter } from "@/lib/businessFilter";
 
-type Business = { id: string; name: string; type: string };
+type ProfileItem = { id: string; name: string; userId: string | null };
 
 const NAV = [
   { href: "/campaigns",  icon: "⊞", label: "ניהול קמפיינים" },
@@ -24,25 +24,27 @@ export default function Sidebar() {
   const { data: session } = useSession();
 
   if (path === "/login") return null;
-  const [business, setBusiness] = useState("all");
-  const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [filter, setFilter] = useState("all");
+  const [profiles, setProfiles] = useState<ProfileItem[]>([]);
 
   useEffect(() => {
-    setBusiness(getBusinessFilter());
-    const handler = () => setBusiness(getBusinessFilter());
+    setFilter(getBusinessFilter());
+    const handler = () => setFilter(getBusinessFilter());
     window.addEventListener("businessFilterChange", handler);
     return () => window.removeEventListener("businessFilterChange", handler);
   }, []);
 
   useEffect(() => {
-    fetch("/api/businesses").then((r) => r.json()).then((data) => {
-      if (Array.isArray(data)) setBusinesses(data);
-    });
-  }, []);
+    if ((session?.user as { role?: string })?.role === "admin") {
+      fetch("/api/profiles").then((r) => r.json()).then((data) => {
+        if (Array.isArray(data)) setProfiles(data);
+      });
+    }
+  }, [session]);
 
-  function handleBusinessChange(id: string) {
-    setBusinessFilter(id);
-    setBusiness(id);
+  function handleFilterChange(val: string) {
+    setBusinessFilter(val);
+    setFilter(val);
     router.refresh();
   }
 
@@ -54,28 +56,28 @@ export default function Sidebar() {
         <div className="text-xs text-gray-400 mt-0.5">Publisher</div>
       </div>
 
-      {/* Business selector - אדמין בלבד */}
-      {(session?.user as { role?: string })?.role === "admin" && businesses.length > 0 && (
+      {/* Profile selector - אדמין בלבד */}
+      {(session?.user as { role?: string })?.role === "admin" && profiles.length > 0 && (
         <div className="px-3 py-3 border-b border-gray-700">
-          <div className="text-xs text-gray-500 mb-2 px-1">עסק פעיל</div>
+          <div className="text-xs text-gray-500 mb-2 px-1">פרופיל פעיל</div>
           <div className="space-y-1">
             <button
-              onClick={() => handleBusinessChange("all")}
+              onClick={() => handleFilterChange("all")}
               className={`w-full text-right px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                business === "all" ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"
+                filter === "all" ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"
               }`}
             >
-              כל העסקים
+              כל הפרופילים
             </button>
-            {businesses.map((b) => (
+            {profiles.map((p) => (
               <button
-                key={b.id}
-                onClick={() => handleBusinessChange(b.type)}
+                key={p.id}
+                onClick={() => handleFilterChange(p.userId || p.id)}
                 className={`w-full text-right px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                  business === b.type ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"
+                  filter === (p.userId || p.id) ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"
                 }`}
               >
-                {b.name}
+                {p.name}
               </button>
             ))}
           </div>
