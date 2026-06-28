@@ -722,44 +722,6 @@ export default function NewCampaignPage() {
                 )}
               </div>
 
-              {/* Background picker - only when no images */}
-              {images.length === 0 && (
-                <div>
-                  <label className="block text-sm text-gray-700 mb-2">רקע לפוסט (אופציונלי)</label>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => setBackgroundIndex(null)}
-                      className={`w-9 h-9 rounded-lg border-2 bg-white flex items-center justify-center text-xs transition-all ${backgroundIndex === null ? "border-blue-500 scale-110" : "border-gray-300"}`}
-                      title="ללא רקע"
-                    >✕</button>
-                    {[
-                      { i: 1, bg: "linear-gradient(135deg,#1a1a2e,#16213e)" },
-                      { i: 2, bg: "linear-gradient(135deg,#c94b8a,#e8a0b4)" },
-                      { i: 3, bg: "linear-gradient(135deg,#f5e6d3,#e8d5c0)" },
-                      { i: 4, bg: "linear-gradient(135deg,#a8d8f0,#7ec8e3)" },
-                      { i: 5, bg: "linear-gradient(135deg,#d4b4f0,#f0b4d4)" },
-                      { i: 6, bg: "linear-gradient(135deg,#fff8f0,#ffeedd)" },
-                      { i: 7, bg: "linear-gradient(135deg,#90ee90,#32cd32)" },
-                      { i: 8, bg: "linear-gradient(135deg,#dc143c,#8b0000)" },
-                      { i: 9, bg: "linear-gradient(135deg,#ff7f7f,#ffb6c1,#87ceeb)" },
-                      { i: 10, bg: "linear-gradient(135deg,#b0b0b0,#d3d3d3)" },
-                      { i: 11, bg: "linear-gradient(135deg,#7b2d8b,#4a90d9)" },
-                      { i: 12, bg: "linear-gradient(135deg,#1a0a00,#4a1a00)" },
-                      { i: 13, bg: "linear-gradient(135deg,#ffd700,#ffa500)" },
-                      { i: 14, bg: "linear-gradient(135deg,#90e0d0,#b0f0e0)" },
-                      { i: 15, bg: "linear-gradient(135deg,#c8c8f0,#d8d8ff)" },
-                    ].map(({ i, bg }) => (
-                      <button
-                        key={i}
-                        onClick={() => setBackgroundIndex(i)}
-                        style={{ background: bg }}
-                        className={`w-9 h-9 rounded-lg border-2 transition-all ${backgroundIndex === i ? "border-blue-500 scale-110" : "border-transparent"}`}
-                        title={`רקע ${i}`}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
 
               <button
                 onClick={() => setStep("templates")}
