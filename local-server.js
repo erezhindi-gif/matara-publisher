@@ -304,9 +304,8 @@ async function processCampaign(campaign, profiles) {
       const profile = await fetch(`${API_BASE}/api/profiles`).then(r => r.json()).then(ps => ps[0]).catch(() => null);
       const phone = profile?.whatsappPhone?.replace(/[-\s]/g, '').replace(/^0/, '972');
       if (phone) {
-        // הקישור ללא text= כדי שלא יהיה קידוד URL מכוער
-        // ההודעה מוצגת כטקסט בפוסט לפני הקישור
-        whatsappUrl = `${campaign.whatsappMessage}\nhttps://wa.me/${phone}`;
+        // הקישור עם text= - פייסבוק מציג אותו כקלפית נקייה "WA.ME"
+        whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(campaign.whatsappMessage)}`;
         log(`[PUBLISH] WhatsApp URL: ${whatsappUrl}`);
       }
     }
