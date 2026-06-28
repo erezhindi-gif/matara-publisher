@@ -101,3 +101,29 @@
 [12:25:50]   [BG] writeBox re-found after bg: true
 [12:26:05] [PUBLISH] SUCCESS: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה
 [12:26:05] [PUBLISH] DONE: 1 success, 0 failed => status=done
+[12:48:07] [PUBLISH] START campaign: לחברה בנתניה דרוש/ה מנהל/ת חשבונות (cmqxlvl820001n89dwtjflcd3)
+[12:48:07] [PUBLISH] profile OK, killing old Edge...
+[12:48:07] [PUBLISH] launching Edge...
+[12:48:09] [PUBLISH] Edge launched, opening Facebook...
+[12:48:18] [PUBLISH] Facebook OK, logged in
+[12:48:18] [PUBLISH] 1 groups to post
+[12:48:18] [PUBLISH] posting to group: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה (1645456215749261)
+[12:48:28] [PUBLISH] current URL: https://www.facebook.com/groups/1645456215749261
+[12:48:30]   [CLICK] create-post: Y=757: "כאן כותבים…"
+[12:48:34]   [BG] Aa button found: true
+[12:48:37]   [BG] clicked circle 13 of 2 (rgb(198, 0, 255)). all: [rgb(198, 0, 255), rgb(226, 1, 59)]
+[12:48:40]   [BG] found background-styled writeBox
+[12:48:54] [PUBLISH] SUCCESS: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה
+[12:48:55] [PUBLISH] DONE: 1 success, 0 failed => status=done
+[12:56:20] [PUBLISH] START campaign: לחברה בנתניה דרוש/ה מנהל/ת חשבונות (cmqxm4uld0001dn26jqxsvor9)
+[12:56:20] [PUBLISH] profile OK, killing old Edge...
+[12:56:20] [PUBLISH] launching Edge...
+[12:56:22] [PUBLISH] Edge launched, opening Facebook...
+[12:56:31] [PUBLISH] Facebook OK, logged in
+[12:56:32] [PUBLISH] 1 groups to post
+[12:56:32] [PUBLISH] posting to group: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה (1645456215749261)
+[12:56:43] [PUBLISH] current URL: https://www.facebook.com/groups/1645456215749261
+[12:56:45]   [CLICK] create-post: Y=757: "כאן כותבים…"
+[12:57:00]   [BG] Aa button found: false
+[12:57:04] [PUBLISH] SUCCESS: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה
+[12:57:05] [PUBLISH] DONE: 1 success, 0 failed => status=done

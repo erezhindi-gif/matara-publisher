@@ -37,6 +37,8 @@ export default function ProfilesPage() {
   const [businessFilter, setBusinessFilterState] = useState("all");
   const [waStatus, setWaStatus] = useState<Record<string, { status: string; qrDataUrl: string | null }>>({});
   const [serverOnline, setServerOnline] = useState<boolean | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", fbUsername: "", edgeProfile: "Default", dailyLimit: 150, whatsappPhone: "" });
 
   useEffect(() => {
     const fetchWaStatus = () => {
@@ -104,6 +106,24 @@ export default function ProfilesPage() {
   async function deleteProfile(id: string) {
     if (!confirm("למחוק פרופיל זה?")) return;
     await fetch(`/api/profiles/${id}`, { method: "DELETE" });
+    fetchProfiles();
+  }
+
+  function startEdit(p: Profile) {
+    setEditingId(p.id);
+    setEditForm({ name: p.name, fbUsername: p.fbUsername, edgeProfile: p.edgeProfile, dailyLimit: p.dailyLimit, whatsappPhone: p.whatsappPhone || "" });
+  }
+
+  async function saveEdit() {
+    if (!editingId) return;
+    setSaving(true);
+    await fetch(`/api/profiles/${editingId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editForm),
+    });
+    setSaving(false);
+    setEditingId(null);
     fetchProfiles();
   }
 
@@ -242,7 +262,41 @@ export default function ProfilesPage() {
 
         <div className="space-y-3">
           {filtered.map((p) => (
-            <div key={p.id} className="bg-white border border-gray-200 rounded-2xl p-5">
+            <div key={p.id} className={`bg-white border rounded-2xl p-5 ${editingId === p.id ? "border-blue-400 shadow-sm" : "border-gray-200"}`}>
+              {editingId === p.id ? (
+                <div className="space-y-3">
+                  <div className="font-semibold text-sm text-gray-700 mb-2">עריכת פרופיל</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">שם</label>
+                      <input className="w-full border border-gray-300 rounded-xl p-2.5 text-sm" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">שם משתמש פייסבוק</label>
+                      <input className="w-full border border-gray-300 rounded-xl p-2.5 text-sm" value={editForm.fbUsername} onChange={e => setEditForm({...editForm, fbUsername: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">פרופיל Edge</label>
+                      <select className="w-full border border-gray-300 rounded-xl p-2.5 text-sm" value={editForm.edgeProfile} onChange={e => setEditForm({...editForm, edgeProfile: e.target.value})}>
+                        {EDGE_PROFILES.map(ep => <option key={ep.value} value={ep.value}>{ep.label}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">מגבלה יומית</label>
+                      <input type="number" className="w-full border border-gray-300 rounded-xl p-2.5 text-sm" value={editForm.dailyLimit} onChange={e => setEditForm({...editForm, dailyLimit: parseInt(e.target.value)||150})} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">📱 מספר וואטסאפ (לקישור בפוסטים)</label>
+                    <input className="w-full border border-gray-300 rounded-xl p-2.5 text-sm" placeholder="0500000000" dir="ltr" value={editForm.whatsappPhone} onChange={e => setEditForm({...editForm, whatsappPhone: e.target.value})} />
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={() => setEditingId(null)} className="flex-1 bg-gray-100 hover:bg-gray-200 rounded-xl p-2.5 text-sm">ביטול</button>
+                    <button onClick={saveEdit} disabled={saving} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-xl p-2.5 text-sm font-semibold">{saving ? "שומר..." : "שמור"}</button>
+                  </div>
+                </div>
+              ) : (
+              <>
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <div className="flex items-center gap-2 mb-0.5">
@@ -256,6 +310,7 @@ export default function ProfilesPage() {
                   {p.whatsappPhone && <div className="text-xs text-green-600 mt-0.5">📱 {p.whatsappPhone}</div>}
                 </div>
                 <div className="flex gap-2">
+                  <button onClick={() => startEdit(p)} className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg px-3 py-1.5 transition-colors">ערוך</button>
                   <button onClick={() => toggleActive(p)} className={`text-xs rounded-lg px-3 py-1.5 transition-colors ${p.isActive ? "bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-600" : "bg-green-50 hover:bg-green-100 text-green-600"}`}>
                     {p.isActive ? "השבת" : "הפעל"}
                   </button>
@@ -293,6 +348,8 @@ export default function ProfilesPage() {
                   );
                 })()}
               </div>
+            </>
+            )}
             </div>
           ))}
         </div>
