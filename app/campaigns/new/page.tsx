@@ -669,14 +669,14 @@ export default function NewCampaignPage() {
 
               <div>
                 <label className="block text-sm text-gray-700 mb-1">מייל (אופציונלי)</label>
-                {contactLinks.filter((l) => l.type === "email" && l.businessId === form.businessId).length > 0 ? (
+                {contactLinks.filter((l) => l.type === "email" && true).length > 0 ? (
                   <select
                     className="w-full bg-white border border-gray-300 rounded-xl p-3 text-gray-900"
                     value={form.emailLink}
                     onChange={(e) => setForm({ ...form, emailLink: e.target.value })}
                   >
                     <option value="">ללא מייל</option>
-                    {contactLinks.filter((l) => l.type === "email" && l.businessId === form.businessId)
+                    {contactLinks.filter((l) => l.type === "email" && true)
                       .map((l) => <option key={l.id} value={l.value}>{l.label}</option>)}
                   </select>
                 ) : (
@@ -773,14 +773,14 @@ export default function NewCampaignPage() {
             {templateMode === "template" && (
               <>
                 <p className="text-gray-700">בחר תבניות קבוצות לפרסום:</p>
-                {templates.filter((t) => t.businessId === form.businessId).length === 0 ? (
+                {templates.filter((t) => true).length === 0 ? (
                   <div className="text-center text-gray-500 bg-white rounded-2xl p-8 border border-gray-200">
                     <p>אין תבניות לעסק זה עדיין</p>
                     <a href="/templates" target="_blank" className="text-blue-500 hover:underline text-sm mt-2 inline-block">צור תבנית חדשה</a>
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {templates.filter((t) => t.businessId === form.businessId).map((t) => (
+                    {templates.filter((t) => true).map((t) => (
                       <div
                         key={t.id}
                         onClick={() => setSelectedTemplates((prev) => prev.includes(t.id) ? prev.filter((id) => id !== t.id) : [...prev, t.id])}

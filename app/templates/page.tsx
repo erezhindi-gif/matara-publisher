@@ -9,6 +9,7 @@ type Template = {
   name: string;
   business: { name: string; type: string };
   groups: { id: string; name: string; memberCount: number | null }[];
+  userId: string | null;
 };
 
 const BUSINESSES = [
@@ -109,7 +110,7 @@ export default function TemplatesPage() {
         {loading && <div className="text-center text-gray-500 py-20">טוען...</div>}
 
         {!loading && (() => {
-          const filtered = businessFilter === "all" ? templates : templates.filter((t) => t.business.type === businessFilter);
+          const filtered = businessFilter === "all" ? templates : templates.filter((t) => t.userId === businessFilter);
           return filtered.length === 0 ? (
             <div className="text-center text-gray-500 py-20">
               <div className="text-5xl mb-4">📁</div>
