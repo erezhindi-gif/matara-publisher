@@ -13,6 +13,7 @@ type Campaign = {
   groupIds: string;
   business: { name: string; type: string };
   posts: { status: string; groupName: string }[];
+  userId: string | null;
 };
 
 type Template = {
@@ -143,7 +144,7 @@ export default function SchedulePage() {
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   const filteredCampaigns = campaigns.filter((c) =>
-    businessFilter === "all" || c.business.type === businessFilter
+    businessFilter === "all" || c.userId === businessFilter
   );
 
   function campaignsForDay(day: Date) {
