@@ -177,20 +177,26 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
             }) || null;
           }).then(h => h && h.asElement ? h.asElement() : null).catch(() => null);
       log(`  [IMG] photo button: ${!!photoBtn}`);
-      if (photoBtn) {
-        // שלח Escape ברקע לסגור את חלון הבחירה של Windows אחרי שייפתח
-        exec('powershell.exe -NonInteractive -Command "Add-Type -AssemblyName System.Windows.Forms; Start-Sleep -Milliseconds 1500; [System.Windows.Forms.SendKeys]::SendWait(\'{ESCAPE}\')"');
-        await photoBtn.click();
-        await new Promise(r => setTimeout(r, 3000)); // המתן לסגירת החלון
-        log(`  [IMG] dialog closed via Escape`);
+      // שלב 1: uploadFile על input שקיים לפני לחיצה (JS רץ, אין dialog)
+      const fileInputBefore = await page.$('input[type="file"]');
+      log(`  [IMG] file input before click: ${!!fileInputBefore}`);
+      if (fileInputBefore) {
+        await fileInputBefore.uploadFile(...localImagePaths);
+        log(`  [IMG] uploadFile done (before click)`);
+        await new Promise(r => setTimeout(r, 1000));
       }
-      // עכשיו ה-JS של פייסבוק רץ שוב - uploadFile יעבד
-      const fileInput = await page.$('input[type="file"][accept*="image"]')
-        || await page.$('input[type="file"]');
-      log(`  [IMG] file input: ${!!fileInput}`);
-      if (fileInput) {
-        await fileInput.uploadFile(...localImagePaths);
-        log(`  [IMG] uploadFile done`);
+
+      // שלב 2: לחץ על כפתור תמונה ואז uploadFile שוב על input החדש
+      if (photoBtn) {
+        await photoBtn.click();
+        await new Promise(r => setTimeout(r, 2000));
+        const fileInputAfter = await page.$('input[type="file"][accept*="image"]')
+          || await page.$('input[type="file"]');
+        log(`  [IMG] file input after click: ${!!fileInputAfter}`);
+        if (fileInputAfter) {
+          await fileInputAfter.uploadFile(...localImagePaths);
+          log(`  [IMG] uploadFile done (after click)`);
+        }
       }
       await new Promise(r => setTimeout(r, 5000));
       log(`  [IMG] image step complete`);
