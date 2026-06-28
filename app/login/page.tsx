@@ -25,7 +25,7 @@ export default function LoginPage() {
     if (res?.ok && !res?.error) {
       window.location.replace(res.url || "/campaigns");
     } else {
-      setError("אימייל או סיסמה שגויים");
+      setError(`שגיאה: ${res?.error || "לא ידוע"} (ok=${res?.ok}, status=${res?.status})`);
     }
   }
 
