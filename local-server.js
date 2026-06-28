@@ -184,9 +184,27 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
 
       await new Promise(r => setTimeout(r, 3000));
       log(`  [IMG] image step complete`);
+
+      // הוסף קישור וואטסאפ אחרי התמונות - כך לא ייווצר כרטיס WA.ME
+      if (whatsappUrl) {
+        await writeBox.click();
+        await new Promise(r => setTimeout(r, 500));
+        await page.keyboard.press('End');
+        await page.keyboard.type(`\n\n${whatsappUrl}`, { delay: 30 });
+        log(`  [WA] whatsapp URL added after images`);
+        await new Promise(r => setTimeout(r, 2000));
+      }
     } catch (e) {
       log(`  [IMG] ERROR: ${e.message}`);
     }
+  } else if (whatsappUrl) {
+    // אין תמונות - הוסף URL לתוכן הרגיל
+    await writeBox.click();
+    await new Promise(r => setTimeout(r, 500));
+    await page.keyboard.press('End');
+    await page.keyboard.type(`\n\n${whatsappUrl}`, { delay: 30 });
+    log(`  [WA] whatsapp URL added (no images)`);
+    await new Promise(r => setTimeout(r, 2000));
   }
 
   // לחץ פרסם - נסה כמה selectors
