@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { getBusinessFilter } from "@/lib/businessFilter";
 
 
 const DAY_NAMES = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי"];
@@ -438,6 +439,7 @@ export default function NewCampaignPage() {
   const [contactLinks, setContactLinks] = useState<ContactLink[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [profileOptions, setProfileOptions] = useState<ProfileOption[]>([]);
+  const sidebarFilter = getBusinessFilter(); // userId של הפרופיל הנבחר בסיידבר, או "all"
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
   const [templateMode, setTemplateMode] = useState<"template" | "groups">("template");
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
@@ -447,7 +449,14 @@ export default function NewCampaignPage() {
   useEffect(() => {
     fetch("/api/settings").then((r) => r.json()).then(setContactLinks);
     fetch("/api/profiles").then((r) => r.json()).then((data) => {
-      if (Array.isArray(data)) setProfileOptions(data);
+      if (Array.isArray(data)) {
+        setProfileOptions(data);
+        // אם יש פרופיל נבחר בסיידבר, הגדר את businessId שלו
+        if (sidebarFilter !== "all") {
+          const selected = data.find((p: ProfileOption) => (p.userId || p.id) === sidebarFilter);
+          if (selected) setForm((f) => ({ ...f, businessId: selected.businessId }));
+        }
+      }
     });
     fetch("/api/templates").then((r) => r.json()).then((data) => {
       setTemplates(data);
@@ -620,7 +629,7 @@ export default function NewCampaignPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Form */}
             <div className="space-y-5">
-              {isAdmin && profileOptions.length > 0 && (
+              {isAdmin && profileOptions.length > 0 && sidebarFilter === "all" && (
                 <div>
                   <label className="block text-sm text-gray-700 mb-1">פרופיל</label>
                   <select
@@ -630,6 +639,14 @@ export default function NewCampaignPage() {
                   >
                     {profileOptions.map((p) => <option key={p.id} value={p.businessId}>{p.name}</option>)}
                   </select>
+                </div>
+              )}
+              {isAdmin && sidebarFilter !== "all" && (
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">פרופיל</label>
+                  <div className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-gray-700">
+                    {profileOptions.find((p) => (p.userId || p.id) === sidebarFilter)?.name || ""}
+                  </div>
                 </div>
               )}
 
