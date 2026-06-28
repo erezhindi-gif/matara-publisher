@@ -178,9 +178,13 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
           }).then(h => h && h.asElement ? h.asElement() : null).catch(() => null);
       log(`  [IMG] photo button: ${!!photoBtn}`);
       if (photoBtn) {
+        // שלח Escape ברקע לסגור את חלון הבחירה של Windows אחרי שייפתח
+        exec('powershell.exe -NonInteractive -Command "Add-Type -AssemblyName System.Windows.Forms; Start-Sleep -Milliseconds 1500; [System.Windows.Forms.SendKeys]::SendWait(\'{ESCAPE}\')"');
         await photoBtn.click();
-        await new Promise(r => setTimeout(r, 2000));
+        await new Promise(r => setTimeout(r, 3000)); // המתן לסגירת החלון
+        log(`  [IMG] dialog closed via Escape`);
       }
+      // עכשיו ה-JS של פייסבוק רץ שוב - uploadFile יעבד
       const fileInput = await page.$('input[type="file"][accept*="image"]')
         || await page.$('input[type="file"]');
       log(`  [IMG] file input: ${!!fileInput}`);
