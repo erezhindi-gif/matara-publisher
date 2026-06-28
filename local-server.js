@@ -163,47 +163,7 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   await page.keyboard.type(fullContent, { delay: 30 });
   await new Promise(r => setTimeout(r, 2000));
 
-  // בחר רקע אחרי הקלדה (פייסבוק שומר את הטקסט)
-  if (localImagePaths.length === 0 && backgroundIndex) {
-    try {
-      const aaEl = await page.$('img[src*="SATP_Aa_square"]')
-        .then(img => img ? page.evaluateHandle(el => el.closest('[role="button"]'), img) : null)
-        .then(h => (h && h.asElement) ? h.asElement() : null)
-        .catch(() => null)
-        || await page.evaluateHandle(() =>
-          [...document.querySelectorAll('[role="button"]')].find(b => b.textContent.trim() === 'Aa') || null
-        ).then(h => h && h.asElement ? h.asElement() : null).catch(() => null);
-
-      log(`  [BG] Aa button found: ${!!aaEl}`);
-      if (aaEl) {
-        await aaEl.click();
-        await new Promise(r => setTimeout(r, 2500));
-
-        const bgClicked = await page.evaluate((bgIdx) => {
-          const dialog = document.querySelector('[role="dialog"]');
-          if (!dialog) return 'no dialog';
-          const all = [...dialog.querySelectorAll('*')];
-          const circles = all.filter(el => {
-            const bg = window.getComputedStyle(el).backgroundColor;
-            if (!bg || bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent') return false;
-            const w = el.offsetWidth, h = el.offsetHeight;
-            if (w < 20 || w > 70 || h < 20 || h > 70) return false;
-            if (Math.abs(w - h) > 10) return false;
-            const m = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-            if (!m) return false;
-            const [r, g, b] = [+m[1], +m[2], +m[3]];
-            return Math.max(r,g,b) - Math.min(r,g,b) >= 30;
-          });
-          if (circles.length === 0) return `no colorful circles`;
-          const target = circles[bgIdx - 1] || circles[0];
-          target.click();
-          return `clicked ${bgIdx} of ${circles.length}: ${window.getComputedStyle(target).backgroundColor}`;
-        }, backgroundIndex);
-        log(`  [BG] ${bgClicked}`);
-        await new Promise(r => setTimeout(r, 1500));
-      }
-    } catch (e) { log('  [WARN] background: ' + e.message); }
-  }
+  // רקע - בוטל (פייסבוק לא תומך בכך עם Puppeteer)
 
   // העלאת תמונות
   if (localImagePaths.length > 0) {
