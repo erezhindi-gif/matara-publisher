@@ -13,6 +13,7 @@
     "@vercel/blob": "^2.4.1",
     "next": "16.2.9",
     "next-auth": "^4.24.14",
+    "node-windows": "^1.0.0-beta.8",
     "puppeteer-core": "^25.2.0",
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",

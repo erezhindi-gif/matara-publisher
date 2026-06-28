@@ -44,7 +44,7 @@ const BG_GRADIENTS: Record<number, string> = {
   15: "linear-gradient(135deg,#c8c8f0,#d8d8ff)",
 };
 
-function FacebookPreview({ content, whatsappLink, imagePreviews, backgroundIndex }: { content: string; whatsappLink: string; imagePreviews: string[]; backgroundIndex?: number | null }) {
+function FacebookPreview({ content, whatsappLink, whatsappMessage, imagePreviews, backgroundIndex }: { content: string; whatsappLink: string; whatsappMessage?: string; imagePreviews: string[]; backgroundIndex?: number | null }) {
   const bg = backgroundIndex && !imagePreviews.length ? BG_GRADIENTS[backgroundIndex] : null;
   const isDark = backgroundIndex && [1, 8, 11, 12].includes(backgroundIndex);
   return (
@@ -60,15 +60,21 @@ function FacebookPreview({ content, whatsappLink, imagePreviews, backgroundIndex
       </div>
       <div
         className="p-4"
-        style={bg ? { background: bg, minHeight: "120px", display: "flex", alignItems: "center", justifyContent: "center" } : {}}
+        style={bg ? { background: bg, minHeight: "120px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" } : {}}
       >
         <pre
-          className="whitespace-pre-wrap font-sans text-sm leading-relaxed"
+          className="whitespace-pre-wrap font-sans text-sm leading-relaxed w-full"
           style={bg ? { color: isDark ? "#fff" : "#000", fontWeight: 600, textAlign: "center" } : { color: "#111827" }}
         >
           {content || "תוכן הפוסט יופיע כאן..."}
         </pre>
-        {whatsappLink && !bg && (
+        {whatsappMessage && (
+          <div className="mt-3 pt-3 border-t border-gray-100 w-full">
+            <span className="inline-flex items-center gap-2 bg-green-500 text-white text-sm font-medium px-4 py-2 rounded-full">📱 שלח הודעה בוואטסאפ</span>
+            <div className="text-xs text-gray-400 mt-1 truncate">&ldquo;{whatsappMessage}&rdquo;</div>
+          </div>
+        )}
+        {whatsappLink && !whatsappMessage && !bg && (
           <div className="mt-3 pt-3 border-t border-gray-100">
             <span className="text-green-600 text-sm">📱 {whatsappLink}</span>
           </div>
@@ -97,7 +103,7 @@ function ScheduleStep({
   scheduleStartDate, setScheduleStartDate, existingCampaigns, templates, selectedTemplates, loading, onBack, onSave,
   dayTimes, setDayTimes, backgroundIndex,
 }: {
-  form: { content: string; whatsappLink: string };
+  form: { content: string; whatsappLink: string; whatsappMessage?: string };
   imagePreviews: string[];
   scheduleDays: number[];
   setScheduleDays: (fn: (prev: number[]) => number[]) => void;
@@ -399,7 +405,7 @@ function ScheduleStep({
 
       <div className="lg:sticky lg:top-8 lg:self-start">
         <div className="text-sm text-gray-500 mb-3 font-medium">תצוגה מקדימה</div>
-        <FacebookPreview content={form.content} whatsappLink={form.whatsappLink} imagePreviews={imagePreviews} backgroundIndex={backgroundIndex} />
+        <FacebookPreview content={form.content} whatsappLink={form.whatsappLink} whatsappMessage={form.whatsappMessage} imagePreviews={imagePreviews} backgroundIndex={backgroundIndex} />
         {busyRanges.length > 0 && (
           <div className="mt-4 bg-white border border-gray-200 rounded-2xl p-4">
             <div className="text-xs font-medium text-gray-500 mb-2">קמפיינים מתוזמנים ביום זה:</div>
@@ -456,6 +462,7 @@ export default function NewCampaignPage() {
     jobTitle: "",
     location: "",
     whatsappLink: "",
+    whatsappMessage: "",
     emailLink: "",
     content: "",
   });
@@ -560,6 +567,7 @@ export default function NewCampaignPage() {
             title: form.jobTitle,
             content: form.content,
             whatsappLink: form.whatsappLink,
+            whatsappMessage: form.whatsappMessage || null,
             emailLink: form.emailLink,
             imageUrls,
             scheduledAt,
@@ -634,22 +642,15 @@ export default function NewCampaignPage() {
               </div>
 
               <div>
-                <label className="block text-sm text-gray-700 mb-1">קישור וואטסאפ</label>
-                {contactLinks.filter((l) => l.type === "whatsapp" && l.businessId === form.businessId).length > 0 ? (
-                  <select
-                    className="w-full bg-white border border-gray-300 rounded-xl p-3 text-gray-900"
-                    value={form.whatsappLink}
-                    onChange={(e) => setForm({ ...form, whatsappLink: e.target.value })}
-                  >
-                    <option value="">ללא קישור וואטסאפ</option>
-                    {contactLinks.filter((l) => l.type === "whatsapp" && l.businessId === form.businessId)
-                      .map((l) => <option key={l.id} value={l.value}>{l.label}</option>)}
-                  </select>
-                ) : (
-                  <div className="text-sm text-gray-500 bg-white border border-gray-300 rounded-xl p-3">
-                    אין קישורים שמורים - <a href="/settings" className="text-blue-500 hover:underline">הוסף בהגדרות</a>
-                  </div>
-                )}
+                <label className="block text-sm text-gray-700 mb-1">📱 כפתור וואטסאפ בפוסט</label>
+                <textarea
+                  className="w-full bg-white border border-gray-300 rounded-xl p-3 text-gray-900 text-sm resize-none"
+                  rows={2}
+                  placeholder={'היי, אשמח לפרטים בנוגע למודעת מנהל/ת חשבונות'}
+                  value={form.whatsappMessage}
+                  onChange={(e) => setForm({ ...form, whatsappMessage: e.target.value })}
+                />
+                <p className="text-xs text-gray-400 mt-1">הטקסט שיישלח אוטומטית כשמישהו לוחץ על קישור הוואטסאפ בפוסט. ימספר הטלפון נלקח מהפרופיל.</p>
               </div>
 
               <div>
@@ -772,7 +773,7 @@ export default function NewCampaignPage() {
             {/* Preview */}
             <div className="lg:sticky lg:top-8 lg:self-start">
               <div className="text-sm text-gray-500 mb-3 font-medium">תצוגה מקדימה</div>
-              <FacebookPreview content={form.content} whatsappLink={form.whatsappLink} imagePreviews={imagePreviews} backgroundIndex={backgroundIndex} />
+              <FacebookPreview content={form.content} whatsappLink={form.whatsappLink} whatsappMessage={form.whatsappMessage} imagePreviews={imagePreviews} backgroundIndex={backgroundIndex} />
             </div>
           </div>
         )}

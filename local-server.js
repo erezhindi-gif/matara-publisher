@@ -78,7 +78,7 @@ async function updatePostStatus(campaignId, groupName, status, error = null) {
   });
 }
 
-async function postToFacebookGroup(page, fbGroupId, groupName, content, localImagePaths = [], backgroundIndex = null) {
+async function postToFacebookGroup(page, fbGroupId, groupName, content, localImagePaths = [], backgroundIndex = null, whatsappUrl = null) {
   console.log(`  פרסום לקבוצה: ${groupName} (${fbGroupId})`);
 
   // נווט ישירות לקבוצה לפי ID
@@ -210,19 +210,42 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
           return `clicked circle ${bgIdx} of ${circles.length} (${window.getComputedStyle(target).backgroundColor}). all: [${circles.map(c=>window.getComputedStyle(c).backgroundColor).join(', ')}]`;
         }, backgroundIndex);
         log(`  [BG] ${bgClicked}`);
-        // המתן לרענון הדיאלוג אחרי בחירת הרקע
-        await new Promise(r => setTimeout(r, 2000));
-        // מצא מחדש את תיבת הטקסט (הדיאלוג התרענן)
-        writeBox = await page.$('[role="dialog"] [contenteditable="true"]')
-          || await page.$('[contenteditable="true"]');
-        log(`  [BG] writeBox re-found after bg: ${!!writeBox}`);
+        // המתן לפייסבוק להחליף את תיבת הטקסט לתיבה עם רקע
+        await new Promise(r => setTimeout(r, 2500));
+        // אחרי בחירת רקע פייסבוק מציג תיבת טקסט חדשה עם הרקע הצבעוני
+        // נחפש את כל contenteditable ונבחר את זה שנמצא בתוך האלמנט עם הרקע
+        const bgWriteBox = await page.evaluateHandle(() => {
+          const dialog = document.querySelector('[role="dialog"]');
+          if (!dialog) return null;
+          const boxes = [...dialog.querySelectorAll('[contenteditable="true"]')];
+          // העדף תיבה שהאב שלה יש לו background-image (גרדיאנט פייסבוק)
+          const bgBox = boxes.find(b => {
+            let el = b;
+            for (let i = 0; i < 5; i++) {
+              if (!el) break;
+              const bg = window.getComputedStyle(el).backgroundImage;
+              if (bg && bg !== 'none') return true;
+              el = el.parentElement;
+            }
+            return false;
+          });
+          return bgBox || boxes[0] || null;
+        }).then(h => h && h.asElement ? h.asElement() : null).catch(() => null);
+        if (bgWriteBox) {
+          writeBox = bgWriteBox;
+          log(`  [BG] found background-styled writeBox`);
+        } else {
+          writeBox = await page.$('[role="dialog"] [contenteditable="true"]') || writeBox;
+          log(`  [BG] using fallback writeBox`);
+        }
       }
     } catch (e) { log('  [WARN] background not applied: ' + e.message); }
   }
 
   await writeBox.click();
   await new Promise(r => setTimeout(r, 1000));
-  await page.keyboard.type(content, { delay: 30 });
+  const fullContent = whatsappUrl ? `${content}\n\n${whatsappUrl}` : content;
+  await page.keyboard.type(fullContent, { delay: 30 });
   await new Promise(r => setTimeout(r, 2000));
 
   // העלאת תמונות
@@ -357,12 +380,24 @@ async function processCampaign(campaign, profiles) {
     log(`[PUBLISH] ${groups.length} groups to post`);
 
     const localImagePaths = campaign.imageUrls?.length > 0 ? await downloadImages(campaign.imageUrls) : [];
+
+    // בנה קישור וואטסאפ אם יש הודעה מוגדרת
+    let whatsappUrl = null;
+    if (campaign.whatsappMessage) {
+      const profile = await fetch(`${API_BASE}/api/profiles`).then(r => r.json()).then(ps => ps[0]).catch(() => null);
+      const phone = profile?.whatsappPhone?.replace(/[-\s]/g, '').replace(/^0/, '972');
+      if (phone) {
+        whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(campaign.whatsappMessage)}`;
+        log(`[PUBLISH] WhatsApp URL: ${whatsappUrl}`);
+      }
+    }
+
     let published = 0, failed = 0;
 
     for (const group of groups) {
       log(`[PUBLISH] posting to group: ${group.name} (${group.fbGroupId})`);
       try {
-        await postToFacebookGroup(page, group.fbGroupId, group.name, campaign.content, localImagePaths, campaign.backgroundIndex || null);
+        await postToFacebookGroup(page, group.fbGroupId, group.name, campaign.content, localImagePaths, campaign.backgroundIndex || null, whatsappUrl);
         await updatePostStatus(campaign.id, group.name, "published");
         published++;
         log(`[PUBLISH] SUCCESS: ${group.name}`);

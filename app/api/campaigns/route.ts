@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
       title: body.title,
       content: body.content,
       whatsappLink: body.whatsappLink || null,
+      whatsappMessage: body.whatsappMessage || null,
       emailLink: body.emailLink || null,
       imageUrls: body.imageUrls || [],
       businessId: business.id,

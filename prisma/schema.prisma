@@ -53,8 +53,9 @@ model Campaign {
   id           String            @id @default(cuid())
   title        String
   content      String
-  whatsappLink String?
-  emailLink    String?
+  whatsappLink    String?
+  whatsappMessage String?
+  emailLink       String?
   imageUrls    String[]
   status       String            @default("draft")
   business     Business          @relation(fields: [businessId], references: [id])
