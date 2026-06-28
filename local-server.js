@@ -303,7 +303,7 @@ async function processCampaign(campaign, profiles) {
       const phone = profile?.whatsappPhone?.replace(/[-\s]/g, '').replace(/^0/, '972');
       if (phone) {
         // הקישור עם text= - פייסבוק מציג אותו כקלפית נקייה "WA.ME"
-        whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(campaign.whatsappMessage)}`;
+        whatsappUrl = `https://wa.me/${phone}`;
         log(`[PUBLISH] WhatsApp URL: ${whatsappUrl}`);
       }
     }
