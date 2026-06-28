@@ -176,55 +176,33 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
         // צלם לראות מה נפתח
         try { await page.screenshot({ path: `C:\\matara-bg-debug.png` }); } catch {}
 
-        // מצא את כפתורי הרקע לפי computed background-color (הם צבעוניים)
-        const bgHandle = await page.evaluateHandle((bgIdx) => {
+        // מצא עיגולי רקע - divים קטנים עגולים עם צבע רקע
+        const bgClicked = await page.evaluate((bgIdx) => {
           const dialog = document.querySelector('[role="dialog"]');
-          if (!dialog) return null;
-          // כל הכפתורים בדיאלוג עם background-color שאינו שקוף/לבן/אפור
-          const allBtns = [...dialog.querySelectorAll('[role="button"]')];
-          const colorBtns = allBtns.filter(b => {
-            const bg = window.getComputedStyle(b).backgroundColor;
+          if (!dialog) return 'no dialog';
+          // חפש כל האלמנטים בדיאלוג
+          const all = [...dialog.querySelectorAll('*')];
+          const circles = all.filter(el => {
+            const cs = window.getComputedStyle(el);
+            const bg = cs.backgroundColor;
             if (!bg || bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent') return false;
-            // סנן כפתורים לבנים/אפורים/שקופים
-            const match = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-            if (!match) return false;
-            const [r, g, b2] = [+match[1], +match[2], +match[3]];
-            // רק אם הצבע "ייחודי" - לא שחור/לבן/אפור
-            const isGray = Math.abs(r - g) < 15 && Math.abs(g - b2) < 15;
-            return !isGray || r < 50; // שחור כן, אפור בינוני לא
+            const w = el.offsetWidth, h = el.offsetHeight;
+            // עיגולי רקע: בין 20-70px, כמעט ריבוע
+            if (w < 20 || w > 70 || h < 20 || h > 70) return false;
+            if (Math.abs(w - h) > 10) return false;
+            // לא לבן/אפור בהיר
+            const m = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+            if (!m) return false;
+            const [r, g, b] = [+m[1], +m[2], +m[3]];
+            if (r > 220 && g > 220 && b > 220) return false; // לבן
+            return true;
           });
-          // גם חפש לפי inline style עם background
-          const styleBtns = allBtns.filter(b => {
-            const s = b.getAttribute('style') || '';
-            return s.includes('background') && !colorBtns.includes(b);
-          });
-          const combined = [...colorBtns, ...styleBtns];
-          return combined[bgIdx - 1] || combined[0] || null;
+          if (circles.length === 0) return 'no circles found';
+          const target = circles[bgIdx - 1] || circles[0];
+          target.click();
+          return `clicked circle ${bgIdx} of ${circles.length} (${window.getComputedStyle(target).backgroundColor})`;
         }, backgroundIndex);
-
-        const bgEl = bgHandle ? await bgHandle.asElement() : null;
-        log(`  [BG] colorful button found: ${!!bgEl}`);
-
-        if (bgEl) {
-          await bgEl.click();
-          await new Promise(r => setTimeout(r, 1000));
-          log(`  [OK] background ${backgroundIndex} applied`);
-        } else {
-          // fallback: נסה לחיצה על הכפתור ה-N אחרי כפתור Aa
-          log(`  [BG] trying fallback - click Nth button after Aa`);
-          const clicked = await page.evaluate((bgIdx) => {
-            const dialog = document.querySelector('[role="dialog"]');
-            if (!dialog) return false;
-            const btns = [...dialog.querySelectorAll('[role="button"]')];
-            // מצא את Aa ולחץ N כפתורים אחריו
-            const aaIdx = btns.findIndex(b => b.textContent.trim() === 'Aa' ||
-              b.querySelector('img[src*="SATP_Aa"]'));
-            const target = aaIdx >= 0 ? btns[aaIdx + bgIdx] : btns[bgIdx];
-            if (target) { target.click(); return true; }
-            return false;
-          }, backgroundIndex);
-          log(`  [BG] fallback click: ${clicked}`);
-        }
+        log(`  [BG] ${bgClicked}`);
       }
     } catch (e) { log('  [WARN] background not applied: ' + e.message); }
   }
@@ -234,46 +212,37 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   await page.keyboard.type(content, { delay: 30 });
   await new Promise(r => setTimeout(r, 2000));
 
-  // העלאת תמונות
+  // העלאת תמונות - uploadFile ישירות על input ללא לחיצה על כפתור
   if (localImagePaths.length > 0) {
     log(`  [IMG] uploading ${localImagePaths.length} images...`);
-    // נסה למצוא כפתור תמונה
-    const photoBtn = await page.$('[aria-label="תמונה/וידאו"]')
-      || await page.$('[aria-label="Photo/video"]')
-      || await page.$('[aria-label="תמונה"]')
-      || await page.$('[aria-label="Photo"]')
-      || await page.evaluateHandle(() => {
-          const dialog = document.querySelector('[role="dialog"]');
-          if (!dialog) return null;
-          return [...dialog.querySelectorAll('[role="button"]')].find(b => {
-            const label = b.getAttribute('aria-label') || '';
-            return label.includes('תמונה') || label.includes('Photo') || label.includes('photo');
-          }) || null;
-        }).then(h => h && h.asElement ? h.asElement() : null).catch(() => null);
-
-    log(`  [IMG] photo button found: ${!!photoBtn}`);
-    if (photoBtn) {
-      await photoBtn.click();
-      await new Promise(r => setTimeout(r, 2000));
-    }
-
-    // חפש file input - גם לפני לחיצה על כפתור וגם אחריה
-    let fileInput = await page.$('input[type="file"]');
-    if (!fileInput) {
-      // נסה לחשוף hidden input
-      await page.evaluate(() => {
-        const inputs = [...document.querySelectorAll('input[type="file"]')];
-        inputs.forEach(i => { i.style.display = 'block'; i.style.visibility = 'visible'; });
+    // חשוף את כל ה-file inputs ומצא את הנכון
+    await page.evaluate(() => {
+      document.querySelectorAll('input[type="file"]').forEach(i => {
+        i.style.display = 'block';
+        i.style.opacity = '1';
+        i.style.visibility = 'visible';
+        i.removeAttribute('hidden');
       });
-      fileInput = await page.$('input[type="file"]');
-    }
+    });
+    const fileInput = await page.$('div[role="dialog"] input[type="file"]')
+      || await page.$('input[type="file"][accept*="image"]')
+      || await page.$('input[type="file"]');
     log(`  [IMG] file input found: ${!!fileInput}`);
     if (fileInput) {
       await fileInput.uploadFile(...localImagePaths);
-      await new Promise(r => setTimeout(r, 5000));
+      await new Promise(r => setTimeout(r, 6000));
       log(`  [IMG] upload done`);
     } else {
-      log(`  [WARN] file input not found - image not uploaded`);
+      // fallback: לחץ על כפתור תמונה ואז uploadFile
+      log(`  [IMG] trying photo button fallback...`);
+      const photoBtn = await page.$('[aria-label="תמונה/וידאו"]')
+        || await page.$('[aria-label="Photo/video"]');
+      if (photoBtn) {
+        await photoBtn.click();
+        await new Promise(r => setTimeout(r, 2000));
+        const fi = await page.$('input[type="file"]');
+        if (fi) { await fi.uploadFile(...localImagePaths); await new Promise(r => setTimeout(r, 6000)); }
+      }
     }
   }
 
