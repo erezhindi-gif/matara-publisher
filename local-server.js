@@ -166,20 +166,23 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   if (localImagePaths.length > 0) {
     log(`  [IMG] uploading ${localImagePaths.length} images: ${localImagePaths.join(', ')}`);
     try {
-      // העתק תמונה ללוח Windows ואז Ctrl+V בתיבת הטקסט - עוקף את ה-dialog לחלוטין
-      const imagePath = localImagePaths[0].replace(/\\/g, '\\\\');
-      const psCmd = `Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; $img = [System.Drawing.Image]::FromFile('${imagePath}'); [System.Windows.Forms.Clipboard]::SetImage($img); $img.Dispose()`;
-      execSync(`powershell.exe -NonInteractive -Command "${psCmd}"`);
-      log(`  [IMG] image copied to clipboard`);
+      // העתק כל תמונה ללוח והדבק - עוקף את ה-dialog לחלוטין
+      for (let i = 0; i < localImagePaths.length; i++) {
+        const imagePath = localImagePaths[i].replace(/\\/g, '\\\\');
+        const psCmd = `Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; $img = [System.Drawing.Image]::FromFile('${imagePath}'); [System.Windows.Forms.Clipboard]::SetImage($img); $img.Dispose()`;
+        execSync(`powershell.exe -NonInteractive -Command "${psCmd}"`);
+        log(`  [IMG] image ${i+1}/${localImagePaths.length} copied to clipboard`);
 
-      await writeBox.click();
-      await new Promise(r => setTimeout(r, 500));
-      await page.keyboard.down('Control');
-      await page.keyboard.press('v');
-      await page.keyboard.up('Control');
-      log(`  [IMG] pasted from clipboard`);
+        await writeBox.click();
+        await new Promise(r => setTimeout(r, 500));
+        await page.keyboard.down('Control');
+        await page.keyboard.press('v');
+        await page.keyboard.up('Control');
+        log(`  [IMG] pasted image ${i+1}`);
+        await new Promise(r => setTimeout(r, 2000));
+      }
 
-      await new Promise(r => setTimeout(r, 5000));
+      await new Promise(r => setTimeout(r, 3000));
       log(`  [IMG] image step complete`);
     } catch (e) {
       log(`  [IMG] ERROR: ${e.message}`);
