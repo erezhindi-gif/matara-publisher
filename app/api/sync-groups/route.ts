@@ -1,35 +1,32 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  const userId = (session?.user as { id?: string })?.id || null;
+
   const body = await req.json();
   const { groups, businessId } = body;
 
-  // שמור קבוצות ב"בנק הקבוצות" - כרגע נשמור כתבנית זמנית
-  let count = 0;
-
-  // מצא או צור תבנית "כל הקבוצות" לעסק זה
   let template = await prisma.groupTemplate.findFirst({
-    where: { businessId, name: "🔄 מסונכרן מפייסבוק" },
+    where: { businessId, name: "🔄 מסונכרן מפייסבוק", userId },
   });
 
   if (!template) {
     template = await prisma.groupTemplate.create({
-      data: { name: "🔄 מסונכרן מפייסבוק", businessId },
+      data: { name: "🔄 מסונכרן מפייסבוק", businessId, userId },
     });
   }
 
-  // הוסף קבוצות חדשות
+  let count = 0;
   for (const g of groups) {
     try {
       await prisma.group.upsert({
         where: { fbGroupId: g.fbGroupId },
-        update: { name: g.name },
-        create: {
-          fbGroupId: g.fbGroupId,
-          name: g.name,
-          templateId: template.id,
-        },
+        update: { name: g.name, templateId: template.id },
+        create: { fbGroupId: g.fbGroupId, name: g.name, templateId: template.id },
       });
       count++;
     } catch {
