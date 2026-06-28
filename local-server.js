@@ -169,7 +169,7 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   if (localImagePaths.length > 0) {
     log(`  [IMG] uploading ${localImagePaths.length} images: ${localImagePaths.join(', ')}`);
     try {
-      // לחץ על כפתור תמונה תחילה כדי לפתוח את ה-input
+      // מצא כפתור תמונה
       const photoBtn = await page.$('[aria-label="תמונה/וידאו"]')
         || await page.$('[aria-label="Photo/video"]')
         || await page.evaluateHandle(() => {
@@ -181,18 +181,20 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
             }) || null;
           }).then(h => h && h.asElement ? h.asElement() : null).catch(() => null);
       log(`  [IMG] photo button: ${!!photoBtn}`);
+
       if (photoBtn) {
-        await photoBtn.click();
-        await new Promise(r => setTimeout(r, 2000));
-      }
-      // uploadFile על input - לאחר לחיצה על כפתור (שפותח dialog בחירת קובץ)
-      // Puppeteer מבטל את ה-dialog ומעלה ישירות
-      const fileInput = await page.$('input[type="file"][accept*="image"]')
-        || await page.$('input[type="file"]');
-      log(`  [IMG] file input: ${!!fileInput}`);
-      if (fileInput) {
-        await fileInput.uploadFile(...localImagePaths);
-        log(`  [IMG] uploadFile done`);
+        // waitForFileChooser מיירט את חלון הקבצים לפני שהוא נפתח
+        const [fileChooser] = await Promise.all([
+          page.waitForFileChooser({ timeout: 5000 }),
+          photoBtn.click(),
+        ]);
+        await fileChooser.accept(localImagePaths);
+        log(`  [IMG] fileChooser accepted`);
+      } else {
+        // fallback: uploadFile ישירות על input
+        const fileInput = await page.$('input[type="file"]');
+        log(`  [IMG] fallback file input: ${!!fileInput}`);
+        if (fileInput) await fileInput.uploadFile(...localImagePaths);
       }
       await new Promise(r => setTimeout(r, 5000));
       log(`  [IMG] image step complete`);
