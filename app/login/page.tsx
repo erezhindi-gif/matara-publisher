@@ -19,11 +19,10 @@ export default function LoginPage() {
       email,
       password,
       redirect: false,
-      callbackUrl: "/campaigns",
     });
     setLoading(false);
     if (res?.ok && !res?.error) {
-      window.location.replace(res.url || "/campaigns");
+      window.location.href = "/campaigns";
     } else {
       setError(`שגיאה: ${res?.error || "לא ידוע"} (ok=${res?.ok}, status=${res?.status})`);
     }
