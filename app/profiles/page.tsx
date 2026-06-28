@@ -37,7 +37,7 @@ export default function ProfilesPage() {
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: "", fbUsername: "", edgeProfile: "Default", businessId: userBusinessId, dailyLimit: 150, whatsappPhone: "" });
+  const [form, setForm] = useState({ name: "", fbUsername: "", edgeProfile: "Default", businessId: userBusinessId, dailyLimit: 150, whatsappPhone: "", workerEmail: "", workerPassword: "" });
   const [businessFilter, setBusinessFilterState] = useState("all");
   const [waStatus, setWaStatus] = useState<Record<string, { status: string; qrDataUrl: string | null }>>({});
   const [serverOnline, setServerOnline] = useState<boolean | null>(null);
@@ -92,7 +92,7 @@ export default function ProfilesPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
-    setForm({ name: "", fbUsername: "", edgeProfile: "Default", businessId: "recruitment", dailyLimit: 150, whatsappPhone: "" });
+    setForm({ name: "", fbUsername: "", edgeProfile: "Default", businessId: userBusinessId, dailyLimit: 150, whatsappPhone: "", workerEmail: "", workerPassword: "" });
     setShowNew(false);
     setSaving(false);
     fetchProfiles();
@@ -245,6 +245,28 @@ export default function ProfilesPage() {
                   dir="ltr"
                 />
                 <p className="text-xs text-gray-400 mt-1">ההודעה תישלח למספר זה כשקמפיין מחכה לאישור</p>
+              </div>
+              <div className="border-t border-gray-200 pt-3">
+                <div className="text-sm font-medium text-gray-700 mb-1">כניסה לעובד (אופציונלי)</div>
+                <p className="text-xs text-gray-400 mb-2">אם תמלא אימייל וסיסמה, ייווצר משתמש שיוכל להיכנס ולראות רק פרופיל זה</p>
+                <div className="space-y-2">
+                  <input
+                    className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900"
+                    placeholder="אימייל לעובד (worker@example.com)"
+                    type="email"
+                    value={form.workerEmail}
+                    onChange={(e) => setForm({ ...form, workerEmail: e.target.value })}
+                    dir="ltr"
+                  />
+                  <input
+                    className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900"
+                    placeholder="סיסמה לעובד"
+                    type="text"
+                    value={form.workerPassword}
+                    onChange={(e) => setForm({ ...form, workerPassword: e.target.value })}
+                    dir="ltr"
+                  />
+                </div>
               </div>
               <div className="flex gap-3 pt-1">
                 <button onClick={() => setShowNew(false)} className="flex-1 bg-gray-100 hover:bg-gray-200 rounded-xl p-3 text-sm transition-colors">ביטול</button>
