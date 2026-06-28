@@ -236,10 +236,45 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
 
   // העלאת תמונות
   if (localImagePaths.length > 0) {
-    const photoBtn = await page.$('[aria-label="תמונה/וידאו"], [aria-label="Photo/video"]');
-    if (photoBtn) { await photoBtn.click(); await new Promise(r => setTimeout(r, 2000)); }
-    const fileInput = await page.$('input[type="file"]');
-    if (fileInput) { await fileInput.uploadFile(...localImagePaths); await new Promise(r => setTimeout(r, 4000)); }
+    log(`  [IMG] uploading ${localImagePaths.length} images...`);
+    // נסה למצוא כפתור תמונה
+    const photoBtn = await page.$('[aria-label="תמונה/וידאו"]')
+      || await page.$('[aria-label="Photo/video"]')
+      || await page.$('[aria-label="תמונה"]')
+      || await page.$('[aria-label="Photo"]')
+      || await page.evaluateHandle(() => {
+          const dialog = document.querySelector('[role="dialog"]');
+          if (!dialog) return null;
+          return [...dialog.querySelectorAll('[role="button"]')].find(b => {
+            const label = b.getAttribute('aria-label') || '';
+            return label.includes('תמונה') || label.includes('Photo') || label.includes('photo');
+          }) || null;
+        }).then(h => h && h.asElement ? h.asElement() : null).catch(() => null);
+
+    log(`  [IMG] photo button found: ${!!photoBtn}`);
+    if (photoBtn) {
+      await photoBtn.click();
+      await new Promise(r => setTimeout(r, 2000));
+    }
+
+    // חפש file input - גם לפני לחיצה על כפתור וגם אחריה
+    let fileInput = await page.$('input[type="file"]');
+    if (!fileInput) {
+      // נסה לחשוף hidden input
+      await page.evaluate(() => {
+        const inputs = [...document.querySelectorAll('input[type="file"]')];
+        inputs.forEach(i => { i.style.display = 'block'; i.style.visibility = 'visible'; });
+      });
+      fileInput = await page.$('input[type="file"]');
+    }
+    log(`  [IMG] file input found: ${!!fileInput}`);
+    if (fileInput) {
+      await fileInput.uploadFile(...localImagePaths);
+      await new Promise(r => setTimeout(r, 5000));
+      log(`  [IMG] upload done`);
+    } else {
+      log(`  [WARN] file input not found - image not uploaded`);
+    }
   }
 
   // לחץ פרסם - נסה כמה selectors
