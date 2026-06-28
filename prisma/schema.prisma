@@ -29,6 +29,7 @@ model Profile {
   postsToday    Int               @default(0)
   lastReset     DateTime          @default(now())
   whatsappPhone String?
+  userId        String?
   campaigns     CampaignProfile[]
 }
 
@@ -37,6 +38,7 @@ model GroupTemplate {
   name       String
   business   Business  @relation(fields: [businessId], references: [id])
   businessId String
+  userId     String?
   groups     Group[]
 }
 
@@ -64,6 +66,7 @@ model Campaign {
   groupIds         String    @default("[]")
   backgroundIndex  Int?
   scheduledAt      DateTime?
+  userId           String?
   createdAt    DateTime          @default(now())
   posts        Post[]
   profiles     CampaignProfile[]
