@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
+    "@types/bcryptjs": "^2.4.6",
     "@vercel/blob": "^2.4.1",
+    "bcryptjs": "^3.0.3",
     "next": "16.2.9",
     "next-auth": "^4.24.14",
     "node-windows": "^1.0.0-beta.8",

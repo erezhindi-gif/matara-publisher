@@ -207,3 +207,202 @@ https://wa.me/972502808180
 [14:11:32] [PUBLISH] Edge launched, opening Facebook...
 [14:11:47] [PUBLISH] Facebook OK, logged in
 [14:11:54] [PUBLISH] 1 groups to post
+[14:16:22] [PUBLISH] START campaign: לחברה בנתניה דרוש/ה מנהל/ת חשבונות (cmqxp05270001obp3ecqxzik7)
+[14:16:22] [PUBLISH] profile OK, killing old Edge...
+[14:16:22] [PUBLISH] launching Edge...
+[14:16:24] [PUBLISH] Edge launched, opening Facebook...
+[14:16:31] [PUBLISH] Facebook OK, logged in
+[14:16:32] [PUBLISH] 1 groups to post
+[14:16:33] [PUBLISH] WhatsApp URL: https://wa.me/972502808180?text=%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A9%D7%9E%D7%97%20%D7%9C%D7%A7%D7%91%D7%9C%20%D7%A4%D7%A8%D7%98%D7%99%D7%9D
+[14:16:33] [PUBLISH] posting to group: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה (1645456215749261)
+[14:16:41] [PUBLISH] current URL: https://www.facebook.com/groups/1645456215749261
+[14:16:43]   [CLICK] create-post: Y=757: "כאן כותבים…"
+[14:17:05]   [IMG] uploading 1 images: C:\Users\erezh\AppData\Local\Temp\matara-publisher\img-1782645392650-9ozod14zzha.jpeg
+[14:17:05]   [IMG] photo button: true
+[14:17:07]   [IMG] file input: true
+[14:17:07]   [IMG] uploadFile done
+[14:17:12]   [IMG] image step complete
+[14:17:17] [PUBLISH] SUCCESS: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה
+[14:17:17] [PUBLISH] DONE: 1 success, 0 failed => status=done
+[14:37:54] [PUBLISH] START campaign: לחברה בנתניה דרוש/ה מנהל/ת חשבונות (cmqxpqp4v0001118f6zxlpwzo)
+[14:37:54] [PUBLISH] profile OK, killing old Edge...
+[14:37:54] [PUBLISH] launching Edge...
+[14:37:56] [PUBLISH] Edge launched, opening Facebook...
+[14:38:05] [PUBLISH] Facebook OK, logged in
+[14:38:06] [PUBLISH] 1 groups to post
+[14:38:07] [PUBLISH] WhatsApp URL: https://wa.me/972502808180?text=%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A9%D7%9E%D7%97%20%D7%9C%D7%A4%D7%A8%D7%98%D7%99%D7%9D%3A
+[14:38:07] [PUBLISH] posting to group: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה (1645456215749261)
+[14:38:15] [PUBLISH] current URL: https://www.facebook.com/groups/1645456215749261
+[14:38:17]   [CLICK] create-post: Y=757: "כאן כותבים…"
+[14:38:37]   [IMG] uploading 1 images: C:\Users\erezh\AppData\Local\Temp\matara-publisher\img-1782646686802-7yf2nfhx92t.jpeg
+[14:38:37]   [IMG] file input: true
+[14:38:37]   [IMG] uploadFile done
+[14:38:42]   [IMG] image step complete
+[14:38:47] [PUBLISH] SUCCESS: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה
+[14:38:47] [PUBLISH] DONE: 1 success, 0 failed => status=done
+[14:45:14] [PUBLISH] START campaign: לחברה בנתניה דרוש/ה מנהל/ת חשבונות (cmqxq1hic0005118fmya4jgh1)
+[14:45:14] [PUBLISH] profile OK, killing old Edge...
+[14:45:14] [PUBLISH] launching Edge...
+[14:45:16] [PUBLISH] Edge launched, opening Facebook...
+[14:45:25] [PUBLISH] Facebook OK, logged in
+[14:45:25] [PUBLISH] 1 groups to post
+[14:45:27] [PUBLISH] WhatsApp URL: https://wa.me/972502808180?text=%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A9%D7%9E%D7%97%20%D7%9C%D7%A4%D7%A8%D7%98%D7%99%D7%9D%3A
+[14:45:27] [PUBLISH] posting to group: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה (1645456215749261)
+[14:45:35] [PUBLISH] current URL: https://www.facebook.com/groups/1645456215749261
+[14:45:37]   [CLICK] create-post: Y=757: "כאן כותבים…"
+[14:45:42]   [IMG] uploading 1 images: C:\Users\erezh\AppData\Local\Temp\matara-publisher\img-1782647125732-ber0myx16yf.jpeg
+[14:45:42]   [IMG] file input: true
+[14:45:42]   [IMG] uploadFile done
+[14:45:47]   [IMG] image step complete
+[14:46:08] [PUBLISH] SUCCESS: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה
+[14:46:08] [PUBLISH] DONE: 1 success, 0 failed => status=done
+[14:53:30] [PUBLISH] START campaign: לחברה בנתניה דרוש/ה מנהל/ת חשבונות (cmqxqcfqb0001a0s5o71oy314)
+[14:53:30] [PUBLISH] profile OK, killing old Edge...
+[14:53:30] [PUBLISH] launching Edge...
+[14:53:32] [PUBLISH] Edge launched, opening Facebook...
+[14:53:40] [PUBLISH] Facebook OK, logged in
+[14:53:40] [PUBLISH] 1 groups to post
+[14:53:41] [PUBLISH] WhatsApp URL: https://wa.me/972502808180?text=%D7%94%D7%99%D7%99%20%D7%9C%D7%A4%D7%A8%D7%98%D7%99%D7%9D%3A
+[14:53:41] [PUBLISH] posting to group: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה (1645456215749261)
+[14:53:50] [PUBLISH] current URL: https://www.facebook.com/groups/1645456215749261
+[14:53:52]   [CLICK] create-post: Y=757: "כאן כותבים…"
+[14:53:57]   [IMG] uploading 1 images: C:\Users\erezh\AppData\Local\Temp\matara-publisher\img-1782647620922-tm0r3pspq5g.jpeg
+[14:53:57]   [IMG] photo button: true
+[14:54:05]   [IMG] ERROR: file chooser timeout
+[14:54:24] [PUBLISH] SUCCESS: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה
+[14:54:24] [PUBLISH] DONE: 1 success, 0 failed => status=done
+[15:01:03] [PUBLISH] START campaign: לחברה בנתניה דרוש/ה מנהל/ת חשבונות (cmqxqlwop00011a5bkgc22xh9)
+[15:01:03] [PUBLISH] profile OK, killing old Edge...
+[15:01:03] [PUBLISH] launching Edge...
+[15:01:06] [PUBLISH] Edge launched, opening Facebook...
+[15:01:15] [PUBLISH] Facebook OK, logged in
+[15:01:15] [PUBLISH] 1 groups to post
+[15:01:16] [PUBLISH] WhatsApp URL: https://wa.me/972502808180?text=%D7%94%D7%99%D7%99%2C%20%D7%9C%D7%A4%D7%A8%D7%98%D7%99%D7%9D%20%D7%A2%D7%9C%20%D7%9E%D7%A9%D7%A8%D7%AA%20%D7%9E%D7%A0%D7%94%D7%9C%D7%AA%20%D7%97%D7%A9%D7%91%D7%95%D7%A0%D7%95%D7%AA
+[15:01:16] [PUBLISH] posting to group: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה (1645456215749261)
+[15:01:23] [PUBLISH] current URL: https://www.facebook.com/groups/1645456215749261
+[15:01:25]   [CLICK] create-post: Y=757: "כאן כותבים…"
+[15:01:30]   [IMG] uploading 1 images: C:\Users\erezh\AppData\Local\Temp\matara-publisher\img-1782648075981-7oroe5jxx18.jpeg
+[15:01:30]   [IMG] photo button: true
+[15:01:30]   [IMG] PowerShell dialog handler started
+[15:01:37]   [IMG] dialog handled
+[15:01:40]   [IMG] image step complete
+[15:02:08] [PUBLISH] SUCCESS: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה
+[15:02:08] [PUBLISH] DONE: 1 success, 0 failed => status=done
+[15:12:49] [PUBLISH] START campaign: לחברה בנתניה דרוש/ה מנהל/ת חשבונות (cmqxr1a8r0001qijzqqmp89ki)
+[15:12:49] [PUBLISH] profile OK, killing old Edge...
+[15:12:49] [PUBLISH] launching Edge...
+[15:12:51] [PUBLISH] Edge launched, opening Facebook...
+[15:13:00] [PUBLISH] Facebook OK, logged in
+[15:13:00] [PUBLISH] 1 groups to post
+[15:13:02] [PUBLISH] WhatsApp URL: https://wa.me/972502808180?text=%D7%94%D7%99%D7%99
+[15:13:02] [PUBLISH] posting to group: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה (1645456215749261)
+[15:13:10] [PUBLISH] current URL: https://www.facebook.com/groups/1645456215749261
+[15:13:12]   [CLICK] create-post: Y=757: "כאן כותבים…"
+[15:13:27]   [IMG] uploading 1 images: C:\Users\erezh\AppData\Local\Temp\matara-publisher\img-1782648780974-n2rrh3gga5.jpeg
+[15:13:27]   [IMG] photo button: true
+[15:13:29]   [IMG] file input: true
+[15:13:29]   [IMG] uploadFile done
+[15:13:34]   [IMG] image step complete
+[15:13:39] [PUBLISH] SUCCESS: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה
+[15:13:39] [PUBLISH] DONE: 1 success, 0 failed => status=done
+[15:19:13] [PUBLISH] START campaign: לחברה בנתניה דרוש/ה מנהל/ת חשבונות (cmqxr8pq1000159tqxu4b5qhm)
+[15:19:13] [PUBLISH] profile OK, killing old Edge...
+[15:19:13] [PUBLISH] launching Edge...
+[15:19:15] [PUBLISH] Edge launched, opening Facebook...
+[15:19:24] [PUBLISH] Facebook OK, logged in
+[15:19:25] [PUBLISH] 1 groups to post
+[15:19:26] [PUBLISH] WhatsApp URL: https://wa.me/972502808180?text=%D7%94%D7%99%D7%99
+[15:19:26] [PUBLISH] posting to group: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה (1645456215749261)
+[15:19:34] [PUBLISH] current URL: https://www.facebook.com/groups/1645456215749261
+[15:19:36]   [CLICK] create-post: Y=757: "כאן כותבים…"
+[15:19:51]   [IMG] uploading 2 images: C:\Users\erezh\AppData\Local\Temp\matara-publisher\img-1782649165106-jbechdmn5u.jpeg, C:\Users\erezh\AppData\Local\Temp\matara-publisher\img-1782649165702-3to0zeag9wg.jpeg
+[15:19:51]   [IMG] photo button: true
+[15:19:54]   [IMG] dialog closed via Escape
+[15:19:54]   [IMG] file input: true
+[15:19:54]   [IMG] ERROR: Multiple file uploads only work with <input type=file multiple>
+[15:19:59] [PUBLISH] SUCCESS: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה
+[15:19:59] [PUBLISH] DONE: 1 success, 0 failed => status=done
+[15:26:11] [PUBLISH] START campaign: לחברה בנתניה דרוש/ה מנהל/ת חשבונות (cmqxriq590003zchb0vmdjv76)
+[15:26:11] [PUBLISH] profile OK, killing old Edge...
+[15:26:12] [PUBLISH] launching Edge...
+[15:26:14] [PUBLISH] Edge launched, opening Facebook...
+[15:26:22] [PUBLISH] Facebook OK, logged in
+[15:26:23] [PUBLISH] 1 groups to post
+[15:26:24] [PUBLISH] WhatsApp URL: https://wa.me/972502808180?text=%D7%94%D7%99%D7%99
+[15:26:24] [PUBLISH] posting to group: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה (1645456215749261)
+[15:26:32] [PUBLISH] current URL: https://www.facebook.com/groups/1645456215749261
+[15:26:34]   [CLICK] create-post: Y=757: "כאן כותבים…"
+[15:26:49]   [IMG] uploading 2 images: C:\Users\erezh\AppData\Local\Temp\matara-publisher\img-1782649583078-0arcqe7yxxv5.jpeg, C:\Users\erezh\AppData\Local\Temp\matara-publisher\img-1782649583665-55u3ciblwf6.jpeg
+[15:26:49]   [IMG] photo button: true
+[15:26:49]   [IMG] file input before click: true
+[15:26:49]   [IMG] ERROR: Multiple file uploads only work with <input type=file multiple>
+[15:26:54] [PUBLISH] SUCCESS: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה
+[15:26:54] [PUBLISH] DONE: 1 success, 0 failed => status=done
+[15:37:18] [PUBLISH] START campaign: לחברה בנתניה דרוש/ה מנהל/ת חשבונות (cmqxrw08s00014vg75evdbuwq)
+[15:37:18] [PUBLISH] profile OK, killing old Edge...
+[15:37:19] [PUBLISH] launching Edge...
+[15:37:21] [PUBLISH] Edge launched, opening Facebook...
+[15:37:30] [PUBLISH] Facebook OK, logged in
+[15:37:31] [PUBLISH] 1 groups to post
+[15:37:32] [PUBLISH] WhatsApp URL: https://wa.me/972502808180?text=%D7%94%D7%99%D7%99%3A
+[15:37:32] [PUBLISH] posting to group: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה (1645456215749261)
+[15:37:41] [PUBLISH] current URL: https://www.facebook.com/groups/1645456215749261
+[15:37:43]   [CLICK] create-post: Y=757: "כאן כותבים…"
+[15:37:58]   [IMG] uploading 2 images: C:\Users\erezh\AppData\Local\Temp\matara-publisher\img-1782650251854-29tm6aaymlg.jpeg, C:\Users\erezh\AppData\Local\Temp\matara-publisher\img-1782650252424-4u4jbuznefu.jpeg
+[15:37:59]   [IMG] image copied to clipboard
+[15:38:00]   [IMG] pasted from clipboard
+[15:38:05]   [IMG] image step complete
+[15:38:09] [PUBLISH] SUCCESS: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה
+[15:38:10] [PUBLISH] DONE: 1 success, 0 failed => status=done
+[15:42:56] [PUBLISH] START campaign: לחברה בנתניה דרוש/ה מנהל/ת חשבונות (cmqxs3b9c0001121nl172v4qc)
+[15:42:56] [PUBLISH] profile OK, killing old Edge...
+[15:42:57] [PUBLISH] launching Edge...
+[15:42:59] [PUBLISH] Edge launched, opening Facebook...
+[15:43:08] [PUBLISH] Facebook OK, logged in
+[15:43:08] [PUBLISH] 1 groups to post
+[15:43:10] [PUBLISH] WhatsApp URL: https://wa.me/972502808180?text=%D7%94%D7%99%D7%99
+[15:43:10] [PUBLISH] posting to group: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה (1645456215749261)
+[15:43:18] [PUBLISH] current URL: https://www.facebook.com/groups/1645456215749261
+[15:43:20]   [CLICK] create-post: Y=757: "כאן כותבים…"
+[15:43:35]   [IMG] uploading 2 images: C:\Users\erezh\AppData\Local\Temp\matara-publisher\img-1782650588820-268n3eqfd7t.jpeg, C:\Users\erezh\AppData\Local\Temp\matara-publisher\img-1782650589462-j0coynd3gfi.jpeg
+[15:43:37]   [IMG] image 1/2 copied to clipboard
+[15:43:37]   [IMG] pasted image 1
+[15:43:40]   [IMG] image 2/2 copied to clipboard
+[15:43:41]   [IMG] pasted image 2
+[15:43:46]   [IMG] image step complete
+[15:43:51] [PUBLISH] SUCCESS: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה
+[15:43:51] [PUBLISH] DONE: 1 success, 0 failed => status=done
+[15:49:13] [PUBLISH] START campaign: לחברה בנתניה דרוש/ה מנהל/ת חשבונות (cmqxsboho0003121nh6azt6zd)
+[15:49:13] [PUBLISH] profile OK, killing old Edge...
+[15:49:13] [PUBLISH] launching Edge...
+[15:49:15] [PUBLISH] Edge launched, opening Facebook...
+[15:49:24] [PUBLISH] Facebook OK, logged in
+[15:49:24] [PUBLISH] 1 groups to post
+[15:49:25] [PUBLISH] WhatsApp URL: https://wa.me/972502808180?text=%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A9%D7%9E%D7%97%20%D7%9C%D7%A4%D7%A8%D7%98%D7%99%D7%9D...
+[15:49:25] [PUBLISH] posting to group: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה (1645456215749261)
+[15:49:34] [PUBLISH] current URL: https://www.facebook.com/groups/1645456215749261
+[15:49:36]   [CLICK] create-post: Y=757: "כאן כותבים…"
+[15:49:51]   [IMG] uploading 1 images: C:\Users\erezh\AppData\Local\Temp\matara-publisher\img-1782650964808-4u7xjzldpzw.jpeg
+[15:49:52]   [IMG] image 1/1 copied to clipboard
+[15:49:53]   [IMG] pasted image 1
+[15:49:58]   [IMG] image step complete
+[15:50:04]   [WA] whatsapp URL added after images
+[15:50:11] [PUBLISH] SUCCESS: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה
+[15:50:11] [PUBLISH] DONE: 1 success, 0 failed => status=done
+[16:00:26] [PUBLISH] START campaign: לחברה בנתניה דרוש/ה מנהל/ת חשבונות (cmqxsq2b40007121njfi19hzb)
+[16:00:26] [PUBLISH] profile OK, killing old Edge...
+[16:00:27] [PUBLISH] launching Edge...
+[16:00:29] [PUBLISH] Edge launched, opening Facebook...
+[16:00:42] [PUBLISH] Facebook OK, logged in
+[16:00:43] [PUBLISH] 1 groups to post
+[16:00:44] [PUBLISH] WhatsApp URL: https://wa.me/972502808180
+[16:00:44] [PUBLISH] posting to group: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה (1645456215749261)
+[16:00:52] [PUBLISH] current URL: https://www.facebook.com/groups/1645456215749261
+[16:00:54]   [CLICK] create-post: Y=757: "כאן כותבים…"
+[16:01:09]   [IMG] uploading 1 images: C:\Users\erezh\AppData\Local\Temp\matara-publisher\img-1782651643204-q4tfsug442s.jpeg
+[16:01:10]   [IMG] image 1/1 copied to clipboard
+[16:01:11]   [IMG] pasted image 1
+[16:01:16]   [IMG] image step complete
+[16:01:18]   [WA] whatsapp URL added after images
+[16:01:24] [PUBLISH] SUCCESS: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה
+[16:01:25] [PUBLISH] DONE: 1 success, 0 failed => status=done

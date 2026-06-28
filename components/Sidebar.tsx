@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useSession, signOut } from "next-auth/react";
 import { getBusinessFilter, setBusinessFilter } from "@/lib/businessFilter";
 
 type Business = { id: string; name: string; type: string };
@@ -20,6 +21,7 @@ const NAV = [
 export default function Sidebar() {
   const path = usePathname();
   const router = useRouter();
+  const { data: session } = useSession();
   const [business, setBusiness] = useState("all");
   const [businesses, setBusinesses] = useState<Business[]>([]);
 
@@ -109,9 +111,15 @@ export default function Sidebar() {
       </div>
 
       {/* User */}
-      <div className="px-5 py-4 border-t border-gray-700">
-        <div className="text-sm font-medium text-white">נועה הינדי</div>
-        <div className="text-xs text-gray-500 mt-0.5">noa@matarahr.co.il</div>
+      <div className="px-4 py-4 border-t border-gray-700">
+        <div className="text-sm font-medium text-white">{session?.user?.name || "..."}</div>
+        <div className="text-xs text-gray-500 mt-0.5">{session?.user?.email}</div>
+        <button
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          className="mt-2 text-xs text-gray-500 hover:text-white transition-colors"
+        >
+          יציאה
+        </button>
       </div>
     </aside>
   );
