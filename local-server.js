@@ -212,37 +212,47 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   await page.keyboard.type(content, { delay: 30 });
   await new Promise(r => setTimeout(r, 2000));
 
-  // העלאת תמונות - uploadFile ישירות על input ללא לחיצה על כפתור
+  // העלאת תמונות
   if (localImagePaths.length > 0) {
-    log(`  [IMG] uploading ${localImagePaths.length} images...`);
-    // חשוף את כל ה-file inputs ומצא את הנכון
-    await page.evaluate(() => {
-      document.querySelectorAll('input[type="file"]').forEach(i => {
-        i.style.display = 'block';
-        i.style.opacity = '1';
-        i.style.visibility = 'visible';
-        i.removeAttribute('hidden');
-      });
-    });
-    const fileInput = await page.$('div[role="dialog"] input[type="file"]')
-      || await page.$('input[type="file"][accept*="image"]')
-      || await page.$('input[type="file"]');
-    log(`  [IMG] file input found: ${!!fileInput}`);
-    if (fileInput) {
-      await fileInput.uploadFile(...localImagePaths);
-      await new Promise(r => setTimeout(r, 6000));
-      log(`  [IMG] upload done`);
-    } else {
-      // fallback: לחץ על כפתור תמונה ואז uploadFile
-      log(`  [IMG] trying photo button fallback...`);
+    log(`  [IMG] uploading ${localImagePaths.length} images: ${localImagePaths.join(', ')}`);
+    try {
+      // שלב 1: uploadFile על input הקיים (לפני לחיצה)
+      const fileInputBefore = await page.$('input[type="file"]');
+      log(`  [IMG] file input before click: ${!!fileInputBefore}`);
+      if (fileInputBefore) {
+        await fileInputBefore.uploadFile(...localImagePaths);
+        log(`  [IMG] uploadFile done (before click)`);
+        await new Promise(r => setTimeout(r, 1000));
+      }
+
+      // שלב 2: לחץ על כפתור תמונה כדי "לאשר" את הבחירה
       const photoBtn = await page.$('[aria-label="תמונה/וידאו"]')
-        || await page.$('[aria-label="Photo/video"]');
+        || await page.$('[aria-label="Photo/video"]')
+        || await page.evaluateHandle(() => {
+            const d = document.querySelector('[role="dialog"]');
+            if (!d) return null;
+            return [...d.querySelectorAll('[role="button"]')].find(b => {
+              const l = b.getAttribute('aria-label') || '';
+              return l.includes('תמונה') || l.includes('Photo');
+            }) || null;
+          }).then(h => h && h.asElement ? h.asElement() : null).catch(() => null);
+      log(`  [IMG] photo button: ${!!photoBtn}`);
       if (photoBtn) {
         await photoBtn.click();
         await new Promise(r => setTimeout(r, 2000));
-        const fi = await page.$('input[type="file"]');
-        if (fi) { await fi.uploadFile(...localImagePaths); await new Promise(r => setTimeout(r, 6000)); }
+        // אחרי לחיצה - נסה uploadFile שוב על input החדש
+        const fileInputAfter = await page.$('input[type="file"][accept*="image"]')
+          || await page.$('input[type="file"]');
+        log(`  [IMG] file input after click: ${!!fileInputAfter}`);
+        if (fileInputAfter) {
+          await fileInputAfter.uploadFile(...localImagePaths);
+          log(`  [IMG] uploadFile done (after click)`);
+        }
       }
+      await new Promise(r => setTimeout(r, 5000));
+      log(`  [IMG] image step complete`);
+    } catch (e) {
+      log(`  [IMG] ERROR: ${e.message}`);
     }
   }
 
