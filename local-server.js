@@ -160,10 +160,6 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   if (localImagePaths.length > 0) {
     log(`  [IMG] uploading ${localImagePaths.length} images: ${localImagePaths.join(', ')}`);
     try {
-      // CDP: עצור את חלון Windows לפני שנפתח, ותפוס את ה-file chooser
-      const client = await page.target().createCDPSession();
-      await client.send('Page.setInterceptFileChooserDialog', { enabled: true });
-
       const photoBtn = await page.$('[aria-label="תמונה/וידאו"]')
         || await page.$('[aria-label="Photo/video"]')
         || await page.evaluateHandle(() => {
@@ -177,24 +173,24 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
       log(`  [IMG] photo button: ${!!photoBtn}`);
 
       if (photoBtn) {
-        await new Promise((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error('file chooser timeout')), 8000);
-          client.on('Page.fileChooserOpened', async () => {
-            clearTimeout(timer);
-            try {
-              await client.send('Page.handleFileChooser', { action: 'accept', files: localImagePaths });
-              log(`  [IMG] CDP fileChooser accepted`);
-            } catch (e) {
-              log(`  [IMG] CDP handleFileChooser error: ${e.message}`);
-            }
-            resolve();
-          });
-          photoBtn.click();
-        });
+        // PowerShell ברקע: אחרי 2.5 שניות מקליד את נתיב הקובץ לחלון הבחירה של Windows
+        const filePath = localImagePaths[0];
+        const psScript = `
+          Start-Sleep -Milliseconds 2500
+          Add-Type -AssemblyName System.Windows.Forms
+          [System.Windows.Forms.SendKeys]::SendWait('${filePath.replace(/\\/g, '\\\\').replace(/'/g, "''")}')
+          [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+        `;
+        const psProc = exec(`powershell.exe -NoProfile -NonInteractive -Command "${psScript.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`);
+        log(`  [IMG] PowerShell dialog handler started`);
+
+        await photoBtn.click();
+        await new Promise(r => setTimeout(r, 7000));
+        try { psProc.kill(); } catch(e) {}
+        log(`  [IMG] dialog handled`);
       }
 
-      await client.detach();
-      await new Promise(r => setTimeout(r, 5000));
+      await new Promise(r => setTimeout(r, 3000));
       log(`  [IMG] image step complete`);
     } catch (e) {
       log(`  [IMG] ERROR: ${e.message}`);
