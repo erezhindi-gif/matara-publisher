@@ -14,6 +14,7 @@ type Campaign = {
   templateIds: string;
   business: { name: string; type: string };
   posts: { status: string }[];
+  userId: string | null;
 };
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
