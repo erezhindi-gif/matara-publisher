@@ -210,6 +210,12 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
           return `clicked circle ${bgIdx} of ${circles.length} (${window.getComputedStyle(target).backgroundColor}). all: [${circles.map(c=>window.getComputedStyle(c).backgroundColor).join(', ')}]`;
         }, backgroundIndex);
         log(`  [BG] ${bgClicked}`);
+        // המתן לרענון הדיאלוג אחרי בחירת הרקע
+        await new Promise(r => setTimeout(r, 2000));
+        // מצא מחדש את תיבת הטקסט (הדיאלוג התרענן)
+        writeBox = await page.$('[role="dialog"] [contenteditable="true"]')
+          || await page.$('[contenteditable="true"]');
+        log(`  [BG] writeBox re-found after bg: ${!!writeBox}`);
       }
     } catch (e) { log('  [WARN] background not applied: ' + e.message); }
   }
