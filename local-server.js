@@ -156,7 +156,13 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
 
   if (!writeBox) throw new Error("ERROR: textbox not found");
 
-  // העלאת תמונות לפני הקלדת הטקסט
+  // הקלד תוכן (ללא קישור וואטסאפ - כדי שלא ייווצר כרטיס WA.ME שמונע תמונה)
+  await writeBox.click();
+  await new Promise(r => setTimeout(r, 1000));
+  await page.keyboard.type(content, { delay: 30 });
+  await new Promise(r => setTimeout(r, 2000));
+
+  // העלאת תמונות
   if (localImagePaths.length > 0) {
     log(`  [IMG] uploading ${localImagePaths.length} images: ${localImagePaths.join(', ')}`);
     try {
@@ -171,38 +177,23 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
             }) || null;
           }).then(h => h && h.asElement ? h.asElement() : null).catch(() => null);
       log(`  [IMG] photo button: ${!!photoBtn}`);
-
       if (photoBtn) {
-        // PowerShell ברקע: אחרי 2.5 שניות מקליד את נתיב הקובץ לחלון הבחירה של Windows
-        const filePath = localImagePaths[0];
-        const psScript = `
-          Start-Sleep -Milliseconds 2500
-          Add-Type -AssemblyName System.Windows.Forms
-          [System.Windows.Forms.SendKeys]::SendWait('${filePath.replace(/\\/g, '\\\\').replace(/'/g, "''")}')
-          [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
-        `;
-        const psProc = exec(`powershell.exe -NoProfile -NonInteractive -Command "${psScript.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`);
-        log(`  [IMG] PowerShell dialog handler started`);
-
         await photoBtn.click();
-        await new Promise(r => setTimeout(r, 7000));
-        try { psProc.kill(); } catch(e) {}
-        log(`  [IMG] dialog handled`);
+        await new Promise(r => setTimeout(r, 2000));
       }
-
-      await new Promise(r => setTimeout(r, 3000));
+      const fileInput = await page.$('input[type="file"][accept*="image"]')
+        || await page.$('input[type="file"]');
+      log(`  [IMG] file input: ${!!fileInput}`);
+      if (fileInput) {
+        await fileInput.uploadFile(...localImagePaths);
+        log(`  [IMG] uploadFile done`);
+      }
+      await new Promise(r => setTimeout(r, 5000));
       log(`  [IMG] image step complete`);
     } catch (e) {
       log(`  [IMG] ERROR: ${e.message}`);
     }
   }
-
-  // הקלד תוכן אחרי העלאת התמונה
-  await writeBox.click();
-  await new Promise(r => setTimeout(r, 1000));
-  const fullContent = whatsappUrl ? `${content}\n\n${whatsappUrl}` : content;
-  await page.keyboard.type(fullContent, { delay: 30 });
-  await new Promise(r => setTimeout(r, 2000));
 
   // לחץ פרסם - נסה כמה selectors
   const postBtnSelectors = [
