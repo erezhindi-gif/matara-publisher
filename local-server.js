@@ -190,17 +190,24 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
             // עיגולי רקע: בין 20-70px, כמעט ריבוע
             if (w < 20 || w > 70 || h < 20 || h > 70) return false;
             if (Math.abs(w - h) > 10) return false;
-            // לא לבן/אפור בהיר
+            // סנן צבעים אפורים/לבנים - רק צבעים עם saturation גבוה
             const m = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
             if (!m) return false;
             const [r, g, b] = [+m[1], +m[2], +m[3]];
-            if (r > 220 && g > 220 && b > 220) return false; // לבן
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            if (max - min < 30) return false; // אפור/לבן/שחור - saturation נמוך
             return true;
           });
-          if (circles.length === 0) return 'no circles found';
+          const allDebug = [...dialog.querySelectorAll('*')].filter(el => {
+            const bg = window.getComputedStyle(el).backgroundColor;
+            if (!bg || bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent') return false;
+            const w = el.offsetWidth, h = el.offsetHeight;
+            return w >= 20 && w <= 70 && h >= 20 && h <= 70 && Math.abs(w-h) <= 10;
+          }).map(el => window.getComputedStyle(el).backgroundColor);
+          if (circles.length === 0) return `no colorful circles. all small squares: [${allDebug.join(', ')}]`;
           const target = circles[bgIdx - 1] || circles[0];
           target.click();
-          return `clicked circle ${bgIdx} of ${circles.length} (${window.getComputedStyle(target).backgroundColor})`;
+          return `clicked circle ${bgIdx} of ${circles.length} (${window.getComputedStyle(target).backgroundColor}). all: [${circles.map(c=>window.getComputedStyle(c).backgroundColor).join(', ')}]`;
         }, backgroundIndex);
         log(`  [BG] ${bgClicked}`);
       }
