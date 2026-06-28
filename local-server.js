@@ -156,32 +156,44 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
 
   if (!writeBox) throw new Error("ERROR: textbox not found");
 
-  // העלאת תמונות לפני הקלדת הטקסט - כדי שכרטיס הוואטסאפ לא יבטל את התמונה
+  // העלאת תמונות לפני הקלדת הטקסט
   if (localImagePaths.length > 0) {
     log(`  [IMG] uploading ${localImagePaths.length} images: ${localImagePaths.join(', ')}`);
     try {
-      await writeBox.click();
-      await new Promise(r => setTimeout(r, 500));
-      // חשוף את כל ה-inputs הנסתרים
-      await page.evaluate(() => {
-        document.querySelectorAll('input[type="file"]').forEach(el => {
-          el.style.display = 'block';
-          el.style.opacity = '1';
-          el.style.visibility = 'visible';
-          el.removeAttribute('hidden');
+      // CDP: עצור את חלון Windows לפני שנפתח, ותפוס את ה-file chooser
+      const client = await page.target().createCDPSession();
+      await client.send('Page.setInterceptFileChooserDialog', { enabled: true });
+
+      const photoBtn = await page.$('[aria-label="תמונה/וידאו"]')
+        || await page.$('[aria-label="Photo/video"]')
+        || await page.evaluateHandle(() => {
+            const d = document.querySelector('[role="dialog"]');
+            if (!d) return null;
+            return [...d.querySelectorAll('[role="button"]')].find(b => {
+              const l = b.getAttribute('aria-label') || '';
+              return l.includes('תמונה') || l.includes('Photo');
+            }) || null;
+          }).then(h => h && h.asElement ? h.asElement() : null).catch(() => null);
+      log(`  [IMG] photo button: ${!!photoBtn}`);
+
+      if (photoBtn) {
+        await new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('file chooser timeout')), 8000);
+          client.on('Page.fileChooserOpened', async () => {
+            clearTimeout(timer);
+            try {
+              await client.send('Page.handleFileChooser', { action: 'accept', files: localImagePaths });
+              log(`  [IMG] CDP fileChooser accepted`);
+            } catch (e) {
+              log(`  [IMG] CDP handleFileChooser error: ${e.message}`);
+            }
+            resolve();
+          });
+          photoBtn.click();
         });
-      });
-      const fileInput = await page.$('input[type="file"][accept*="image"]')
-        || await page.$('input[type="file"]');
-      log(`  [IMG] file input: ${!!fileInput}`);
-      if (fileInput) {
-        await fileInput.uploadFile(...localImagePaths);
-        log(`  [IMG] uploadFile done`);
-        await page.evaluate(el => {
-          el.dispatchEvent(new Event('change', { bubbles: true }));
-          el.dispatchEvent(new Event('input', { bubbles: true }));
-        }, fileInput);
       }
+
+      await client.detach();
       await new Promise(r => setTimeout(r, 5000));
       log(`  [IMG] image step complete`);
     } catch (e) {
