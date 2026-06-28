@@ -166,38 +166,19 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   if (localImagePaths.length > 0) {
     log(`  [IMG] uploading ${localImagePaths.length} images: ${localImagePaths.join(', ')}`);
     try {
-      const photoBtn = await page.$('[aria-label="תמונה/וידאו"]')
-        || await page.$('[aria-label="Photo/video"]')
-        || await page.evaluateHandle(() => {
-            const d = document.querySelector('[role="dialog"]');
-            if (!d) return null;
-            return [...d.querySelectorAll('[role="button"]')].find(b => {
-              const l = b.getAttribute('aria-label') || '';
-              return l.includes('תמונה') || l.includes('Photo');
-            }) || null;
-          }).then(h => h && h.asElement ? h.asElement() : null).catch(() => null);
-      log(`  [IMG] photo button: ${!!photoBtn}`);
-      // שלב 1: uploadFile על input שקיים לפני לחיצה (JS רץ, אין dialog)
-      const fileInputBefore = await page.$('input[type="file"]');
-      log(`  [IMG] file input before click: ${!!fileInputBefore}`);
-      if (fileInputBefore) {
-        await fileInputBefore.uploadFile(...localImagePaths);
-        log(`  [IMG] uploadFile done (before click)`);
-        await new Promise(r => setTimeout(r, 1000));
-      }
+      // העתק תמונה ללוח Windows ואז Ctrl+V בתיבת הטקסט - עוקף את ה-dialog לחלוטין
+      const imagePath = localImagePaths[0].replace(/\\/g, '\\\\');
+      const psCmd = `Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; $img = [System.Drawing.Image]::FromFile('${imagePath}'); [System.Windows.Forms.Clipboard]::SetImage($img); $img.Dispose()`;
+      execSync(`powershell.exe -NonInteractive -Command "${psCmd}"`);
+      log(`  [IMG] image copied to clipboard`);
 
-      // שלב 2: לחץ על כפתור תמונה ואז uploadFile שוב על input החדש
-      if (photoBtn) {
-        await photoBtn.click();
-        await new Promise(r => setTimeout(r, 2000));
-        const fileInputAfter = await page.$('input[type="file"][accept*="image"]')
-          || await page.$('input[type="file"]');
-        log(`  [IMG] file input after click: ${!!fileInputAfter}`);
-        if (fileInputAfter) {
-          await fileInputAfter.uploadFile(...localImagePaths);
-          log(`  [IMG] uploadFile done (after click)`);
-        }
-      }
+      await writeBox.click();
+      await new Promise(r => setTimeout(r, 500));
+      await page.keyboard.down('Control');
+      await page.keyboard.press('v');
+      await page.keyboard.up('Control');
+      log(`  [IMG] pasted from clipboard`);
+
       await new Promise(r => setTimeout(r, 5000));
       log(`  [IMG] image step complete`);
     } catch (e) {
