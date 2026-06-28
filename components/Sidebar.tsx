@@ -37,7 +37,15 @@ export default function Sidebar() {
   useEffect(() => {
     if ((session?.user as { role?: string })?.role === "admin") {
       fetch("/api/profiles").then((r) => r.json()).then((data) => {
-        if (Array.isArray(data)) setProfiles(data);
+        if (Array.isArray(data)) {
+          setProfiles(data);
+          // אפס פילטר לא תקין
+          const validValues = ["all", ...data.map((p: ProfileItem) => p.userId || p.id)];
+          if (!validValues.includes(getBusinessFilter())) {
+            setBusinessFilter("all");
+            setFilter("all");
+          }
+        }
       });
     }
   }, [session]);
