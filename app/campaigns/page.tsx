@@ -45,7 +45,7 @@ export default function CampaignsPage() {
     function fetchCampaigns() {
       fetch("/api/campaigns")
         .then((r) => r.json())
-        .then((data) => { setCampaigns(data); setLoading(false); });
+        .then((data) => { setCampaigns(Array.isArray(data) ? data : []); setLoading(false); });
     }
     fetchCampaigns();
     const interval = setInterval(fetchCampaigns, 15000);

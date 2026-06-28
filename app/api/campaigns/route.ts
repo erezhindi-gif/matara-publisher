@@ -5,18 +5,23 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  const isAdmin = (session?.user as { role?: string })?.role === "admin";
-  const userId = (session?.user as { id?: string })?.id;
+  try {
+    const session = await getServerSession(authOptions);
+    const isAdmin = (session?.user as { role?: string })?.role === "admin";
+    const userId = (session?.user as { id?: string })?.id;
 
-  const where = (!session || isAdmin) ? {} : { userId };
+    const where = (!session || isAdmin) ? {} : { userId };
 
-  const campaigns = await prisma.campaign.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-    include: { business: true, posts: true },
-  });
-  return NextResponse.json(campaigns);
+    const campaigns = await prisma.campaign.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      include: { business: true, posts: true },
+    });
+    return NextResponse.json(campaigns);
+  } catch (e) {
+    console.error("GET /api/campaigns error:", e);
+    return NextResponse.json({ error: String(e) }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {

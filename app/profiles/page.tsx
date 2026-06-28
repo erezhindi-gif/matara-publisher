@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { getBusinessFilter } from "@/lib/businessFilter";
 
 type Profile = {
@@ -29,11 +30,14 @@ const EDGE_PROFILES = [
 ];
 
 export default function ProfilesPage() {
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as { role?: string })?.role === "admin";
+  const userBusinessId = (session?.user as { businessId?: string })?.businessId || "recruitment";
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: "", fbUsername: "", edgeProfile: "Default", businessId: "recruitment", dailyLimit: 150, whatsappPhone: "" });
+  const [form, setForm] = useState({ name: "", fbUsername: "", edgeProfile: "Default", businessId: userBusinessId, dailyLimit: 150, whatsappPhone: "" });
   const [businessFilter, setBusinessFilterState] = useState("all");
   const [waStatus, setWaStatus] = useState<Record<string, { status: string; qrDataUrl: string | null }>>({});
   const [serverOnline, setServerOnline] = useState<boolean | null>(null);
@@ -211,12 +215,14 @@ export default function ProfilesPage() {
                 <input className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900" placeholder="ariel.cohen" value={form.fbUsername} onChange={(e) => setForm({ ...form, fbUsername: e.target.value })} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">עסק</label>
-                  <select className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900" value={form.businessId} onChange={(e) => setForm({ ...form, businessId: e.target.value })}>
-                    {BUSINESSES.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                  </select>
-                </div>
+                {isAdmin && (
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">עסק</label>
+                    <select className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900" value={form.businessId} onChange={(e) => setForm({ ...form, businessId: e.target.value })}>
+                      {BUSINESSES.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">פרופיל Edge</label>
                   <select className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900" value={form.edgeProfile} onChange={(e) => setForm({ ...form, edgeProfile: e.target.value })}>
