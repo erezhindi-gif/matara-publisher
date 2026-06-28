@@ -169,16 +169,7 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
   if (localImagePaths.length > 0) {
     log(`  [IMG] uploading ${localImagePaths.length} images: ${localImagePaths.join(', ')}`);
     try {
-      // שלב 1: uploadFile על input הקיים (לפני לחיצה)
-      const fileInputBefore = await page.$('input[type="file"]');
-      log(`  [IMG] file input before click: ${!!fileInputBefore}`);
-      if (fileInputBefore) {
-        await fileInputBefore.uploadFile(...localImagePaths);
-        log(`  [IMG] uploadFile done (before click)`);
-        await new Promise(r => setTimeout(r, 1000));
-      }
-
-      // שלב 2: לחץ על כפתור תמונה כדי "לאשר" את הבחירה
+      // לחץ על כפתור תמונה תחילה כדי לפתוח את ה-input
       const photoBtn = await page.$('[aria-label="תמונה/וידאו"]')
         || await page.$('[aria-label="Photo/video"]')
         || await page.evaluateHandle(() => {
@@ -193,14 +184,15 @@ async function postToFacebookGroup(page, fbGroupId, groupName, content, localIma
       if (photoBtn) {
         await photoBtn.click();
         await new Promise(r => setTimeout(r, 2000));
-        // אחרי לחיצה - נסה uploadFile שוב על input החדש
-        const fileInputAfter = await page.$('input[type="file"][accept*="image"]')
-          || await page.$('input[type="file"]');
-        log(`  [IMG] file input after click: ${!!fileInputAfter}`);
-        if (fileInputAfter) {
-          await fileInputAfter.uploadFile(...localImagePaths);
-          log(`  [IMG] uploadFile done (after click)`);
-        }
+      }
+      // uploadFile על input - לאחר לחיצה על כפתור (שפותח dialog בחירת קובץ)
+      // Puppeteer מבטל את ה-dialog ומעלה ישירות
+      const fileInput = await page.$('input[type="file"][accept*="image"]')
+        || await page.$('input[type="file"]');
+      log(`  [IMG] file input: ${!!fileInput}`);
+      if (fileInput) {
+        await fileInput.uploadFile(...localImagePaths);
+        log(`  [IMG] uploadFile done`);
       }
       await new Promise(r => setTimeout(r, 5000));
       log(`  [IMG] image step complete`);
