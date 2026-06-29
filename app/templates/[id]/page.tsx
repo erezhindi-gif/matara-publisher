@@ -59,9 +59,7 @@ export default function TemplateDetailPage() {
     return allGroups.filter((g) => g.name.toLowerCase().includes(q));
   }, [allGroups, search]);
 
-  const MAX_GROUPS = 60;
   const currentGroupCount = template?.groups.length || 0;
-  const remainingSlots = MAX_GROUPS - currentGroupCount;
 
   function toggleGroup(fbGroupId: string) {
     setSelected((prev) => {
@@ -69,7 +67,6 @@ export default function TemplateDetailPage() {
       if (next.has(fbGroupId)) {
         next.delete(fbGroupId);
       } else {
-        if (next.size >= remainingSlots) return prev; // חסום אם הגענו למגבלה
         next.add(fbGroupId);
       }
       return next;
@@ -118,8 +115,8 @@ export default function TemplateDetailPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className={`border rounded-2xl p-4 text-center ${currentGroupCount >= MAX_GROUPS ? "bg-red-900/20 border-red-700" : "bg-gray-900 border-gray-800"}`}>
-            <div className={`text-2xl font-bold ${currentGroupCount >= MAX_GROUPS ? "text-red-400" : "text-blue-400"}`}>{currentGroupCount}/{MAX_GROUPS}</div>
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 text-center">
+            <div className="text-2xl font-bold text-blue-400">{currentGroupCount}</div>
             <div className="text-xs text-gray-500">קבוצות</div>
           </div>
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 text-center">
@@ -156,17 +153,10 @@ export default function TemplateDetailPage() {
                 />
                 <div className="flex items-center justify-between mt-2">
                   {selected.size > 0 && <div className="text-xs text-blue-400">נבחרו {selected.size} קבוצות</div>}
-                  <div className={`text-xs mr-auto ${currentGroupCount >= MAX_GROUPS ? "text-red-400 font-bold" : remainingSlots <= 10 ? "text-yellow-400" : "text-gray-500"}`}>
-                    {currentGroupCount}/{MAX_GROUPS} קבוצות בתבנית
-                    {remainingSlots <= 0 && " - מלא"}
-                    {remainingSlots > 0 && remainingSlots <= 10 && ` (נותרו ${remainingSlots})`}
+                  <div className="text-xs text-gray-500 mr-auto">
+                    {currentGroupCount} קבוצות בתבנית
                   </div>
                 </div>
-                {remainingSlots <= 0 && (
-                  <div className="bg-red-900/30 border border-red-700 rounded-xl p-2 mt-2 text-xs text-red-400 text-center">
-                    🚫 הגעת למגבלת 60 קבוצות לתבנית
-                  </div>
-                )}
               </div>
 
               <div className="overflow-y-auto flex-1 p-2">
@@ -203,10 +193,10 @@ export default function TemplateDetailPage() {
                 </button>
                 <button
                   onClick={addSelected}
-                  disabled={selected.size === 0 || saving || remainingSlots <= 0}
+                  disabled={selected.size === 0 || saving}
                   className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 rounded-xl p-3 text-sm font-semibold transition-colors"
                 >
-                  {saving ? "מוסיף..." : remainingSlots <= 0 ? "🚫 מלא" : `הוסף ${selected.size > 0 ? selected.size : ""} קבוצות`}
+                  {saving ? "מוסיף..." : `הוסף ${selected.size > 0 ? selected.size : ""} קבוצות`}
                 </button>
               </div>
             </div>

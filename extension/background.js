@@ -101,13 +101,11 @@ async function syncGroups(job, token) {
       await sleep(7000);
       try {
         const allGroups = new Map();
-        // גלול 20 פעמים ואחרי כל גלילה שלוף קבוצות
-        for (let i = 0; i < 20; i++) {
-          await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            func: scrollGroupsSidebar,
-          });
-          await sleep(1200);
+        let noNewCount = 0;
+
+        // גלול עד שאין קבוצות חדשות 5 פעמים ברציפות
+        for (let i = 0; i < 100; i++) {
+          const prevSize = allGroups.size;
 
           const results = await chrome.scripting.executeScript({
             target: { tabId: tab.id },
@@ -116,12 +114,25 @@ async function syncGroups(job, token) {
           const found = results?.[0]?.result || [];
           for (const g of found) allGroups.set(g.fbGroupId, g);
 
-          // דווח progress
-          await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: "running", groupsFound: allGroups.size }),
+          // גלול
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: scrollGroupsSidebar,
           });
+          await sleep(800);
+
+          // דווח progress
+          if (allGroups.size !== prevSize) {
+            noNewCount = 0;
+            await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status: "running", groupsFound: allGroups.size }),
+            });
+          } else {
+            noNewCount++;
+            if (noNewCount >= 5) break; // אין קבוצות חדשות - סיים
+          }
         }
 
         const groups = Array.from(allGroups.values());
