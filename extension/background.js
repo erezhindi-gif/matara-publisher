@@ -97,7 +97,7 @@ async function publishPost(post, token) {
 async function syncGroups(job, token) {
   console.log("מתחיל סנכרון...");
   return new Promise((resolve) => {
-    chrome.tabs.create({ url: "https://www.facebook.com/groups/?category=joined", active: false }, async (tab) => {
+    chrome.tabs.create({ url: "https://www.facebook.com/groups/joins/", active: false }, async (tab) => {
       await sleep(7000);
       try {
         const allGroups = new Map();
@@ -176,7 +176,8 @@ function scrollGroupsSidebar() {
 function scrapeGroups() {
   const results = [];
   const seen = new Set();
-  const skipIds = ["feed", "discover", "create", "joins", "joined", "category", "membership", "permalink", "posts"];
+  const skipIds = ["feed", "discover", "create", "joins", "joined", "category", "membership", "permalink", "posts", "join"];
+  const skipText = ["הצגת", "הביקור", "לפני", "ago", "חברים", "פעילות"];
 
   document.querySelectorAll('a[href*="/groups/"]').forEach((link) => {
     const href = link.href || "";
@@ -190,24 +191,26 @@ function scrapeGroups() {
 
     let name = "";
 
-    // 1. aria-label של הקישור - הכי נקי
-    const ariaLabel = link.getAttribute("aria-label");
-    if (ariaLabel && ariaLabel.length > 1 && ariaLabel.length < 100) {
-      name = ariaLabel.trim();
+    // עלה בDOM עד 8 רמות כדי למצוא את הכרטיס, ובו חפש כותרת
+    let container = link.parentElement;
+    for (let i = 0; i < 8 && container; i++) {
+      const headings = container.querySelectorAll("h2, h3, h4, [role='heading']");
+      for (const h of headings) {
+        const text = (h.innerText || "").trim();
+        const isBad = skipText.some(w => text.includes(w));
+        if (text.length > 1 && text.length < 120 && !isBad) {
+          name = text;
+          break;
+        }
+      }
+      if (name) break;
+      container = container.parentElement;
     }
 
-    // 2. heading בתוך הקישור
+    // גיבוי: aria-label
     if (!name) {
-      const heading = link.querySelector("h2, h3, h4, [role='heading']");
-      if (heading) name = (heading.innerText || "").trim();
-    }
-
-    // 3. span ישיר בתוך הקישור - הכי קצר ונקי
-    if (!name) {
-      const spans = Array.from(link.querySelectorAll("span"))
-        .map(s => (s.innerText || "").trim())
-        .filter(t => t.length > 1 && t.length < 80 && !/^\d+$/.test(t) && !t.includes("לפני") && !t.includes("ago") && !t.includes("חבר"));
-      if (spans.length > 0) name = spans.sort((a, b) => a.length - b.length)[0];
+      const al = link.getAttribute("aria-label") || "";
+      if (al.length > 1 && al.length < 100) name = al.trim();
     }
 
     if (name && name.length > 1) {
