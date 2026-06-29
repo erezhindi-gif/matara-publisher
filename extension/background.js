@@ -98,15 +98,15 @@ async function syncGroups(job, token) {
   console.log("מתחיל סנכרון...");
   return new Promise((resolve) => {
     chrome.tabs.create({ url: "https://www.facebook.com/groups/joins/", active: false }, async (tab) => {
-      await sleep(7000);
+      await sleep(10000); // המתן לטעינת הדף
       try {
         const allGroups = new Map();
         let noNewCount = 0;
 
-        // גלול עד שאין קבוצות חדשות 5 פעמים ברציפות
-        for (let i = 0; i < 100; i++) {
+        for (let i = 0; i < 200; i++) {
           const prevSize = allGroups.size;
 
+          // שלוף קבוצות
           const results = await chrome.scripting.executeScript({
             target: { tabId: tab.id },
             func: scrapeGroups,
@@ -114,12 +114,13 @@ async function syncGroups(job, token) {
           const found = results?.[0]?.result || [];
           for (const g of found) allGroups.set(g.fbGroupId, g);
 
-          // גלול
+          // גלול לתחתית
           await chrome.scripting.executeScript({
             target: { tabId: tab.id },
             func: scrollGroupsSidebar,
           });
-          await sleep(800);
+
+          await sleep(2000); // המתן לטעינת תוכן חדש
 
           // דווח progress
           if (allGroups.size !== prevSize) {
@@ -131,7 +132,7 @@ async function syncGroups(job, token) {
             });
           } else {
             noNewCount++;
-            if (noNewCount >= 5) break; // אין קבוצות חדשות - סיים
+            if (noNewCount >= 15) break; // 15 × 2 שניות = 30 שניות ללא חדש - סיים
           }
         }
 
@@ -163,14 +164,13 @@ async function syncGroups(job, token) {
 }
 
 function scrollGroupsSidebar() {
-  // בדף /groups/?category=joined הגלילה היא של הדף הראשי
-  window.scrollBy(0, 800);
-  // גם גלול לכרטיס האחרון
-  const links = Array.from(document.querySelectorAll('a[href*="/groups/"]'));
-  if (links.length > 0) {
-    links[links.length - 1].scrollIntoView({ block: "end" });
-  }
-  return true;
+  // גלול לתחתית הדף לחלוטין
+  window.scrollTo(0, document.body.scrollHeight);
+  document.documentElement.scrollTop = document.documentElement.scrollHeight;
+  // גם גלול לאלמנט האחרון
+  const all = document.querySelectorAll('[role="article"], [data-type="group_card"], a[href*="/groups/"]');
+  if (all.length > 0) all[all.length - 1].scrollIntoView({ block: "end" });
+  return document.body.scrollHeight;
 }
 
 function scrapeGroups() {
