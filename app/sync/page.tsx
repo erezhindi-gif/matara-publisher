@@ -1,20 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { getBusinessFilter } from "@/lib/businessFilter";
 
-const LOCAL_SERVER = "http://localhost:3333";
-
-type Profile = { id: string; name: string; businessId: string; edgeProfile: string; userId: string | null };
+type Profile = { id: string; name: string; businessId: string; userId: string | null };
 
 export default function SyncPage() {
-  const [status, setStatus] = useState<"idle" | "checking" | "syncing" | "done" | "error">("idle");
-  const [message, setMessage] = useState("");
-  const [serverOnline, setServerOnline] = useState<boolean | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedProfileId, setSelectedProfileId] = useState("");
   const [businessFilter, setBusinessFilterState] = useState("all");
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [jobStatus, setJobStatus] = useState<string | null>(null);
+  const [groupCount, setGroupCount] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setBusinessFilterState(getBusinessFilter());
@@ -25,64 +25,50 @@ export default function SyncPage() {
 
   useEffect(() => {
     fetch("/api/profiles").then((r) => r.json()).then((data) => {
-      if (Array.isArray(data)) {
-        setProfiles(data);
-        // auto-select profile based on sidebar filter
-        if (businessFilter !== "all") {
-          const match = data.find((p: Profile) => p.userId === businessFilter);
-          if (match) { setSelectedProfileId(match.id); return; }
-        }
-        if (data[0]) setSelectedProfileId(data[0].id);
+      if (!Array.isArray(data)) return;
+      setProfiles(data);
+      if (businessFilter !== "all") {
+        const match = data.find((p: Profile) => p.userId === businessFilter);
+        if (match) { setSelectedProfileId(match.id); return; }
       }
+      if (data[0]) setSelectedProfileId(data[0].id);
     });
   }, [businessFilter]);
 
-  async function checkServer() {
-    setStatus("checking");
-    try {
-      const res = await fetch(`${LOCAL_SERVER}/ping`, { signal: AbortSignal.timeout(3000) });
-      const data = await res.json();
-      if (data.ok) { setServerOnline(true); setStatus("idle"); }
-    } catch {
-      setServerOnline(false);
-      setStatus("idle");
-    }
-  }
+  useEffect(() => {
+    if (!jobId) return;
+    pollRef.current = setInterval(async () => {
+      const res = await fetch(`/api/extension/sync/${jobId}`);
+      const { job } = await res.json();
+      setJobStatus(job.status);
+      setGroupCount(job.groupCount);
+      if (job.error) setError(job.error);
+      if (["done", "failed", "cancelled"].includes(job.status)) {
+        clearInterval(pollRef.current!);
+      }
+    }, 2000);
+    return () => clearInterval(pollRef.current!);
+  }, [jobId]);
 
   async function startSync() {
     const profile = profiles.find((p) => p.id === selectedProfileId);
     if (!profile) return;
-    setStatus("syncing");
-    setMessage("פותח פייסבוק וסורק קבוצות...");
-    try {
-      const res = await fetch(`${LOCAL_SERVER}/sync-groups`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          businessId: profile.businessId,
-          edgeProfile: profile.edgeProfile || "Default",
-        }),
-        signal: AbortSignal.timeout(120000),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setStatus("done");
-        setMessage(`הועלו ${data.count} קבוצות בהצלחה!`);
-      } else {
-        setStatus("error");
-        setMessage(data.error || "שגיאה בסנכרון");
-      }
-    } catch {
-      setStatus("error");
-      setMessage("לא ניתן להתחבר לשרת המקומי. האם הוא פועל?");
-    }
+    setError(null);
+    setGroupCount(null);
+    setJobStatus("waiting");
+
+    const res = await fetch("/api/extension/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ businessId: profile.businessId }),
+    });
+    const { job } = await res.json();
+    setJobId(job.id);
   }
 
-  const visibleProfiles = businessFilter === "all"
-    ? profiles
-    : profiles.filter((p) => p.userId === businessFilter);
-
   const selectedProfile = profiles.find((p) => p.id === selectedProfileId);
+  const visibleProfiles = businessFilter === "all" ? profiles : profiles.filter((p) => p.userId === businessFilter);
+  const isRunning = jobStatus === "waiting" || jobStatus === "running" || jobStatus === "pending";
 
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900 p-8" dir="rtl">
@@ -92,34 +78,16 @@ export default function SyncPage() {
           <h1 className="text-2xl font-bold">סנכרון קבוצות פייסבוק</h1>
         </div>
 
-        <div className="bg-blue-950/20 border border-blue-800/40 rounded-2xl p-5 mb-6">
-          <h2 className="font-semibold text-blue-300 mb-3">לפני הסנכרון</h2>
-          <p className="text-sm text-gray-700 mb-2">ודא שהשרת המקומי פועל על המחשב שלך:</p>
-          <code className="block bg-white text-green-400 px-4 py-3 rounded-xl text-sm mb-3">
-            node local-server.js
-          </code>
-          <p className="text-xs text-gray-500">הפעל פעם אחת ביום - השאר את החלון פתוח</p>
+        {/* הוראות */}
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 mb-6">
+          <h2 className="font-semibold text-blue-800 mb-2">איך זה עובד?</h2>
+          <p className="text-sm text-blue-700">
+            לחץ "סנכרן" - תוסף Matara Publisher בדפדפן שלך יפתח פייסבוק ברקע, יסרוק את הקבוצות שלך ויעלה אותן למערכת.
+          </p>
+          <p className="text-sm text-blue-600 mt-2 font-medium">⚡ חייב להיות מותקן תוסף Matara Publisher בדפדפן</p>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="font-medium mb-1">סטטוס השרת המקומי</div>
-              <div className={`text-sm ${serverOnline === true ? "text-green-400" : serverOnline === false ? "text-red-400" : "text-gray-500"}`}>
-                {serverOnline === true ? "פועל" : serverOnline === false ? "לא פועל - הפעל node local-server.js" : "לא נבדק"}
-              </div>
-            </div>
-            <button
-              onClick={checkServer}
-              disabled={status === "checking"}
-              className="bg-gray-200 hover:bg-gray-300 rounded-xl px-4 py-2 text-sm transition-colors disabled:opacity-50"
-            >
-              {status === "checking" ? "בודק..." : "בדוק חיבור"}
-            </button>
-          </div>
-        </div>
-
-        {/* בחירת פרופיל - רק אם אדמין עם "כל הפרופילים" */}
+        {/* בחירת פרופיל */}
         {businessFilter === "all" && visibleProfiles.length > 1 ? (
           <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-4">
             <label className="block text-sm text-gray-700 mb-2">סנכרן קבוצות עבור:</label>
@@ -137,33 +105,58 @@ export default function SyncPage() {
           <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-4">
             <div className="text-sm text-gray-500 mb-1">סנכרן קבוצות עבור:</div>
             <div className="font-semibold">{selectedProfile.name}</div>
-            <div className="text-xs text-gray-400 mt-1">Edge: {selectedProfile.edgeProfile || "Default"}</div>
           </div>
         ) : null}
 
+        {/* כפתור סנכרון */}
         <button
           onClick={startSync}
-          disabled={status === "syncing" || serverOnline === false || !selectedProfileId}
-          className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:from-gray-700 disabled:to-gray-700 disabled:text-gray-400 rounded-2xl p-4 font-semibold text-lg transition-all shadow-lg shadow-blue-500/20"
+          disabled={isRunning || !selectedProfileId}
+          className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:from-gray-400 disabled:to-gray-400 rounded-2xl p-4 font-semibold text-lg text-white transition-all shadow-lg shadow-blue-500/20"
         >
-          {status === "syncing" ? (
-            <span className="flex items-center justify-center gap-2">
-              <span className="animate-spin">⟳</span>
-              מסנכרן...
-            </span>
-          ) : "סנכרן קבוצות עכשיו"}
+          {isRunning ? "מסנכרן..." : "סנכרן קבוצות עכשיו"}
         </button>
 
-        {message && (
-          <div className={`mt-4 rounded-2xl p-4 text-center ${status === "done" ? "bg-green-950/30 border border-green-800/40 text-green-300" : "bg-red-950/30 border border-red-800/40 text-red-300"}`}>
-            {message}
+        {/* סטטוס */}
+        {jobStatus && (
+          <div className={`mt-6 rounded-2xl p-5 text-center border ${
+            jobStatus === "done" ? "bg-green-50 border-green-200" :
+            jobStatus === "failed" ? "bg-red-50 border-red-200" :
+            "bg-blue-50 border-blue-200"
+          }`}>
+            {jobStatus === "waiting" && (
+              <div>
+                <div className="text-2xl mb-2">⏳</div>
+                <div className="font-semibold text-blue-800">ממתין לתוסף...</div>
+                <div className="text-sm text-blue-600 mt-1">התוסף יתחיל לסרוק תוך 30 שניות</div>
+              </div>
+            )}
+            {(jobStatus === "pending" || jobStatus === "running") && (
+              <div>
+                <div className="text-2xl mb-2 animate-spin inline-block">⟳</div>
+                <div className="font-semibold text-blue-800">סורק קבוצות...</div>
+                <div className="text-sm text-blue-600 mt-1">פייסבוק נפתח ברקע</div>
+              </div>
+            )}
+            {jobStatus === "done" && (
+              <div>
+                <div className="text-4xl mb-2">✅</div>
+                <div className="font-semibold text-green-800">סנכרון הושלם!</div>
+                {groupCount && <div className="text-green-700 mt-1">{groupCount} קבוצות נוספו למערכת</div>}
+                <Link href="/templates" className="block mt-3 text-blue-600 hover:underline text-sm">
+                  צפה בקבוצות ←
+                </Link>
+              </div>
+            )}
+            {jobStatus === "failed" && (
+              <div>
+                <div className="text-4xl mb-2">❌</div>
+                <div className="font-semibold text-red-800">הסנכרון נכשל</div>
+                {error && <div className="text-red-600 text-sm mt-1">{error}</div>}
+                <div className="text-sm text-red-500 mt-2">ודא שהתוסף מותקן ופייסבוק פתוח</div>
+              </div>
+            )}
           </div>
-        )}
-
-        {status === "done" && (
-          <Link href="/templates" className="block mt-4 text-center text-blue-400 hover:underline text-sm">
-            צפה בקבוצות שסונכרנו ←
-          </Link>
         )}
       </div>
     </main>

@@ -54,7 +54,7 @@ export default function ProfilesPage() {
   }, []);
 
   async function connectWhatsApp(profileId: string) {
-    if (!serverOnline && isAdmin) {
+    if (!serverOnline) {
       alert("השרת המקומי לא פועל! פתח חלון שחור והרץ: node local-server.js");
       return;
     }
@@ -164,7 +164,7 @@ export default function ProfilesPage() {
         </div>
 
         {/* Server status */}
-        {isAdmin && serverOnline === false && (
+        {serverOnline === false && (
           <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">
             <div className="flex items-center justify-between gap-4">
               <div>
@@ -187,7 +187,7 @@ export default function ProfilesPage() {
             </div>
           </div>
         )}
-        {isAdmin && serverOnline === true && (
+        {serverOnline === true && (
           <div className="bg-green-50 border border-green-200 rounded-2xl p-3 mb-4 text-sm text-green-700">
             ✅ השרת המקומי פעיל - וואטסאפ זמין
           </div>

@@ -45,25 +45,123 @@ async function autoLogin() {
 }
 
 async function tick() {
-  // נסה התחברות אוטומטית תחילה
   await autoLogin();
 
   const { apiToken } = await chrome.storage.local.get("apiToken");
   if (!apiToken) return;
 
   try {
-    const res = await fetch(`${API_BASE}/api/extension/jobs?token=${apiToken}`);
-    if (!res.ok) return;
-    const { posts } = await res.json();
-    if (!posts || posts.length === 0) return;
+    // בדוק פוסטים לפרסום
+    const jobsRes = await fetch(`${API_BASE}/api/extension/jobs?token=${apiToken}`);
+    if (jobsRes.ok) {
+      const { posts } = await jobsRes.json();
+      if (posts && posts.length > 0) {
+        for (const post of posts) {
+          await publishPost(post, apiToken);
+          await sleep(5000);
+        }
+      }
+    }
 
-    for (const post of posts) {
-      await publishPost(post, apiToken);
-      await sleep(5000);
+    // בדוק משימות סנכרון
+    const syncRes = await fetch(`${API_BASE}/api/extension/sync?token=${apiToken}`);
+    if (syncRes.ok) {
+      const { job } = await syncRes.json();
+      if (job) await syncGroups(job, apiToken);
     }
   } catch (err) {
     console.error("שגיאה:", err);
   }
+}
+
+async function syncGroups(job, token) {
+  console.log("מתחיל סנכרון קבוצות...");
+
+  // סמן כ"בביצוע"
+  await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: "running" }),
+  });
+
+  return new Promise((resolve) => {
+    chrome.tabs.create({ url: "https://www.facebook.com/groups/feed/", active: false }, async (tab) => {
+      await sleep(6000);
+      try {
+        // גלול כמה פעמים לטעינת יותר קבוצות
+        for (let i = 0; i < 10; i++) {
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: () => {
+              const links = document.querySelectorAll('a[href*="/groups/"]');
+              if (links.length > 0) {
+                const el = links[links.length - 1];
+                el.scrollIntoView();
+              }
+            },
+          });
+          await sleep(1500);
+        }
+
+        // סרוק קבוצות
+        const results = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: scrapeGroups,
+        });
+
+        const groups = results?.[0]?.result || [];
+        console.log(`נמצאו ${groups.length} קבוצות`);
+
+        await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "done", groups }),
+        });
+
+        chrome.notifications.create({
+          type: "basic",
+          iconUrl: "icon48.png",
+          title: "סנכרון הושלם",
+          message: `נמצאו ${groups.length} קבוצות`,
+        });
+      } catch (err) {
+        await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "failed", error: err.message }),
+        });
+      } finally {
+        await sleep(1000);
+        chrome.tabs.remove(tab.id);
+        resolve();
+      }
+    });
+  });
+}
+
+function scrapeGroups() {
+  const results = [];
+  const seen = new Set();
+  document.querySelectorAll('a[href*="/groups/"]').forEach((link) => {
+    const href = link.href || "";
+    const match = href.match(/facebook\.com\/groups\/([^/?#\s]+)/);
+    if (!match) return;
+    const groupId = match[1];
+    if (seen.has(groupId)) return;
+    const isNumeric = /^\d+$/.test(groupId);
+    const isSlug = /^[a-zA-Z0-9._-]{3,}$/.test(groupId);
+    if (!isNumeric && !isSlug) return;
+    seen.add(groupId);
+    const lines = (link.innerText || "").split("\n").map(l => l.trim()).filter(l => l.length > 2);
+    let name = "";
+    for (const line of lines) {
+      if (!line.includes("לפני") && !line.includes("פעילות") && line.length < 150) {
+        name = line; break;
+      }
+    }
+    if (name && name.length > 2) results.push({ fbGroupId: groupId, name });
+  });
+  return results;
 }
 
 async function publishPost(post, token) {
