@@ -95,10 +95,10 @@ async function publishPost(post, token) {
 }
 
 async function syncGroups(job, token) {
-  console.log("מתחיל סנכרון GraphQL...");
   return new Promise((resolve) => {
-    chrome.tabs.create({ url: "https://www.facebook.com/groups/feed/", active: false }, async (tab) => {
-      await sleep(12000); // המתן לטעינת הדף והקריאות הראשוניות
+    // groups/joins מציג כרטיסי קבוצות בגריד - ה-GraphQL יתפוס את הנתונים
+    chrome.tabs.create({ url: "https://www.facebook.com/groups/joins/", active: false }, async (tab) => {
+      await sleep(10000);
       try {
         const allGroups = new Map();
         let noNewCount = 0;
@@ -106,18 +106,30 @@ async function syncGroups(job, token) {
         for (let i = 0; i < 300; i++) {
           const prevSize = allGroups.size;
 
-          // שלוף קבוצות מהסרגל הימני
-          const results = await chrome.scripting.executeScript({
+          // קרא מה-GraphQL interceptor (content-groups.js)
+          const gqlResults = await chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            func: scrapeGroups,
+            world: "MAIN",
+            func: () => Array.from(window.__groupsCapture?.values() || []),
           });
-          const found = results?.[0]?.result || [];
-          for (const g of found) allGroups.set(g.fbGroupId, g);
+          const gqlGroups = gqlResults?.[0]?.result || [];
+          for (const g of gqlGroups) allGroups.set(g.fbGroupId, g);
 
-          // גלול את הסרגל הימני עצמו
+          // גם סרוק DOM כגיבוי
+          const domResults = await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: scrapeGroupCards,
+          });
+          const domGroups = domResults?.[0]?.result || [];
+          for (const g of domGroups) allGroups.set(g.fbGroupId, g);
+
+          // גלול להטעין עוד
           await chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            func: scrollGroupsSidebar,
+            func: () => {
+              window.scrollBy(0, 800);
+              document.documentElement.dispatchEvent(new Event("scroll"));
+            },
           });
 
           await sleep(2000);
@@ -131,7 +143,7 @@ async function syncGroups(job, token) {
             });
           } else {
             noNewCount++;
-            if (noNewCount >= 10) break;
+            if (noNewCount >= 8) break;
           }
         }
 
@@ -162,52 +174,30 @@ async function syncGroups(job, token) {
   });
 }
 
-function findGroupsSidebar() {
-  // מצא את הסרגל הימני - קונטיינר שגולל בנפרד ומכיל קישורי קבוצות
-  const all = Array.from(document.querySelectorAll("*"));
-  for (const el of all) {
-    if (el.scrollHeight <= el.clientHeight + 100) continue;
-    const ov = window.getComputedStyle(el).overflowY;
-    if (ov !== "auto" && ov !== "scroll") continue;
-    const rect = el.getBoundingClientRect();
-    if (rect.width < 80 || rect.width > 500) continue;
-    if (el.querySelectorAll('a[href*="/groups/"]').length >= 3) return el;
-  }
-  return null;
-}
-
-function scrapeGroups() {
+function scrapeGroupCards() {
+  // סורק כרטיסי קבוצות בדף groups/joins - כל כרטיס הוא div עם תמונה + שם + כפתור
   const results = [];
   const seen = new Set();
   const skipIds = new Set(["feed", "discover", "create", "joins", "joined", "category", "membership", "permalink", "posts", "join", "your_posts", "explore"]);
-  const skipWords = ["לפני", "ago", "פעילות", "הצגת", "הצטרף", "צור", "ביקור", "חיפוש", "כתוב", "פרסם", "שתף"];
+  const skipText = new Set(["הצגת הקבוצה", "View Group", "View group", "הצטרף", "Join"]);
 
-  const sidebar = findGroupsSidebar();
-  const scope = sidebar || document;
-
-  scope.querySelectorAll('a[href*="/groups/"]').forEach((link) => {
-    if (!sidebar && link.closest('[role="article"]')) return;
+  document.querySelectorAll('a[href*="/groups/"]').forEach((link) => {
+    // דלג על קישורי ניווט (header/nav)
+    if (link.closest("nav") || link.closest("header") || link.closest('[role="navigation"]')) return;
     const match = (link.href || "").match(/facebook\.com\/groups\/([^/?#\s]+)/);
     if (!match) return;
     const groupId = match[1];
     if (skipIds.has(groupId)) return;
     if (!/^[\w.-]{2,}$/.test(groupId)) return;
     if (seen.has(groupId)) return;
-    const firstLine = (link.innerText || link.textContent || "").split("\n")[0].trim();
-    if (!firstLine || firstLine.length < 2 || firstLine.length > 150) return;
-    if (skipWords.some(w => firstLine.includes(w))) return;
+    const text = (link.innerText || link.textContent || "").trim();
+    if (!text || text.length < 2 || text.length > 150) return;
+    if (skipText.has(text)) return;
     seen.add(groupId);
-    results.push({ fbGroupId: groupId, name: firstLine });
+    results.push({ fbGroupId: groupId, name: text.split("\n")[0].trim() });
   });
 
   return results;
-}
-
-function scrollGroupsSidebar() {
-  const sidebar = findGroupsSidebar();
-  if (sidebar) { sidebar.scrollTop += 600; return sidebar.scrollTop; }
-  window.scrollBy(0, 600);
-  return 0;
 }
 
 function injectPost(content) {

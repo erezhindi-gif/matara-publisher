@@ -11,7 +11,7 @@
   ],
   "content_scripts": [
     {
-      "matches": ["https://www.facebook.com/groups/feed", "https://www.facebook.com/groups/feed/*"],
+      "matches": ["https://www.facebook.com/groups/joins", "https://www.facebook.com/groups/joins/*"],
       "js": ["content-groups.js"],
       "run_at": "document_start",
       "world": "MAIN"
