@@ -176,29 +176,30 @@ function scrollGroupsSidebar() {
 function scrapeGroups() {
   const results = [];
   const seen = new Set();
-  const skipIds = ["feed", "discover", "create", "joins", "joined", "category", "membership", "permalink", "posts", "join"];
-  const skipText = ["הצגת", "הביקור", "לפני", "ago", "חברים", "פעילות"];
 
-  document.querySelectorAll('a[href*="/groups/"]').forEach((link) => {
-    const href = link.href || "";
+  // חפש ספציפית כפתורי "הצגת הקבוצה" - אלה קיימים רק בכרטיסי קבוצות
+  const viewButtons = Array.from(document.querySelectorAll('a[href*="/groups/"]')).filter(a => {
+    const text = (a.innerText || a.textContent || "").trim();
+    return text === "הצגת הקבוצה" || text === "View Group" || text === "View group";
+  });
+
+  for (const btn of viewButtons) {
+    const href = btn.href || "";
     const match = href.match(/facebook\.com\/groups\/([^/?#\s]+)/);
-    if (!match) return;
+    if (!match) continue;
     const groupId = match[1];
-    if (skipIds.includes(groupId)) return;
-    if (seen.has(groupId)) return;
+    if (seen.has(groupId)) continue;
     const isValid = /^\d+$/.test(groupId) || /^[a-zA-Z0-9._-]{3,}$/.test(groupId);
-    if (!isValid) return;
+    if (!isValid) continue;
 
+    // עלה בDOM כדי למצוא את הכרטיס ובו חפש את שם הקבוצה
     let name = "";
-
-    // עלה בDOM עד 8 רמות כדי למצוא את הכרטיס, ובו חפש כותרת
-    let container = link.parentElement;
-    for (let i = 0; i < 8 && container; i++) {
-      const headings = container.querySelectorAll("h2, h3, h4, [role='heading']");
+    let container = btn.parentElement;
+    for (let i = 0; i < 10 && container; i++) {
+      const headings = container.querySelectorAll("h2, h3, h4, [role='heading'], strong");
       for (const h of headings) {
         const text = (h.innerText || "").trim();
-        const isBad = skipText.some(w => text.includes(w));
-        if (text.length > 1 && text.length < 120 && !isBad) {
+        if (text.length > 1 && text.length < 150 && !text.includes("הצגת") && !text.includes("הביקור") && !text.includes("לפני")) {
           name = text;
           break;
         }
@@ -207,17 +208,12 @@ function scrapeGroups() {
       container = container.parentElement;
     }
 
-    // גיבוי: aria-label
-    if (!name) {
-      const al = link.getAttribute("aria-label") || "";
-      if (al.length > 1 && al.length < 100) name = al.trim();
-    }
-
     if (name && name.length > 1) {
       seen.add(groupId);
       results.push({ fbGroupId: groupId, name });
     }
-  });
+  }
+
   return results;
 }
 
