@@ -96,35 +96,30 @@ async function publishPost(post, token) {
 
 async function syncGroups(job, token) {
   return new Promise((resolve) => {
-    chrome.tabs.create({ url: "https://www.facebook.com/groups/joins/", active: false }, async (tab) => {
+    chrome.tabs.create({ url: "https://www.facebook.com/groups/feed/", active: false }, async (tab) => {
       await sleep(10000);
       try {
         const allGroups = new Map();
-        let noNewCount = 0;
 
+        // שלב 1: מצא את קונטיינר הקבוצות הנכון ע"י בדיקה איזה אלמנט באמת מעלה קישורים חדשים
+        const findResult = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: findGroupsContainer,
+        });
+        const debug = findResult?.[0]?.result || [];
+        console.log("Debug containers:", JSON.stringify(debug));
+
+        // שלב 2: גלול וסרוק
+        let noNewCount = 0;
         for (let i = 0; i < 400; i++) {
           const prevSize = allGroups.size;
 
-          // קרא מה-GraphQL interceptor (content-groups.js שרץ ב-MAIN world)
-          const gqlResult = await chrome.scripting.executeScript({
+          const scrollResult = await chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            world: "MAIN",
-            func: () => Array.from(window.__groupsCapture?.values() || []),
+            func: scrollAndExtract,
           });
-          for (const g of (gqlResult?.[0]?.result || [])) allGroups.set(g.fbGroupId, g);
-
-          // גיבוי: סריקת DOM ישירה של כרטיסי קבוצות
-          const domResult = await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            func: scrapeJoinsPage,
-          });
-          for (const g of (domResult?.[0]?.result || [])) allGroups.set(g.fbGroupId, g);
-
-          // גלול את קונטיינר הקבוצות (לא הפיד הראשי)
-          await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            func: scrollGroupsContainer,
-          });
+          const groups = scrollResult?.[0]?.result || [];
+          for (const g of groups) allGroups.set(g.fbGroupId, g);
 
           await sleep(2000);
 
@@ -137,7 +132,7 @@ async function syncGroups(job, token) {
             });
           } else {
             noNewCount++;
-            if (noNewCount >= 5) break; // 5 גלילות ללא קבוצות חדשות - סיים
+            if (noNewCount >= 10) break;
           }
         }
 
@@ -168,21 +163,87 @@ async function syncGroups(job, token) {
   });
 }
 
-// סורק את דף groups/joins - כרטיסי קבוצות בגריד, ללא פוסטים
-function scrapeJoinsPage() {
+// מוצא את קונטיינר הקבוצות ע"י בדיקה: מגלל 500px ובודק אם עלו קישורים חדשים
+function findGroupsContainer() {
   const SKIP_IDS = new Set(["feed","joins","joined","discover","create","your_posts","explore","membership","permalink","category","posts","join"]);
-  const SKIP_TEXT = new Set(["הצגת הקבוצה","View Group","View group","הצטרף","Join","כתוב משהו","Write something"]);
+  const debug = [];
+
+  function countGroupLinks(el) {
+    const seen = new Set();
+    el.querySelectorAll('a[href*="/groups/"]').forEach(a => {
+      const m = a.href.match(/facebook\.com\/groups\/([^/?#\s]+)/);
+      if (m && !SKIP_IDS.has(m[1]) && /^[\w.-]{2,80}$/.test(m[1])) seen.add(m[1]);
+    });
+    return seen.size;
+  }
+
+  const candidates = Array.from(document.querySelectorAll("*")).filter(el => {
+    if (el.scrollHeight <= el.clientHeight + 50) return false;
+    const rect = el.getBoundingClientRect();
+    if (rect.width < 50 || rect.height < 100) return false;
+    return true;
+  });
+
+  let bestEl = null;
+  let bestGain = 0;
+
+  candidates.forEach((el, idx) => {
+    const before = countGroupLinks(el);
+    if (before === 0) return; // אין קישורי קבוצות בכלל - לא רלוונטי
+    const prevTop = el.scrollTop;
+    el.scrollTop += 500;
+    const after = countGroupLinks(el);
+    const gain = after - before;
+    const rect = el.getBoundingClientRect();
+
+    debug.push({
+      idx,
+      tag: el.tagName,
+      role: el.getAttribute("role") || "",
+      clientH: Math.round(el.clientHeight),
+      scrollH: Math.round(el.scrollHeight),
+      linksBefore: before,
+      linksAfter: after,
+      gain,
+      x: Math.round(rect.x),
+      w: Math.round(rect.width),
+    });
+
+    if (gain > bestGain) {
+      bestGain = gain;
+      bestEl = el;
+    } else {
+      el.scrollTop = prevTop; // חזור אם לא הקונטיינר הנכון
+    }
+  });
+
+  if (bestEl) {
+    window.__syncContainer = bestEl;
+  }
+
+  return debug;
+}
+
+// גולל את הקונטיינר שנמצא ומחזיר קישורי קבוצות
+function scrollAndExtract() {
+  const SKIP_IDS = new Set(["feed","joins","joined","discover","create","your_posts","explore","membership","permalink","category","posts","join"]);
+  const SKIP_TEXT = new Set(["הצגת הקבוצה","View Group","View group","הצטרף","Join"]);
+
+  const container = window.__syncContainer;
+  if (container) {
+    container.scrollTop += 500;
+  }
+
+  const scope = container || document;
   const seen = new Set();
   const results = [];
 
-  document.querySelectorAll('a[href*="facebook.com/groups/"]').forEach((a) => {
-    if (a.closest('[role="banner"]') || a.closest('[role="navigation"]') || a.closest("header")) return;
+  scope.querySelectorAll('a[href*="/groups/"]').forEach(a => {
     const m = a.href.match(/facebook\.com\/groups\/([^/?#\s]+)/);
     if (!m) return;
-    const id = m[1].toLowerCase();
+    const id = m[1].toLowerCase().replace(/\/$/, "");
     if (SKIP_IDS.has(id) || !/^[\w.-]{2,80}$/.test(id)) return;
     if (seen.has(id)) return;
-    // שם הקבוצה: שורה ראשונה שאינה פעולה
     const raw = (a.innerText || a.textContent || "").trim();
     const name = raw.split("\n").map(l => l.trim()).find(l => l.length >= 2 && l.length <= 150 && !SKIP_TEXT.has(l));
     if (!name) return;
@@ -191,24 +252,6 @@ function scrapeJoinsPage() {
   });
 
   return results;
-}
-
-// גולל את קונטיינר הקבוצות הנכון - לא הדף הראשי
-function scrollGroupsContainer() {
-  // חפש קונטיינר גלילה שמכיל links לקבוצות - זה דף groups/joins אז זה ה-main
-  const main = document.querySelector('[role="main"]');
-  if (main) {
-    main.scrollTop += 1200;
-    if (main.scrollTop === 0) {
-      // אם ה-main לא גולל - נסה גלילת חלון
-      window.scrollBy({ top: 1200, behavior: "instant" });
-    }
-  } else {
-    window.scrollBy({ top: 1200, behavior: "instant" });
-  }
-  // שלח אירוע גלילה כדי לעורר infinite scroll של React
-  window.dispatchEvent(new Event("scroll"));
-  document.dispatchEvent(new Event("scroll"));
 }
 
 function injectPost(content) {
