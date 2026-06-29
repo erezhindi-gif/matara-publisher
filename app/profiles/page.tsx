@@ -34,7 +34,7 @@ export default function ProfilesPage() {
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: "", fbUsername: "", edgeProfile: "Default", businessId: userBusinessId, dailyLimit: 150, whatsappPhone: "", workerEmail: "", workerPassword: "" });
+  const [form, setForm] = useState({ name: "", fbUsername: "", edgeProfile: "Default", businessId: userBusinessId, businessName: "", dailyLimit: 150, whatsappPhone: "", workerEmail: "", workerPassword: "" });
   const [businessFilter, setBusinessFilterState] = useState("all");
   const [waStatus, setWaStatus] = useState<Record<string, { status: string; qrDataUrl: string | null }>>({});
   const [serverOnline, setServerOnline] = useState<boolean | null>(null);
@@ -89,7 +89,7 @@ export default function ProfilesPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
-    setForm({ name: "", fbUsername: "", edgeProfile: "Default", businessId: userBusinessId, dailyLimit: 150, whatsappPhone: "", workerEmail: "", workerPassword: "" });
+    setForm({ name: "", fbUsername: "", edgeProfile: "Default", businessId: userBusinessId, businessName: "", dailyLimit: 150, whatsappPhone: "", workerEmail: "", workerPassword: "" });
     setShowNew(false);
     setSaving(false);
     fetchProfiles();
@@ -214,11 +214,13 @@ export default function ProfilesPage() {
               <div className="grid grid-cols-2 gap-3">
                 {isAdmin && (
                   <div>
-                    <label className="block text-sm text-gray-600 mb-1">עסק</label>
-                    <select className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900" value={form.businessId} onChange={(e) => setForm({ ...form, businessId: e.target.value })}>
-                      <option value="carpentry">נויה מטבחים</option>
-                      <option value="recruitment">מטרה - גיוס והשמה</option>
-                    </select>
+                    <label className="block text-sm text-gray-600 mb-1">שם העסק</label>
+                    <input
+                      className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900"
+                      placeholder="לדוגמה: נויה מטבחים"
+                      value={form.businessName || ""}
+                      onChange={(e) => setForm({ ...form, businessName: e.target.value })}
+                    />
                   </div>
                 )}
                 <div>

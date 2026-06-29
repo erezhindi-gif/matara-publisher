@@ -24,6 +24,19 @@ export async function POST(req: NextRequest) {
   const isAdmin = (session?.user as { role?: string })?.role === "admin";
   const body = await req.json();
 
+  // מצא או צור עסק לפי שם חופשי
+  let businessId = body.businessId;
+  if (body.businessName && body.businessName.trim()) {
+    const slug = body.businessName.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9֐-׿-]/g, "");
+    let business = await prisma.business.findFirst({ where: { name: body.businessName.trim() } });
+    if (!business) {
+      business = await prisma.business.create({
+        data: { id: slug || `business-${Date.now()}`, name: body.businessName.trim(), type: slug || "custom" },
+      });
+    }
+    businessId = business.id;
+  }
+
   // If admin provides worker credentials, create a user account linked to this profile
   let profileUserId: string | null = null;
   if (isAdmin && body.workerEmail && body.workerPassword) {
@@ -45,7 +58,7 @@ export async function POST(req: NextRequest) {
       name: body.name,
       fbUsername: body.fbUsername,
       edgeProfile: body.edgeProfile || "Default",
-      businessId: body.businessId,
+      businessId: businessId,
       dailyLimit: body.dailyLimit || 150,
       whatsappPhone: body.whatsappPhone || null,
       userId: profileUserId,
