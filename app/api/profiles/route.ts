@@ -41,16 +41,17 @@ export async function POST(req: NextRequest) {
   let profileUserId: string | null = null;
   if (isAdmin && body.workerEmail && body.workerPassword) {
     const hashed = await bcrypt.hash(body.workerPassword, 10);
-    const newUser = await prisma.user.create({
-      data: {
-        name: body.name,
-        email: body.workerEmail,
-        password: hashed,
-        role: "user",
-        businessId: body.businessId || null,
-      },
-    });
-    profileUserId = newUser.id;
+    const existing = await prisma.user.findUnique({ where: { email: body.workerEmail } });
+    if (existing) {
+      // עדכן סיסמה אם המשתמש כבר קיים
+      await prisma.user.update({ where: { email: body.workerEmail }, data: { password: hashed, businessId: businessId || null } });
+      profileUserId = existing.id;
+    } else {
+      const newUser = await prisma.user.create({
+        data: { name: body.name, email: body.workerEmail, password: hashed, role: "user", businessId: businessId || null },
+      });
+      profileUserId = newUser.id;
+    }
   }
 
   const profile = await prisma.profile.create({
