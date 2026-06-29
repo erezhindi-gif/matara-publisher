@@ -192,6 +192,10 @@ function scrapeGroups() {
   const skipWords = ["לפני", "ago", "פעילות", "הצגת", "הצטרף", "צור", "ביקור"];
 
   document.querySelectorAll('a[href*="/groups/"]').forEach((link) => {
+    // דלג על קישורים שנמצאים בתוך פוסטים בפיד
+    if (link.closest('[role="article"]')) return;
+    if (link.closest('[role="feed"]')) return;
+
     const href = link.href || "";
     const match = href.match(/facebook\.com\/groups\/([^/?#\s]+)/);
     if (!match) return;
