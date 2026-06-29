@@ -102,14 +102,16 @@ model ContactLink {
 }
 
 model SyncJob {
-  id         String   @id @default(cuid())
-  userId     String
-  businessId String
-  status     String   @default("pending")
-  groupCount Int?
-  error      String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String   @id @default(cuid())
+  userId      String
+  businessId  String
+  status      String   @default("pending")
+  groupCount  Int?
+  groupsFound Int      @default(0)
+  claimedBy   String?
+  error       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Post {
@@ -119,6 +121,7 @@ model Post {
   fbGroupId   String
   groupName   String
   status      String    @default("pending")
+  claimedBy   String?
   publishedAt DateTime?
   error       String?
   createdAt   DateTime  @default(now())

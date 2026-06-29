@@ -13,6 +13,7 @@ export default function SyncPage() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<string | null>(null);
   const [groupCount, setGroupCount] = useState<number | null>(null);
+  const [groupsFound, setGroupsFound] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -42,6 +43,7 @@ export default function SyncPage() {
       const { job } = await res.json();
       setJobStatus(job.status);
       setGroupCount(job.groupCount);
+      setGroupsFound(job.groupsFound || 0);
       if (job.error) setError(job.error);
       if (["done", "failed", "cancelled"].includes(job.status)) {
         clearInterval(pollRef.current!);
@@ -55,6 +57,7 @@ export default function SyncPage() {
     if (!profile) return;
     setError(null);
     setGroupCount(null);
+    setGroupsFound(0);
     setJobStatus("waiting");
 
     const res = await fetch("/api/extension/sync", {
@@ -135,7 +138,12 @@ export default function SyncPage() {
               <div>
                 <div className="text-2xl mb-2 animate-spin inline-block">⟳</div>
                 <div className="font-semibold text-blue-800">סורק קבוצות...</div>
-                <div className="text-sm text-blue-600 mt-1">פייסבוק נפתח ברקע</div>
+                {groupsFound > 0 && (
+                  <div className="text-3xl font-bold text-blue-700 mt-2">{groupsFound}</div>
+                )}
+                <div className="text-sm text-blue-600 mt-1">
+                  {groupsFound > 0 ? `קבוצות נמצאו עד כה` : "פייסבוק נפתח ברקע"}
+                </div>
               </div>
             )}
             {jobStatus === "done" && (

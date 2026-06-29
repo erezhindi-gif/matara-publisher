@@ -1,7 +1,13 @@
 const API_BASE = "https://matara-publisher.vercel.app";
 const POLL_INTERVAL_MINUTES = 0.5;
 
-chrome.runtime.onInstalled.addListener(() => {
+// צור deviceId יחודי לכל התקנה
+chrome.runtime.onInstalled.addListener(async () => {
+  const { deviceId } = await chrome.storage.local.get("deviceId");
+  if (!deviceId) {
+    const id = "device_" + Math.random().toString(36).slice(2) + Date.now();
+    await chrome.storage.local.set({ deviceId: id });
+  }
   chrome.alarms.create("poll", { periodInMinutes: POLL_INTERVAL_MINUTES });
   autoLogin();
 });
@@ -10,7 +16,6 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "poll") tick();
 });
 
-// כשהמשתמש פותח טאב של האתר - ננסה להתחבר אוטומטית
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url?.includes("matara-publisher.vercel.app")) {
     autoLogin();
@@ -19,23 +24,15 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 async function autoLogin() {
   try {
-    // שלח בקשה לאתר עם cookies של הדפדפן (המשתמש כבר מחובר)
-    const res = await fetch(`${API_BASE}/api/extension/token`, {
-      credentials: "include",
-    });
-    if (!res.ok) {
-      await chrome.storage.local.remove(["apiToken", "userName", "userEmail"]);
-      return;
-    }
+    const res = await fetch(`${API_BASE}/api/extension/token`, { credentials: "include" });
+    if (!res.ok) { await chrome.storage.local.remove(["apiToken", "userName", "userEmail"]); return; }
     const { token } = await res.json();
     if (!token) return;
-
-    // שמור טוקן בשקט
     const { apiToken } = await chrome.storage.local.get("apiToken");
     if (apiToken !== token) {
       await chrome.storage.local.set({ apiToken: token });
-      // קבל פרטי משתמש
-      const jobsRes = await fetch(`${API_BASE}/api/extension/jobs?token=${token}`);
+      const { deviceId } = await chrome.storage.local.get("deviceId");
+      const jobsRes = await fetch(`${API_BASE}/api/extension/jobs?token=${token}&deviceId=${deviceId || ""}`);
       if (jobsRes.ok) {
         const { user } = await jobsRes.json();
         if (user) await chrome.storage.local.set({ userName: user.name, userEmail: user.email });
@@ -46,13 +43,12 @@ async function autoLogin() {
 
 async function tick() {
   await autoLogin();
-
-  const { apiToken } = await chrome.storage.local.get("apiToken");
+  const { apiToken, deviceId } = await chrome.storage.local.get(["apiToken", "deviceId"]);
   if (!apiToken) return;
 
   try {
-    // בדוק פוסטים לפרסום
-    const jobsRes = await fetch(`${API_BASE}/api/extension/jobs?token=${apiToken}`);
+    // בדוק פוסטים
+    const jobsRes = await fetch(`${API_BASE}/api/extension/jobs?token=${apiToken}&deviceId=${deviceId || ""}`);
     if (jobsRes.ok) {
       const { posts } = await jobsRes.json();
       if (posts && posts.length > 0) {
@@ -63,8 +59,8 @@ async function tick() {
       }
     }
 
-    // בדוק משימות סנכרון
-    const syncRes = await fetch(`${API_BASE}/api/extension/sync?token=${apiToken}`);
+    // בדוק סנכרון
+    const syncRes = await fetch(`${API_BASE}/api/extension/sync?token=${apiToken}&deviceId=${deviceId || ""}`);
     if (syncRes.ok) {
       const { job } = await syncRes.json();
       if (job) await syncGroups(job, apiToken);
@@ -74,53 +70,69 @@ async function tick() {
   }
 }
 
-async function syncGroups(job, token) {
-  console.log("מתחיל סנכרון קבוצות...");
-
-  // סמן כ"בביצוע"
-  await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status: "running" }),
-  });
-
+async function publishPost(post, token) {
+  const url = `https://www.facebook.com/groups/${post.fbGroupId}`;
   return new Promise((resolve) => {
-    chrome.tabs.create({ url: "https://www.facebook.com/groups/feed/", active: false }, async (tab) => {
+    chrome.tabs.create({ url, active: false }, async (tab) => {
       await sleep(6000);
       try {
-        // גלול כמה פעמים לטעינת יותר קבוצות
-        for (let i = 0; i < 10; i++) {
-          await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            func: () => {
-              const links = document.querySelectorAll('a[href*="/groups/"]');
-              if (links.length > 0) {
-                const el = links[links.length - 1];
-                el.scrollIntoView();
-              }
-            },
-          });
-          await sleep(1500);
-        }
-
-        // סרוק קבוצות
         const results = await chrome.scripting.executeScript({
           target: { tabId: tab.id },
-          func: scrapeGroups,
+          func: injectPost,
+          args: [post.campaign.content],
         });
+        const result = results?.[0]?.result;
+        await updatePostStatus(post.id, result?.success ? "published" : "failed", result?.error || null, token);
+      } catch (err) {
+        await updatePostStatus(post.id, "failed", err.message, token);
+      } finally {
+        await sleep(2000);
+        chrome.tabs.remove(tab.id);
+        resolve();
+      }
+    });
+  });
+}
 
-        const groups = results?.[0]?.result || [];
-        console.log(`נמצאו ${groups.length} קבוצות`);
+async function syncGroups(job, token) {
+  console.log("מתחיל סנכרון...");
+  return new Promise((resolve) => {
+    chrome.tabs.create({ url: "https://www.facebook.com/groups/feed/", active: false }, async (tab) => {
+      await sleep(7000);
+      try {
+        const allGroups = new Map();
+        // גלול 20 פעמים ואחרי כל גלילה שלוף קבוצות
+        for (let i = 0; i < 20; i++) {
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: scrollGroupsSidebar,
+          });
+          await sleep(1200);
 
+          const results = await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: scrapeGroups,
+          });
+          const found = results?.[0]?.result || [];
+          for (const g of found) allGroups.set(g.fbGroupId, g);
+
+          // דווח progress
+          await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "running", groupsFound: allGroups.size }),
+          });
+        }
+
+        const groups = Array.from(allGroups.values());
         await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "done", groups }),
+          body: JSON.stringify({ status: "done", groups, groupsFound: groups.length }),
         });
 
         chrome.notifications.create({
-          type: "basic",
-          iconUrl: "icon48.png",
+          type: "basic", iconUrl: "icon48.png",
           title: "סנכרון הושלם",
           message: `נמצאו ${groups.length} קבוצות`,
         });
@@ -139,6 +151,30 @@ async function syncGroups(job, token) {
   });
 }
 
+function scrollGroupsSidebar() {
+  // נסה לגלול את הסרגל הצדדי של הקבוצות
+  const candidates = [
+    ...document.querySelectorAll('[role="navigation"]'),
+    ...document.querySelectorAll('[data-pagelet="LeftRail"]'),
+    ...document.querySelectorAll('div[style*="overflow"]'),
+  ];
+
+  for (const el of candidates) {
+    if (el.scrollHeight > el.clientHeight + 50) {
+      el.scrollTop += 800;
+      return true;
+    }
+  }
+
+  // גיבוי - גלול לפי קישורי קבוצות
+  const links = document.querySelectorAll('a[href*="/groups/"]');
+  if (links.length > 0) {
+    links[links.length - 1].scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  window.scrollBy(0, 500);
+  return true;
+}
+
 function scrapeGroups() {
   const results = [];
   const seen = new Set();
@@ -151,11 +187,12 @@ function scrapeGroups() {
     const isNumeric = /^\d+$/.test(groupId);
     const isSlug = /^[a-zA-Z0-9._-]{3,}$/.test(groupId);
     if (!isNumeric && !isSlug) return;
+    if (["feed", "discover", "create", "joins"].includes(groupId)) return;
     seen.add(groupId);
     const lines = (link.innerText || "").split("\n").map(l => l.trim()).filter(l => l.length > 2);
     let name = "";
     for (const line of lines) {
-      if (!line.includes("לפני") && !line.includes("פעילות") && line.length < 150) {
+      if (!line.includes("לפני") && !line.includes("פעילות") && !line.includes("ago") && line.length < 150) {
         name = line; break;
       }
     }
@@ -164,38 +201,7 @@ function scrapeGroups() {
   return results;
 }
 
-async function publishPost(post, token) {
-  await updateStatus(post.id, "running", null, token);
-
-  const url = `https://www.facebook.com/groups/${post.fbGroupId}`;
-
-  return new Promise((resolve) => {
-    chrome.tabs.create({ url, active: false }, async (tab) => {
-      await sleep(6000);
-      try {
-        const results = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: injectPost,
-          args: [post.campaign.content, post.campaign.imageUrls || []],
-        });
-        const result = results?.[0]?.result;
-        if (result?.success) {
-          await updateStatus(post.id, "published", null, token);
-        } else {
-          await updateStatus(post.id, "failed", result?.error || "שגיאה", token);
-        }
-      } catch (err) {
-        await updateStatus(post.id, "failed", err.message, token);
-      } finally {
-        await sleep(2000);
-        chrome.tabs.remove(tab.id);
-        resolve();
-      }
-    });
-  });
-}
-
-function injectPost(content, imageUrls) {
+function injectPost(content) {
   return new Promise(async (resolve) => {
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     try {
@@ -236,14 +242,13 @@ function injectPost(content, imageUrls) {
   });
 }
 
-async function updateStatus(postId, status, error, token) {
-  try {
-    await fetch(`${API_BASE}/api/extension/jobs/${postId}?token=${token}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, error }),
-    });
-  } catch {}
+async function updatePostStatus(postId, status, error, token) {
+  const { deviceId } = await chrome.storage.local.get("deviceId");
+  await fetch(`${API_BASE}/api/extension/jobs/${postId}?token=${token}&deviceId=${deviceId || ""}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status, error }),
+  });
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }

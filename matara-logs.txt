@@ -406,3 +406,20 @@ https://wa.me/972502808180
 [16:01:18]   [WA] whatsapp URL added after images
 [16:01:24] [PUBLISH] SUCCESS: נתניה השרון עמק חפר - פרסום חינם עסקים לוח דרושים הצעות עבודה
 [16:01:25] [PUBLISH] DONE: 1 success, 0 failed => status=done
+[14:52:30] [PUBLISH] START campaign: מנהלת חשבונות (cmqz5r3at00019bib35ffgz9a)
+[14:52:30] [PUBLISH] profile OK, killing old Edge...
+[14:52:31] [PUBLISH] launching Edge...
+[14:52:33] [PUBLISH] Edge launched, opening Facebook...
+[14:52:42] [PUBLISH] Facebook OK, logged in
+[14:52:43] [PUBLISH] 1 groups to post
+[14:52:44] [PUBLISH] WhatsApp URL: https://wa.me/972502808180
+[14:52:44] [PUBLISH] posting to group: דרושים נתניה והסביבה (394054573086469)
+[14:52:51] [PUBLISH] current URL: https://www.facebook.com/groups/394054573086469
+[14:52:53]   [CLICK] create-post: Y=713: "כאן כותבים…"
+[14:53:02]   [IMG] uploading 1 images: C:\Users\erezh\AppData\Local\Temp\matara-publisher\img-1782733963480-oh5nrc0wpxe.jpg
+[14:53:04]   [IMG] image 1/1 copied to clipboard
+[14:53:04]   [IMG] pasted image 1
+[14:53:09]   [IMG] image step complete
+[14:53:11]   [WA] whatsapp URL added after images
+[14:53:18] [PUBLISH] SUCCESS: דרושים נתניה והסביבה
+[14:53:18] [PUBLISH] DONE: 1 success, 0 failed => status=done

@@ -46,20 +46,8 @@ export default function TemplateDetailPage() {
     setLoadingGroups(true);
     setSearch("");
     setSelected(new Set());
-    // טען את כל התבניות כדי לשלוף את כל הקבוצות
-    const res = await fetch("/api/templates");
-    const templates: Template[] = await res.json();
-    const seen = new Set<string>();
-    const groups: Group[] = [];
-    for (const t of templates) {
-      for (const g of t.groups) {
-        if (!seen.has(g.fbGroupId)) {
-          seen.add(g.fbGroupId);
-          groups.push(g);
-        }
-      }
-    }
-    // הסר קבוצות שכבר בתבנית
+    const res = await fetch("/api/groups");
+    const groups: Group[] = await res.json();
     const inTemplate = new Set(template?.groups.map((g) => g.fbGroupId) || []);
     setAllGroups(groups.filter((g) => !inTemplate.has(g.fbGroupId)));
     setLoadingGroups(false);
