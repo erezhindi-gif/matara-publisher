@@ -163,61 +163,57 @@ async function syncGroups(job, token) {
 }
 
 function scrollGroupsSidebar() {
-  // בממשק עברית הסרגל בצד ימין, באנגלית בצד שמאל
-  // מחפשים כל אלמנט גלילה שמכיל קישורי קבוצות
-  const allScrollable = Array.from(document.querySelectorAll("*")).filter((el) => {
-    if (el.scrollHeight <= el.clientHeight + 50) return false;
-    const style = window.getComputedStyle(el);
-    const overflow = style.overflow + style.overflowY;
-    return overflow.includes("auto") || overflow.includes("scroll");
-  });
-
-  // מחפש את הסרגל שמכיל קישורי קבוצות
-  for (const el of allScrollable) {
-    if (el.querySelector('a[href*="/groups/"]')) {
-      el.scrollTop += 600;
-      return true;
-    }
-  }
-
-  // גיבוי - גלול לקישור האחרון של קבוצה
-  const links = document.querySelectorAll('a[href*="/groups/"]');
+  // בדף /groups/?category=joined הגלילה היא של הדף הראשי
+  window.scrollBy(0, 800);
+  // גם גלול לכרטיס האחרון
+  const links = Array.from(document.querySelectorAll('a[href*="/groups/"]'));
   if (links.length > 0) {
-    links[links.length - 1].scrollIntoView({ behavior: "smooth", block: "end" });
+    links[links.length - 1].scrollIntoView({ block: "end" });
   }
-  window.scrollBy(0, 600);
   return true;
 }
 
 function scrapeGroups() {
   const results = [];
   const seen = new Set();
-  const badWords = ["לפני", "פעילות", "ago", "לא נקרא", "חברים חדשים", "פוסט", "תמונה", "עדכון", "הצטרף", "הצטרפ", "מנהל", "אישר", "notifications", "notification"];
+  const skipIds = ["feed", "discover", "create", "joins", "joined", "category", "membership", "permalink", "posts"];
 
   document.querySelectorAll('a[href*="/groups/"]').forEach((link) => {
     const href = link.href || "";
     const match = href.match(/facebook\.com\/groups\/([^/?#\s]+)/);
     if (!match) return;
     const groupId = match[1];
+    if (skipIds.includes(groupId)) return;
     if (seen.has(groupId)) return;
-    const isNumeric = /^\d+$/.test(groupId);
-    const isSlug = /^[a-zA-Z0-9._-]{3,}$/.test(groupId);
-    if (!isNumeric && !isSlug) return;
-    if (["feed", "discover", "create", "joins", "joined", "category"].includes(groupId)) return;
-    seen.add(groupId);
+    const isValid = /^\d+$/.test(groupId) || /^[a-zA-Z0-9._-]{3,}$/.test(groupId);
+    if (!isValid) return;
 
-    // חפש שם - קח את הטקסט הקצר ביותר בלי מילים רעות
-    const lines = (link.innerText || "").split("\n").map(l => l.trim()).filter(l => l.length > 1 && l.length < 100);
     let name = "";
-    for (const line of lines) {
-      const hasBadWord = badWords.some(w => line.includes(w));
-      if (!hasBadWord) { name = line; break; }
+
+    // 1. aria-label של הקישור - הכי נקי
+    const ariaLabel = link.getAttribute("aria-label");
+    if (ariaLabel && ariaLabel.length > 1 && ariaLabel.length < 100) {
+      name = ariaLabel.trim();
     }
-    // אם לא מצאנו שם טוב - קח את השורה הקצרה ביותר
-    if (!name && lines.length > 0) {
-      name = lines.sort((a, b) => a.length - b.length)[0];
+
+    // 2. heading בתוך הקישור
+    if (!name) {
+      const heading = link.querySelector("h2, h3, h4, [role='heading']");
+      if (heading) name = (heading.innerText || "").trim();
     }
-    if (name && name.length > 1) results.push({ fbGroupId: groupId, name });
+
+    // 3. span ישיר בתוך הקישור - הכי קצר ונקי
+    if (!name) {
+      const spans = Array.from(link.querySelectorAll("span"))
+        .map(s => (s.innerText || "").trim())
+        .filter(t => t.length > 1 && t.length < 80 && !/^\d+$/.test(t) && !t.includes("לפני") && !t.includes("ago") && !t.includes("חבר"));
+      if (spans.length > 0) name = spans.sort((a, b) => a.length - b.length)[0];
+    }
+
+    if (name && name.length > 1) {
+      seen.add(groupId);
+      results.push({ fbGroupId: groupId, name });
+    }
   });
   return results;
 }
