@@ -4,67 +4,44 @@
   <meta charset="UTF-8">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; width: 300px; background: #0f172a; color: #e2e8f0; }
-    .header { background: #1e293b; padding: 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #334155; }
-    .header img { width: 32px; height: 32px; }
-    .header h1 { font-size: 16px; font-weight: bold; }
+    body { font-family: Arial, sans-serif; width: 280px; background: #0f172a; color: #e2e8f0; }
+    .header { background: #1e293b; padding: 16px; border-bottom: 1px solid #334155; }
+    .header h1 { font-size: 15px; font-weight: bold; }
+    .header p { font-size: 11px; color: #64748b; margin-top: 2px; }
     .body { padding: 16px; }
-    .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; font-size: 13px; margin-bottom: 16px; }
-    .status-connected { background: #064e3b; color: #6ee7b7; }
-    .status-disconnected { background: #450a0a; color: #fca5a5; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; }
-    .dot-green { background: #22c55e; }
+    .status { display: flex; align-items: center; gap: 10px; background: #1e293b; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .dot-green { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
     .dot-red { background: #ef4444; }
-    .user-info { background: #1e293b; border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 13px; color: #94a3b8; }
-    .user-info strong { color: #e2e8f0; display: block; margin-bottom: 4px; }
-    label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 6px; }
-    input { width: 100%; background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px; color: #e2e8f0; font-size: 13px; direction: ltr; }
-    input:focus { outline: none; border-color: #3b82f6; }
-    .btn { width: 100%; padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: bold; margin-top: 10px; }
-    .btn-primary { background: #3b82f6; color: white; }
-    .btn-primary:hover { background: #2563eb; }
-    .btn-secondary { background: #334155; color: #e2e8f0; }
-    .btn-secondary:hover { background: #475569; }
-    .error { color: #fca5a5; font-size: 12px; margin-top: 8px; }
-    .divider { height: 1px; background: #334155; margin: 16px 0; }
-    .footer { font-size: 11px; color: #475569; text-align: center; padding: 12px; }
+    .dot-yellow { background: #f59e0b; }
+    .status-text { font-size: 13px; font-weight: bold; }
+    .status-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
+    .user-box { background: #1e293b; border-radius: 12px; padding: 12px; font-size: 12px; }
+    .user-name { font-weight: bold; color: #e2e8f0; }
+    .user-email { color: #64748b; margin-top: 2px; }
+    .footer { padding: 12px 16px; font-size: 11px; color: #334155; border-top: 1px solid #1e293b; text-align: center; }
+    a { color: #3b82f6; text-decoration: none; }
   </style>
 </head>
 <body>
   <div class="header">
-    <div>
-      <h1>Matara Publisher</h1>
-      <div style="font-size:11px;color:#64748b">פרסום אוטומטי לפייסבוק</div>
-    </div>
+    <h1>Matara Publisher</h1>
+    <p>פרסום אוטומטי לקבוצות פייסבוק</p>
   </div>
-
   <div class="body">
-    <div id="statusBadge" class="status-badge status-disconnected">
-      <div class="dot dot-red" id="dot"></div>
-      <span id="statusText">לא מחובר</span>
+    <div class="status">
+      <div class="dot" id="dot"></div>
+      <div>
+        <div class="status-text" id="statusText">בודק...</div>
+        <div class="status-sub" id="statusSub"></div>
+      </div>
     </div>
-
-    <div id="userInfo" style="display:none" class="user-info">
-      <strong id="userName"></strong>
-      <span id="userEmail"></span>
-    </div>
-
-    <div id="tokenSection">
-      <label>קוד אישי (מתוך הגדרות האתר)</label>
-      <input type="text" id="tokenInput" placeholder="הדבק כאן את הקוד שלך..." />
-      <button class="btn btn-primary" id="saveBtn">התחבר</button>
-      <div id="error" class="error"></div>
-    </div>
-
-    <div id="connectedSection" style="display:none">
-      <div style="font-size:13px;color:#94a3b8;margin-bottom:8px">התוסף פועל ברקע ויפרסם אוטומטית.</div>
-      <div class="divider"></div>
-      <button class="btn btn-secondary" id="disconnectBtn">התנתק</button>
+    <div class="user-box" id="userBox" style="display:none">
+      <div class="user-name" id="userName"></div>
+      <div class="user-email" id="userEmail"></div>
     </div>
   </div>
-
-  <div class="footer">בודק פוסטים חדשים כל 30 שניות</div>
-
+  <div class="footer" id="footer"></div>
   <script src="popup.js"></script>
 </body>
 </html>
