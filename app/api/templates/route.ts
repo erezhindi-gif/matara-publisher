@@ -25,9 +25,7 @@ export async function POST(req: NextRequest) {
 
   let business = await prisma.business.findFirst({ where: { id: body.businessId } });
   if (!business) {
-    const type = body.businessId === "recruitment" ? "recruitment" : "carpentry";
-    const name = type === "recruitment" ? "מטרה - גיוס והשמה" : "נויה מטבחים";
-    business = await prisma.business.create({ data: { id: body.businessId, name, type } });
+    business = await prisma.business.create({ data: { id: body.businessId, name: body.businessName || body.businessId, type: body.businessId } });
   }
 
   const template = await prisma.groupTemplate.create({

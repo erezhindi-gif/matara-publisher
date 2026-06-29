@@ -18,7 +18,7 @@ export default function TemplatesPage() {
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newBusiness, setNewBusiness] = useState("recruitment");
+  const [newBusiness, setNewBusiness] = useState("");
   const [saving, setSaving] = useState(false);
   const [businessFilter, setBusinessFilterState] = useState("all");
 
@@ -80,15 +80,13 @@ export default function TemplatesPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-700 mb-1">עסק</label>
-                <select
+                <label className="block text-sm text-gray-700 mb-1">שם העסק</label>
+                <input
                   className="w-full bg-gray-200 border border-gray-300 rounded-xl p-3 text-gray-900"
+                  placeholder="לדוגמה: נויה מטבחים"
                   value={newBusiness}
                   onChange={(e) => setNewBusiness(e.target.value)}
-                >
-                  <option value="carpentry">נויה מטבחים</option>
-                  <option value="recruitment">מטרה - גיוס והשמה</option>
-                </select>
+                />
               </div>
               <div className="flex gap-3">
                 <button onClick={() => setShowNew(false)} className="flex-1 bg-gray-200 hover:bg-gray-300 rounded-xl p-3 transition-colors">

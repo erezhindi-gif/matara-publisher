@@ -34,10 +34,8 @@ export async function POST(req: NextRequest) {
   });
 
   if (!business) {
-    const type = body.businessId === "recruitment" ? "recruitment" : "carpentry";
-    const name = type === "recruitment" ? "מטרה - גיוס והשמה" : "נויה מטבחים";
     business = await prisma.business.create({
-      data: { id: body.businessId, name, type },
+      data: { id: body.businessId, name: body.businessName || body.businessId, type: body.businessId },
     });
   }
 

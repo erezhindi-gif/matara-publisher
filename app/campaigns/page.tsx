@@ -132,7 +132,7 @@ export default function CampaignsPage() {
                   className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-md hover:border-blue-300 transition-all group"
                 >
                   {/* Color bar by business */}
-                  <div className={`h-1.5 w-full ${c.business.type === "recruitment" ? "bg-blue-500" : "bg-orange-400"}`} />
+                  <div className={`h-1.5 w-full ${"bg-blue-500"}`} />
 
                   <div className="p-4">
                     {/* Status badge */}

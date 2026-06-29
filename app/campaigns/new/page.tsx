@@ -514,8 +514,7 @@ export default function NewCampaignPage() {
   const [dayTimes, setDayTimes] = useState<Record<number, string>>({});
   const [existingCampaigns, setExistingCampaigns] = useState<{ scheduledAt: string; title: string; templateIds: string; status: string; posts: { status: string }[] }[]>([]);
 
-  const selectedProfile = profileOptions.find((p) => p.businessId === form.businessId) || profileOptions[0];
-  const selectedBusiness = { type: selectedProfile?.businessId === "recruitment" ? "recruitment" : "carpentry" };
+  const selectedProfile = profileOptions.find((p) => p.businessId === form.businessId) || profileOptions[0];;
 
   async function generateWithAI() {
     if (!form.jobTitle) return;
@@ -529,7 +528,8 @@ export default function NewCampaignPage() {
           location: form.location,
           whatsappLink: form.whatsappLink,
           emailLink: form.emailLink,
-          businessType: selectedBusiness.type,
+          businessType: selectedProfile?.businessId || form.businessId,
+          businessName: selectedProfile?.name || "",
         }),
       });
       const data = await res.json();
@@ -652,11 +652,11 @@ export default function NewCampaignPage() {
 
               <div>
                 <label className="block text-sm text-gray-700 mb-1">
-                  {selectedBusiness.type === "recruitment" ? "שם התפקיד" : "תיאור העבודה / מוצר"}
+                  תיאור / שם תפקיד
                 </label>
                 <input
                   className="w-full bg-white border border-gray-300 rounded-xl p-3 text-gray-900"
-                  placeholder={selectedBusiness.type === "recruitment" ? "למשל: מנהל/ת חשבונות" : "למשל: מטבח שהושלם בנתניה"}
+                  placeholder="למשל: מנהל/ת חשבונות, מטבח בנתניה..."
                   value={form.jobTitle}
                   onChange={(e) => setForm({ ...form, jobTitle: e.target.value })}
                 />
