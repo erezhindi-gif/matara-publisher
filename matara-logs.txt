@@ -435,3 +435,16 @@ https://wa.me/972502808180
 [15:21:51]   [CLICK] create-post: Y=713: "כאן כותבים…"
 [15:21:55] [PUBLISH] FAILED: דרושים נתניה והסביבה - Attempted to use detached Frame '1C7403BAFCAB8440431CC12422DBD2C8'.
 [15:21:56] [PUBLISH] DONE: 0 success, 1 failed => status=failed
+[16:35:31] [PUBLISH] START campaign: למשרד מפורסם בנתניה דרוש/ה (cmqz9f83w0003i7ltbttsvh0z)
+[16:35:31] [PUBLISH] profile OK, killing old Edge...
+[16:35:31] [PUBLISH] launching Edge...
+[16:35:33] [PUBLISH] Edge launched, opening Facebook...
+[16:35:43] [PUBLISH] Facebook OK, logged in
+[16:35:44] [PUBLISH] 1 groups to post
+[16:35:44] [PUBLISH] WhatsApp URL: https://wa.me/972502808180
+[16:35:44] [PUBLISH] posting to group: דרושים נתניה והסביבה (394054573086469)
+[16:35:51] [PUBLISH] current URL: https://www.facebook.com/groups/394054573086469
+[16:35:53]   [CLICK] create-post: Y=713: "כאן כותבים…"
+[16:36:04]   [WA] whatsapp URL added (no images)
+[16:36:11] [PUBLISH] SUCCESS: דרושים נתניה והסביבה
+[16:36:11] [PUBLISH] DONE: 1 success, 0 failed => status=done

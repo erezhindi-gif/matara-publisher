@@ -9,6 +9,14 @@
     "https://www.facebook.com/*",
     "https://web.facebook.com/*"
   ],
+  "content_scripts": [
+    {
+      "matches": ["https://www.facebook.com/groups/joins/*"],
+      "js": ["content-groups.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    }
+  ],
   "background": {
     "service_worker": "background.js"
   },

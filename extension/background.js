@@ -95,34 +95,35 @@ async function publishPost(post, token) {
 }
 
 async function syncGroups(job, token) {
-  console.log("מתחיל סנכרון...");
+  console.log("מתחיל סנכרון GraphQL...");
   return new Promise((resolve) => {
     chrome.tabs.create({ url: "https://www.facebook.com/groups/joins/", active: false }, async (tab) => {
-      await sleep(10000); // המתן לטעינת הדף
+      await sleep(12000); // המתן לטעינת הדף והקריאות הראשוניות
       try {
         const allGroups = new Map();
         let noNewCount = 0;
 
-        for (let i = 0; i < 200; i++) {
+        for (let i = 0; i < 300; i++) {
           const prevSize = allGroups.size;
 
-          // שלוף קבוצות
+          // קרא קבוצות שנתפסו ע"י content-groups.js
           const results = await chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            func: scrapeGroups,
+            world: "MAIN",
+            func: () => Array.from(window.__groupsCapture?.values() || []),
           });
           const found = results?.[0]?.result || [];
           for (const g of found) allGroups.set(g.fbGroupId, g);
 
-          // גלול לתחתית
+          // גלול לתחתית לטעון עוד
           await chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            func: scrollGroupsSidebar,
+            world: "MAIN",
+            func: () => { window.scrollTo(0, document.body.scrollHeight); return document.body.scrollHeight; },
           });
 
-          await sleep(2000); // המתן לטעינת תוכן חדש
+          await sleep(2000);
 
-          // דווח progress
           if (allGroups.size !== prevSize) {
             noNewCount = 0;
             await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}`, {
@@ -132,7 +133,7 @@ async function syncGroups(job, token) {
             });
           } else {
             noNewCount++;
-            if (noNewCount >= 15) break; // 15 × 2 שניות = 30 שניות ללא חדש - סיים
+            if (noNewCount >= 10) break;
           }
         }
 
