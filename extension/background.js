@@ -97,7 +97,7 @@ async function publishPost(post, token) {
 async function syncGroups(job, token) {
   console.log("מתחיל סנכרון...");
   return new Promise((resolve) => {
-    chrome.tabs.create({ url: "https://www.facebook.com/groups/feed/", active: false }, async (tab) => {
+    chrome.tabs.create({ url: "https://www.facebook.com/groups/?category=joined", active: false }, async (tab) => {
       await sleep(7000);
       try {
         const allGroups = new Map();
@@ -192,6 +192,8 @@ function scrollGroupsSidebar() {
 function scrapeGroups() {
   const results = [];
   const seen = new Set();
+  const badWords = ["לפני", "פעילות", "ago", "לא נקרא", "חברים חדשים", "פוסט", "תמונה", "עדכון", "הצטרף", "הצטרפ", "מנהל", "אישר", "notifications", "notification"];
+
   document.querySelectorAll('a[href*="/groups/"]').forEach((link) => {
     const href = link.href || "";
     const match = href.match(/facebook\.com\/groups\/([^/?#\s]+)/);
@@ -201,16 +203,21 @@ function scrapeGroups() {
     const isNumeric = /^\d+$/.test(groupId);
     const isSlug = /^[a-zA-Z0-9._-]{3,}$/.test(groupId);
     if (!isNumeric && !isSlug) return;
-    if (["feed", "discover", "create", "joins"].includes(groupId)) return;
+    if (["feed", "discover", "create", "joins", "joined", "category"].includes(groupId)) return;
     seen.add(groupId);
-    const lines = (link.innerText || "").split("\n").map(l => l.trim()).filter(l => l.length > 2);
+
+    // חפש שם - קח את הטקסט הקצר ביותר בלי מילים רעות
+    const lines = (link.innerText || "").split("\n").map(l => l.trim()).filter(l => l.length > 1 && l.length < 100);
     let name = "";
     for (const line of lines) {
-      if (!line.includes("לפני") && !line.includes("פעילות") && !line.includes("ago") && line.length < 150) {
-        name = line; break;
-      }
+      const hasBadWord = badWords.some(w => line.includes(w));
+      if (!hasBadWord) { name = line; break; }
     }
-    if (name && name.length > 2) results.push({ fbGroupId: groupId, name });
+    // אם לא מצאנו שם טוב - קח את השורה הקצרה ביותר
+    if (!name && lines.length > 0) {
+      name = lines.sort((a, b) => a.length - b.length)[0];
+    }
+    if (name && name.length > 1) results.push({ fbGroupId: groupId, name });
   });
   return results;
 }
