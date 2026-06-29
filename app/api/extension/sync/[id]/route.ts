@@ -34,13 +34,38 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       });
     }
 
+    const now = new Date();
+    let newCount = 0;
+    let updatedCount = 0;
+    let skippedCount = 0;
+
     for (const g of groups) {
-      await prisma.group.upsert({
-        where: { fbGroupId: g.fbGroupId },
-        update: { name: g.name },
-        create: { fbGroupId: g.fbGroupId, name: g.name, templateId: template.id },
-      });
+      if (!g.fbGroupId || !g.name) { skippedCount++; continue; }
+      const normalized = g.fbGroupId.trim().toLowerCase();
+      if (!normalized.match(/^[\w.-]{2,}$/)) { skippedCount++; continue; }
+      if (!g.name || g.name.length < 2 || g.name.length > 200) { skippedCount++; continue; }
+
+      const existing = await prisma.group.findUnique({ where: { fbGroupId: normalized } });
+      if (existing) {
+        await prisma.group.update({
+          where: { fbGroupId: normalized },
+          data: { name: g.name, lastSeenAt: now },
+        });
+        updatedCount++;
+      } else {
+        await prisma.group.create({
+          data: { fbGroupId: normalized, name: g.name, templateId: template.id, lastSeenAt: now },
+        });
+        newCount++;
+      }
     }
+
+    await prisma.syncJob.update({
+      where: { id },
+      data: { groupCount: newCount + updatedCount },
+    });
+
+    return NextResponse.json({ ok: true, summary: { new: newCount, updated: updatedCount, skipped: skippedCount } });
   }
 
   return NextResponse.json({ ok: true });

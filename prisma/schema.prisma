@@ -47,6 +47,7 @@ model Group {
   fbGroupId   String        @unique
   name        String
   memberCount Int?
+  lastSeenAt  DateTime?
   template    GroupTemplate @relation(fields: [templateId], references: [id])
   templateId  String
 }

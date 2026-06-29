@@ -96,45 +96,39 @@ async function publishPost(post, token) {
 
 async function syncGroups(job, token) {
   return new Promise((resolve) => {
-    // groups/joins מציג כרטיסי קבוצות בגריד - ה-GraphQL יתפוס את הנתונים
     chrome.tabs.create({ url: "https://www.facebook.com/groups/joins/", active: false }, async (tab) => {
       await sleep(10000);
       try {
         const allGroups = new Map();
         let noNewCount = 0;
 
-        for (let i = 0; i < 300; i++) {
+        for (let i = 0; i < 400; i++) {
           const prevSize = allGroups.size;
 
-          // קרא מה-GraphQL interceptor (content-groups.js)
-          const gqlResults = await chrome.scripting.executeScript({
+          // קרא מה-GraphQL interceptor (content-groups.js שרץ ב-MAIN world)
+          const gqlResult = await chrome.scripting.executeScript({
             target: { tabId: tab.id },
             world: "MAIN",
             func: () => Array.from(window.__groupsCapture?.values() || []),
           });
-          const gqlGroups = gqlResults?.[0]?.result || [];
-          for (const g of gqlGroups) allGroups.set(g.fbGroupId, g);
+          for (const g of (gqlResult?.[0]?.result || [])) allGroups.set(g.fbGroupId, g);
 
-          // גם סרוק DOM כגיבוי
-          const domResults = await chrome.scripting.executeScript({
+          // גיבוי: סריקת DOM ישירה של כרטיסי קבוצות
+          const domResult = await chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            func: scrapeGroupCards,
+            func: scrapeJoinsPage,
           });
-          const domGroups = domResults?.[0]?.result || [];
-          for (const g of domGroups) allGroups.set(g.fbGroupId, g);
+          for (const g of (domResult?.[0]?.result || [])) allGroups.set(g.fbGroupId, g);
 
-          // גלול להטעין עוד
+          // גלול את קונטיינר הקבוצות (לא הפיד הראשי)
           await chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            func: () => {
-              window.scrollBy(0, 800);
-              document.documentElement.dispatchEvent(new Event("scroll"));
-            },
+            func: scrollGroupsContainer,
           });
 
           await sleep(2000);
 
-          if (allGroups.size !== prevSize) {
+          if (allGroups.size > prevSize) {
             noNewCount = 0;
             await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}`, {
               method: "POST",
@@ -143,7 +137,7 @@ async function syncGroups(job, token) {
             });
           } else {
             noNewCount++;
-            if (noNewCount >= 8) break;
+            if (noNewCount >= 5) break; // 5 גלילות ללא קבוצות חדשות - סיים
           }
         }
 
@@ -174,30 +168,47 @@ async function syncGroups(job, token) {
   });
 }
 
-function scrapeGroupCards() {
-  // סורק כרטיסי קבוצות בדף groups/joins - כל כרטיס הוא div עם תמונה + שם + כפתור
-  const results = [];
+// סורק את דף groups/joins - כרטיסי קבוצות בגריד, ללא פוסטים
+function scrapeJoinsPage() {
+  const SKIP_IDS = new Set(["feed","joins","joined","discover","create","your_posts","explore","membership","permalink","category","posts","join"]);
+  const SKIP_TEXT = new Set(["הצגת הקבוצה","View Group","View group","הצטרף","Join","כתוב משהו","Write something"]);
   const seen = new Set();
-  const skipIds = new Set(["feed", "discover", "create", "joins", "joined", "category", "membership", "permalink", "posts", "join", "your_posts", "explore"]);
-  const skipText = new Set(["הצגת הקבוצה", "View Group", "View group", "הצטרף", "Join"]);
+  const results = [];
 
-  document.querySelectorAll('a[href*="/groups/"]').forEach((link) => {
-    // דלג על קישורי ניווט (header/nav)
-    if (link.closest("nav") || link.closest("header") || link.closest('[role="navigation"]')) return;
-    const match = (link.href || "").match(/facebook\.com\/groups\/([^/?#\s]+)/);
-    if (!match) return;
-    const groupId = match[1];
-    if (skipIds.has(groupId)) return;
-    if (!/^[\w.-]{2,}$/.test(groupId)) return;
-    if (seen.has(groupId)) return;
-    const text = (link.innerText || link.textContent || "").trim();
-    if (!text || text.length < 2 || text.length > 150) return;
-    if (skipText.has(text)) return;
-    seen.add(groupId);
-    results.push({ fbGroupId: groupId, name: text.split("\n")[0].trim() });
+  document.querySelectorAll('a[href*="facebook.com/groups/"]').forEach((a) => {
+    if (a.closest('[role="banner"]') || a.closest('[role="navigation"]') || a.closest("header")) return;
+    const m = a.href.match(/facebook\.com\/groups\/([^/?#\s]+)/);
+    if (!m) return;
+    const id = m[1].toLowerCase();
+    if (SKIP_IDS.has(id) || !/^[\w.-]{2,80}$/.test(id)) return;
+    if (seen.has(id)) return;
+    // שם הקבוצה: שורה ראשונה שאינה פעולה
+    const raw = (a.innerText || a.textContent || "").trim();
+    const name = raw.split("\n").map(l => l.trim()).find(l => l.length >= 2 && l.length <= 150 && !SKIP_TEXT.has(l));
+    if (!name) return;
+    seen.add(id);
+    results.push({ fbGroupId: id, name });
   });
 
   return results;
+}
+
+// גולל את קונטיינר הקבוצות הנכון - לא הדף הראשי
+function scrollGroupsContainer() {
+  // חפש קונטיינר גלילה שמכיל links לקבוצות - זה דף groups/joins אז זה ה-main
+  const main = document.querySelector('[role="main"]');
+  if (main) {
+    main.scrollTop += 1200;
+    if (main.scrollTop === 0) {
+      // אם ה-main לא גולל - נסה גלילת חלון
+      window.scrollBy({ top: 1200, behavior: "instant" });
+    }
+  } else {
+    window.scrollBy({ top: 1200, behavior: "instant" });
+  }
+  // שלח אירוע גלילה כדי לעורר infinite scroll של React
+  window.dispatchEvent(new Event("scroll"));
+  document.dispatchEvent(new Event("scroll"));
 }
 
 function injectPost(content) {
