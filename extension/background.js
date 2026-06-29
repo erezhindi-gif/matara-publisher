@@ -163,26 +163,29 @@ async function syncGroups(job, token) {
 }
 
 function scrollGroupsSidebar() {
-  // נסה לגלול את הסרגל הצדדי של הקבוצות
-  const candidates = [
-    ...document.querySelectorAll('[role="navigation"]'),
-    ...document.querySelectorAll('[data-pagelet="LeftRail"]'),
-    ...document.querySelectorAll('div[style*="overflow"]'),
-  ];
+  // בממשק עברית הסרגל בצד ימין, באנגלית בצד שמאל
+  // מחפשים כל אלמנט גלילה שמכיל קישורי קבוצות
+  const allScrollable = Array.from(document.querySelectorAll("*")).filter((el) => {
+    if (el.scrollHeight <= el.clientHeight + 50) return false;
+    const style = window.getComputedStyle(el);
+    const overflow = style.overflow + style.overflowY;
+    return overflow.includes("auto") || overflow.includes("scroll");
+  });
 
-  for (const el of candidates) {
-    if (el.scrollHeight > el.clientHeight + 50) {
-      el.scrollTop += 800;
+  // מחפש את הסרגל שמכיל קישורי קבוצות
+  for (const el of allScrollable) {
+    if (el.querySelector('a[href*="/groups/"]')) {
+      el.scrollTop += 600;
       return true;
     }
   }
 
-  // גיבוי - גלול לפי קישורי קבוצות
+  // גיבוי - גלול לקישור האחרון של קבוצה
   const links = document.querySelectorAll('a[href*="/groups/"]');
   if (links.length > 0) {
-    links[links.length - 1].scrollIntoView({ behavior: "smooth", block: "center" });
+    links[links.length - 1].scrollIntoView({ behavior: "smooth", block: "end" });
   }
-  window.scrollBy(0, 500);
+  window.scrollBy(0, 600);
   return true;
 }
 
