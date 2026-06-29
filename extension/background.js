@@ -97,7 +97,7 @@ async function publishPost(post, token) {
 async function syncGroups(job, token) {
   console.log("מתחיל סנכרון...");
   return new Promise((resolve) => {
-    chrome.tabs.create({ url: "https://www.facebook.com/groups/feed/", active: false }, async (tab) => {
+    chrome.tabs.create({ url: "https://www.facebook.com/groups/joins/", active: false }, async (tab) => {
       await sleep(10000); // המתן לטעינת הדף
       try {
         const allGroups = new Map();
@@ -164,55 +164,55 @@ async function syncGroups(job, token) {
 }
 
 function scrollGroupsSidebar() {
-  // מצא את ה-container הגלילה של רשימת הקבוצות בסרגל
-  const groupLinks = Array.from(document.querySelectorAll('a[href*="/groups/"]'));
-
-  // עלה בDOM ומצא container גלילה
-  for (const link of groupLinks) {
-    let el = link.parentElement;
-    for (let i = 0; i < 12 && el; i++) {
-      const style = window.getComputedStyle(el);
-      const ov = style.overflow + style.overflowY;
-      if ((ov.includes("auto") || ov.includes("scroll")) && el.scrollHeight > el.clientHeight + 100) {
-        el.scrollTop += 600;
-        return true;
-      }
-      el = el.parentElement;
-    }
-  }
-  // גיבוי
-  window.scrollBy(0, 800);
-  return true;
+  // בדף groups/joins הגלילה היא של הדף הראשי
+  window.scrollTo(0, document.body.scrollHeight);
+  return document.body.scrollHeight;
 }
 
 function scrapeGroups() {
   const results = [];
   const seen = new Set();
   const skipIds = ["feed", "discover", "create", "joins", "joined", "category", "membership", "permalink", "posts", "join"];
-  const skipWords = ["לפני", "ago", "פעילות", "הצגת", "הצטרף", "צור", "ביקור"];
 
-  document.querySelectorAll('a[href*="/groups/"]').forEach((link) => {
-    // דלג על קישורים שנמצאים בתוך פוסטים בפיד
-    if (link.closest('[role="article"]')) return;
-    if (link.closest('[role="feed"]')) return;
-
-    const href = link.href || "";
-    const match = href.match(/facebook\.com\/groups\/([^/?#\s]+)/);
-    if (!match) return;
-    const groupId = match[1];
-    if (skipIds.includes(groupId)) return;
-    if (seen.has(groupId)) return;
-    const isValid = /^\d+$/.test(groupId) || /^[a-zA-Z0-9._-]{3,}$/.test(groupId);
-    if (!isValid) return;
-
-    // קח רק את השורה הראשונה - שם הקבוצה
-    const firstLine = (link.innerText || link.textContent || "").split("\n")[0].trim();
-    if (!firstLine || firstLine.length < 2 || firstLine.length > 150) return;
-    if (skipWords.some(w => firstLine.includes(w))) return;
-
-    seen.add(groupId);
-    results.push({ fbGroupId: groupId, name: firstLine });
+  // מצא כל אלמנט עם טקסט "הצגת הקבוצה" - אלה רק בכרטיסי הקבוצות
+  const allEls = Array.from(document.querySelectorAll("a, div, span"));
+  const viewBtns = allEls.filter(el => {
+    if (el.children.length > 0) return false; // רק עלים ב-DOM
+    const t = (el.innerText || el.textContent || "").trim();
+    return t === "הצגת הקבוצה" || t === "View Group" || t === "View group";
   });
+
+  for (const btn of viewBtns) {
+    // מצא את הקישור לקבוצה - הורה שהוא <a> עם groups
+    let groupId = null;
+    let el = btn;
+    for (let i = 0; i < 5 && el; i++) {
+      if (el.tagName === "A" && el.href && el.href.includes("/groups/")) {
+        const m = el.href.match(/facebook\.com\/groups\/([^/?#\s]+)/);
+        if (m && !skipIds.includes(m[1])) { groupId = m[1]; break; }
+      }
+      el = el.parentElement;
+    }
+    if (!groupId) continue;
+    if (seen.has(groupId)) continue;
+
+    // מצא שם קבוצה - עלה בDOM וחפש heading
+    let name = "";
+    let container = btn.parentElement;
+    for (let i = 0; i < 12 && container; i++) {
+      const h = container.querySelector("h2, h3, h4, [role='heading']");
+      if (h) {
+        const t = (h.innerText || "").trim();
+        if (t.length > 1 && t.length < 150) { name = t; break; }
+      }
+      container = container.parentElement;
+    }
+
+    if (name) {
+      seen.add(groupId);
+      results.push({ fbGroupId: groupId, name });
+    }
+  }
 
   return results;
 }
