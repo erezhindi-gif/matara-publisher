@@ -439,7 +439,7 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function syncGroups(businessId = "carpentry") {
+async function syncGroups(businessId = "carpentry", edgeProfile = "Default") {
   // סגור Edge אם פתוח, פתח מחדש עם puppeteer, וסיים בפתיחה מחדש
   let edgeWasOpen = false;
   try {
@@ -451,7 +451,7 @@ async function syncGroups(businessId = "carpentry") {
   const browser = await puppeteer.launch({
     executablePath: EDGE_PATH,
     userDataDir: EDGE_USER_DATA,
-    args: ["--profile-directory=Default", "--no-first-run"],
+    args: [`--profile-directory=${edgeProfile}`, "--no-first-run"],
     headless: false,
   });
 
@@ -608,8 +608,8 @@ const server = http.createServer(async (req, res) => {
       console.log("מתחיל סנכרון קבוצות...");
 
       try {
-        const { businessId } = JSON.parse(body || "{}");
-        const result = await syncGroups(businessId || "carpentry");
+        const { businessId, edgeProfile } = JSON.parse(body || "{}");
+        const result = await syncGroups(businessId || "carpentry", edgeProfile || "Default");
         console.log("סנכרון הסתיים:", result);
         res.writeHead(200);
         res.end(JSON.stringify(result));
