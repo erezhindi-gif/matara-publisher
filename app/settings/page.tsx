@@ -23,6 +23,8 @@ export default function SettingsPage() {
   const [businessFilter, setBusinessFilterState] = useState("all");
   const [form, setForm] = useState({ label: "", type: "whatsapp", value: "", businessId: "", isDefault: false });
   const [saving, setSaving] = useState(false);
+  const [apiToken, setApiToken] = useState<string | null>(null);
+  const [tokenCopied, setTokenCopied] = useState(false);
 
   useEffect(() => {
     setBusinessFilterState(getBusinessFilter());
@@ -30,6 +32,25 @@ export default function SettingsPage() {
     window.addEventListener("businessFilterChange", handler);
     return () => window.removeEventListener("businessFilterChange", handler);
   }, []);
+
+  useEffect(() => {
+    fetch("/api/extension/token").then((r) => r.json()).then((d) => {
+      if (d.token) setApiToken(d.token);
+    });
+  }, []);
+
+  async function regenerateToken() {
+    const res = await fetch("/api/extension/token", { method: "POST" });
+    const d = await res.json();
+    if (d.token) setApiToken(d.token);
+  }
+
+  async function copyToken() {
+    if (!apiToken) return;
+    await navigator.clipboard.writeText(apiToken);
+    setTokenCopied(true);
+    setTimeout(() => setTokenCopied(false), 2000);
+  }
 
   useEffect(() => {
     Promise.all([
@@ -207,6 +228,37 @@ export default function SettingsPage() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Extension Token */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-2">תוסף Chrome - קוד אישי</h2>
+          <p className="text-sm text-gray-500 mb-4">העתק את הקוד הזה והדבק בתוסף Matara Publisher בדפדפן שלך.</p>
+          <div className="bg-white border border-gray-200 rounded-2xl p-5">
+            {apiToken ? (
+              <div className="space-y-3">
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 font-mono text-xs text-gray-700 break-all" dir="ltr">
+                  {apiToken}
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={copyToken}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl p-3 font-semibold text-sm transition-colors"
+                  >
+                    {tokenCopied ? "✓ הועתק!" : "העתק קוד"}
+                  </button>
+                  <button
+                    onClick={regenerateToken}
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl p-3 text-sm transition-colors"
+                  >
+                    צור קוד חדש
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-gray-400 text-sm text-center py-4">טוען...</div>
+            )}
+          </div>
         </div>
 
         {/* Profiles shortcut */}

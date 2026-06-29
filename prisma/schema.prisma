@@ -87,6 +87,7 @@ model User {
   password   String
   role       String   @default("user")
   businessId String?
+  apiToken   String?  @unique
   createdAt  DateTime @default(now())
 }
 
