@@ -98,8 +98,9 @@ async function publishPost(post, token) {
 async function syncGroups(job, token) {
   let tabId = null;
   try {
+    // נווט בדיוק כמו גלישה רגילה: בית → קבוצות → הקבוצות שלך → כל הקבוצות שהצטרפת אליהן
     const tab = await new Promise((resolve) =>
-      chrome.tabs.create({ url: "https://www.facebook.com/groups/joins/", active: false }, resolve)
+      chrome.tabs.create({ url: "https://www.facebook.com/", active: false }, resolve)
     );
     tabId = tab.id;
 
@@ -124,14 +125,47 @@ async function syncGroups(job, token) {
         pending.delete(requestId);
         chrome.debugger.sendCommand({ tabId }, "Network.getResponseBody", { requestId }, (result) => {
           if (chrome.runtime.lastError || !result?.body) return;
-          extractGroupsFromGraphQL(result.body, found);
+          const text = result.base64Encoded ? atob(result.body) : result.body;
+          extractGroupsFromGraphQL(text, found);
         });
       }
     };
     chrome.debugger.onEvent.addListener(onEvent);
 
-    // המתן לטעינה הראשונית
-    await sleep(8000);
+    await sleep(4000);
+
+    // לחץ על "קבוצות" בניווט הראשי
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const link = Array.from(document.querySelectorAll('a[href*="/groups/"]'))
+          .find(a => /\/groups\/?($|\?)/.test(new URL(a.href).pathname));
+        if (link) link.click();
+      },
+    });
+    await sleep(4000);
+
+    // לחץ על "הקבוצות שלך" / "כל הקבוצות שהצטרפת אליהן" - חיפוש לפי href
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const link = document.querySelector('a[href*="/groups/joins"]')
+          || Array.from(document.querySelectorAll('a')).find(a => (a.textContent || "").includes("כל הקבוצות"));
+        if (link) link.click();
+      },
+    });
+    await sleep(6000);
+
+    // ודא שהגענו לדף הנכון - אם לא, נווט ישירות
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        if (!location.pathname.includes("/groups/joins")) {
+          location.href = "https://www.facebook.com/groups/joins/";
+        }
+      },
+    });
+    await sleep(6000);
 
     // גלול את הדף כדי לטעון עוד תוצאות (infinite scroll)
     let noNewCount = 0;
@@ -188,7 +222,12 @@ async function syncGroups(job, token) {
 
 // סורק תשובת GraphQL גולמית (JSON) ומחפש אובייקטי קבוצה - לא תלוי במבנה DOM
 function extractGroupsFromGraphQL(text, map) {
-  for (const line of text.split("\n")) {
+  // פייסבוק לפעמים מוסיפה תחילית הגנה לפני ה-JSON
+  let cleaned = text.trim();
+  if (cleaned.startsWith("for (;;);")) cleaned = cleaned.slice("for (;;);".length);
+  if (cleaned.startsWith("for(;;);")) cleaned = cleaned.slice("for(;;);".length);
+
+  for (const line of cleaned.split("\n")) {
     if (!line.trim()) continue;
     let data;
     try { data = JSON.parse(line); } catch { continue; }
