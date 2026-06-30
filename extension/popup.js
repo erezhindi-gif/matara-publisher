@@ -1,4 +1,7 @@
 async function init() {
+  const manifest = chrome.runtime.getManifest();
+  document.getElementById("version").textContent = `גרסה ${manifest.version}`;
+
   const { apiToken, userName, userEmail } = await chrome.storage.local.get(["apiToken", "userName", "userEmail"]);
 
   if (apiToken && userName) {
