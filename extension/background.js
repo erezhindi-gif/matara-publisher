@@ -170,6 +170,13 @@ async function syncGroups(job, token) {
     // גלול את הדף כדי לטעון עוד תוצאות (infinite scroll)
     let noNewCount = 0;
     for (let i = 0; i < 200; i++) {
+      // סרוק כרטיסים גלויים לפני הגלילה הבאה
+      const domResult = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: scrapeJoinedGroupCards,
+      });
+      for (const g of (domResult?.[0]?.result || [])) found.set(g.fbGroupId, g);
+
       await chrome.scripting.executeScript({
         target: { tabId },
         func: () => {
@@ -218,6 +225,53 @@ async function syncGroups(job, token) {
     try { await new Promise((resolve) => chrome.debugger.detach({ tabId }, resolve)); } catch {}
     if (tabId) chrome.tabs.remove(tabId);
   }
+}
+
+// סורק כרטיסי קבוצות בדף groups/joins - מתבסס על כפתור "הצגת הקבוצה"/"View Group"
+// שמקושר תמיד ישירות לקבוצה, ומתעלם מהסרגל הימני (התראות/שיתופים)
+function scrapeJoinedGroupCards() {
+  const SKIP_IDS = new Set(["feed", "joins", "joined", "discover", "create", "your_posts", "explore", "membership", "permalink", "category", "posts", "join"]);
+  const BTN_TEXT = new Set(["הצגת הקבוצה", "View Group", "View group", "ראה קבוצה"]);
+  const seen = new Set();
+  const results = [];
+
+  const buttons = Array.from(document.querySelectorAll("a")).filter((a) => {
+    const t = (a.innerText || a.textContent || "").trim();
+    return BTN_TEXT.has(t);
+  });
+
+  for (const btn of buttons) {
+    // דלג על כל מה שבתוך הסרגל הימני / ניווט / כותרת
+    if (btn.closest("aside") || btn.closest("nav") || btn.closest("header") || btn.closest('[role="navigation"]') || btn.closest('[role="banner"]')) continue;
+
+    const m = (btn.href || "").match(/facebook\.com\/groups\/([^/?#\s]+)/);
+    if (!m) continue;
+    const id = m[1].toLowerCase().replace(/\/$/, "");
+    if (SKIP_IDS.has(id) || !/^[\w.-]{2,80}$/.test(id) || seen.has(id)) continue;
+
+    // עלה ב-DOM למצוא את כרטיס הקבוצה (עד 10 הורים) וחפש את השם - השורה הראשונה בכרטיס
+    let card = btn;
+    let name = null;
+    for (let depth = 0; depth < 6 && card; depth++) {
+      card = card.parentElement;
+      if (!card) break;
+      const lines = (card.innerText || "").split("\n").map((l) => l.trim()).filter(Boolean);
+      const candidate = lines.find((l) =>
+        l.length >= 2 && l.length <= 150 &&
+        !BTN_TEXT.has(l) &&
+        !l.includes("ביקור האחרון") &&
+        !l.includes("לפני") &&
+        l !== "..." && l !== "···"
+      );
+      if (candidate) { name = candidate; break; }
+    }
+    if (!name) continue;
+
+    seen.add(id);
+    results.push({ fbGroupId: id, name });
+  }
+
+  return results;
 }
 
 // סורק תשובת GraphQL גולמית (JSON) ומחפש אובייקטי קבוצה - לא תלוי במבנה DOM
