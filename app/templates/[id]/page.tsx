@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
@@ -28,8 +28,17 @@ export default function TemplateDetailPage() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showPickerScrollTop, setShowPickerScrollTop] = useState(false);
+  const pickerListRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { fetchTemplate(); }, [id]);
+
+  useEffect(() => {
+    const onScroll = () => setShowScrollTop(window.scrollY > 400);
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   function fetchTemplate() {
     fetch("/api/templates")
@@ -159,7 +168,20 @@ export default function TemplateDetailPage() {
                 </div>
               </div>
 
-              <div className="overflow-y-auto flex-1 p-2">
+              <div
+                ref={pickerListRef}
+                onScroll={(e) => setShowPickerScrollTop(e.currentTarget.scrollTop > 400)}
+                className="overflow-y-auto flex-1 p-2 relative"
+              >
+                {showPickerScrollTop && (
+                  <button
+                    onClick={() => pickerListRef.current?.scrollTo({ top: 0, behavior: "smooth" })}
+                    className="sticky top-2 right-2 float-left bg-blue-600 hover:bg-blue-700 text-white rounded-full w-9 h-9 flex items-center justify-center shadow-lg z-10"
+                    title="חזור למעלה"
+                  >
+                    ↑
+                  </button>
+                )}
                 {loadingGroups ? (
                   <div className="text-center text-gray-500 py-8">טוען קבוצות...</div>
                 ) : filtered.length === 0 ? (
@@ -229,6 +251,16 @@ export default function TemplateDetailPage() {
           </div>
         )}
       </div>
+
+      {showScrollTop && (
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="fixed bottom-6 left-6 bg-blue-600 hover:bg-blue-700 text-white rounded-full w-12 h-12 flex items-center justify-center shadow-lg shadow-blue-500/30 z-40 text-xl"
+          title="חזור למעלה"
+        >
+          ↑
+        </button>
+      )}
     </main>
   );
 }

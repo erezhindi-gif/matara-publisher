@@ -448,3 +448,15 @@ https://wa.me/972502808180
 [16:36:04]   [WA] whatsapp URL added (no images)
 [16:36:11] [PUBLISH] SUCCESS: דרושים נתניה והסביבה
 [16:36:11] [PUBLISH] DONE: 1 success, 0 failed => status=done
+[16:10:05] [PUBLISH] START campaign: מחסנאי/ת ממוחשב/ת (cmr0nz1op030zybbeqad38y8q)
+[16:10:05] [PUBLISH] profile OK, killing old Edge...
+[16:10:06] [PUBLISH] launching Edge...
+[16:10:07] [PUBLISH] Edge launched, opening Facebook...
+[16:10:17] [PUBLISH] Facebook OK, logged in
+[16:10:19] [PUBLISH] 1 groups to post
+[16:10:19] [PUBLISH] WhatsApp URL: https://wa.me/972502808180
+[16:10:19] [PUBLISH] posting to group: נתניה פרסום חופשי (152777078763698)
+[16:10:28] [PUBLISH] current URL: https://www.facebook.com/groups/152777078763698
+[16:10:30]   [CLICK] create-post: Y=713: "כאן כותבים…"
+[16:10:41] [PUBLISH] FAILED: נתניה פרסום חופשי - Protocol error (Input.insertText): Target closed
+[16:10:42] [PUBLISH] DONE: 0 success, 1 failed => status=failed
