@@ -94,164 +94,132 @@ async function publishPost(post, token) {
   });
 }
 
+// סנכרון קבוצות ברמת רשת - לא תלוי במבנה ה-DOM של פייסבוק, עובד זהה על כל פרופיל
 async function syncGroups(job, token) {
-  return new Promise((resolve) => {
-    chrome.tabs.create({ url: "https://www.facebook.com/groups/feed/", active: false }, async (tab) => {
-      await sleep(10000);
-      try {
-        const allGroups = new Map();
+  let tabId = null;
+  try {
+    const tab = await new Promise((resolve) =>
+      chrome.tabs.create({ url: "https://www.facebook.com/groups/joins/", active: false }, resolve)
+    );
+    tabId = tab.id;
 
-        // שלב 1: מצא את קונטיינר הקבוצות הנכון ע"י בדיקה איזה אלמנט באמת מעלה קישורים חדשים
-        const findResult = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: findGroupsContainer,
-        });
-        const debug = findResult?.[0]?.result || [];
-        console.log("Debug containers:", JSON.stringify(debug));
+    const found = new Map();
+    let lastReportedSize = 0;
 
-        // שלב 2: גלול וסרוק
-        let noNewCount = 0;
-        for (let i = 0; i < 400; i++) {
-          const prevSize = allGroups.size;
+    await new Promise((resolve) => chrome.debugger.attach({ tabId }, "1.3", resolve));
+    await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Network.enable", {}, resolve));
 
-          const scrollResult = await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            func: scrollAndExtract,
-          });
-          const groups = scrollResult?.[0]?.result || [];
-          for (const g of groups) allGroups.set(g.fbGroupId, g);
+    const pending = new Map(); // requestId -> true (graphql request)
 
-          await sleep(2000);
+    const onEvent = (source, method, params) => {
+      if (source.tabId !== tabId) return;
 
-          if (allGroups.size > prevSize) {
-            noNewCount = 0;
-            await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ status: "running", groupsFound: allGroups.size }),
-            });
-          } else {
-            noNewCount++;
-            if (noNewCount >= 10) break;
-          }
-        }
-
-        const groups = Array.from(allGroups.values());
-        await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "done", groups, groupsFound: groups.length }),
-        });
-
-        chrome.notifications.create({
-          type: "basic", iconUrl: "icon48.png",
-          title: "סנכרון הושלם",
-          message: `נמצאו ${groups.length} קבוצות`,
-        });
-      } catch (err) {
-        await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "failed", error: err.message }),
-        });
-      } finally {
-        await sleep(1000);
-        chrome.tabs.remove(tab.id);
-        resolve();
+      if (method === "Network.responseReceived") {
+        const url = params.response?.url || "";
+        if (url.includes("/api/graphql")) pending.set(params.requestId, true);
       }
-    });
-  });
-}
 
-// מוצא את קונטיינר הקבוצות ע"י בדיקה: מגלל 500px ובודק אם עלו קישורים חדשים
-function findGroupsContainer() {
-  const SKIP_IDS = new Set(["feed","joins","joined","discover","create","your_posts","explore","membership","permalink","category","posts","join"]);
-  const debug = [];
+      if (method === "Network.loadingFinished" && pending.has(params.requestId)) {
+        const requestId = params.requestId;
+        pending.delete(requestId);
+        chrome.debugger.sendCommand({ tabId }, "Network.getResponseBody", { requestId }, (result) => {
+          if (chrome.runtime.lastError || !result?.body) return;
+          extractGroupsFromGraphQL(result.body, found);
+        });
+      }
+    };
+    chrome.debugger.onEvent.addListener(onEvent);
 
-  function countGroupLinks(el) {
-    const seen = new Set();
-    el.querySelectorAll('a[href*="/groups/"]').forEach(a => {
-      const m = a.href.match(/facebook\.com\/groups\/([^/?#\s]+)/);
-      if (m && !SKIP_IDS.has(m[1]) && /^[\w.-]{2,80}$/.test(m[1])) seen.add(m[1]);
-    });
-    return seen.size;
-  }
+    // המתן לטעינה הראשונית
+    await sleep(8000);
 
-  const candidates = Array.from(document.querySelectorAll("*")).filter(el => {
-    if (el.scrollHeight <= el.clientHeight + 50) return false;
-    const rect = el.getBoundingClientRect();
-    if (rect.width < 50 || rect.height < 100) return false;
-    return true;
-  });
+    // גלול את הדף כדי לטעון עוד תוצאות (infinite scroll)
+    let noNewCount = 0;
+    for (let i = 0; i < 200; i++) {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => {
+          window.scrollTo(0, document.body.scrollHeight);
+          window.dispatchEvent(new Event("scroll"));
+        },
+      });
+      await sleep(2500);
 
-  let bestEl = null;
-  let bestGain = 0;
-
-  candidates.forEach((el, idx) => {
-    const before = countGroupLinks(el);
-    if (before === 0) return; // אין קישורי קבוצות בכלל - לא רלוונטי
-    const prevTop = el.scrollTop;
-    el.scrollTop += 500;
-    const after = countGroupLinks(el);
-    const gain = after - before;
-    const rect = el.getBoundingClientRect();
-
-    debug.push({
-      idx,
-      tag: el.tagName,
-      role: el.getAttribute("role") || "",
-      clientH: Math.round(el.clientHeight),
-      scrollH: Math.round(el.scrollHeight),
-      linksBefore: before,
-      linksAfter: after,
-      gain,
-      x: Math.round(rect.x),
-      w: Math.round(rect.width),
-    });
-
-    if (gain > bestGain) {
-      bestGain = gain;
-      bestEl = el;
-    } else {
-      el.scrollTop = prevTop; // חזור אם לא הקונטיינר הנכון
+      if (found.size > lastReportedSize) {
+        noNewCount = 0;
+        lastReportedSize = found.size;
+        await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "running", groupsFound: found.size }),
+        });
+      } else {
+        noNewCount++;
+        if (noNewCount >= 6) break;
+      }
     }
-  });
 
-  if (bestEl) {
-    window.__syncContainer = bestEl;
+    chrome.debugger.onEvent.removeListener(onEvent);
+    await new Promise((resolve) => chrome.debugger.detach({ tabId }, resolve));
+
+    const groups = Array.from(found.values());
+    await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "done", groups, groupsFound: groups.length }),
+    });
+
+    chrome.notifications.create({
+      type: "basic", iconUrl: "icon48.png",
+      title: "סנכרון הושלם",
+      message: `נמצאו ${groups.length} קבוצות`,
+    });
+  } catch (err) {
+    await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "failed", error: err.message }),
+    });
+  } finally {
+    try { await new Promise((resolve) => chrome.debugger.detach({ tabId }, resolve)); } catch {}
+    if (tabId) chrome.tabs.remove(tabId);
   }
-
-  return debug;
 }
 
-// גולל את הקונטיינר שנמצא ומחזיר קישורי קבוצות
-function scrollAndExtract() {
-  const SKIP_IDS = new Set(["feed","joins","joined","discover","create","your_posts","explore","membership","permalink","category","posts","join"]);
-  const SKIP_TEXT = new Set(["הצגת הקבוצה","View Group","View group","הצטרף","Join"]);
+// סורק תשובת GraphQL גולמית (JSON) ומחפש אובייקטי קבוצה - לא תלוי במבנה DOM
+function extractGroupsFromGraphQL(text, map) {
+  for (const line of text.split("\n")) {
+    if (!line.trim()) continue;
+    let data;
+    try { data = JSON.parse(line); } catch { continue; }
+    walkForGroups(data, map, 0);
+  }
+}
 
-  const container = window.__syncContainer;
-  if (container) {
-    container.scrollTop += 500;
+function walkForGroups(obj, map, depth) {
+  if (!obj || typeof obj !== "object" || depth > 30) return;
+
+  const typename = obj.__typename;
+  if ((typename === "Group" || typename === "CometGroup" || typename === "GroupPage") && obj.id && typeof obj.name === "string") {
+    map.set(obj.id, { fbGroupId: obj.id, name: obj.name });
+  } else if (obj.url && typeof obj.url === "string" && typeof obj.name === "string") {
+    const m = obj.url.match(/facebook\.com\/groups\/([^/?#\s]+)/);
+    if (m) {
+      const id = m[1].replace(/\/$/, "");
+      const skip = new Set(["feed", "joins", "joined", "discover", "create", "your_posts", "explore", "membership", "permalink"]);
+      if (!skip.has(id) && /^[\w.-]{2,80}$/.test(id) && obj.name.length >= 2 && obj.name.length <= 200) {
+        map.set(id, { fbGroupId: id, name: obj.name });
+      }
+    }
   }
 
-  const scope = container || document;
-  const seen = new Set();
-  const results = [];
-
-  scope.querySelectorAll('a[href*="/groups/"]').forEach(a => {
-    const m = a.href.match(/facebook\.com\/groups\/([^/?#\s]+)/);
-    if (!m) return;
-    const id = m[1].toLowerCase().replace(/\/$/, "");
-    if (SKIP_IDS.has(id) || !/^[\w.-]{2,80}$/.test(id)) return;
-    if (seen.has(id)) return;
-    const raw = (a.innerText || a.textContent || "").trim();
-    const name = raw.split("\n").map(l => l.trim()).find(l => l.length >= 2 && l.length <= 150 && !SKIP_TEXT.has(l));
-    if (!name) return;
-    seen.add(id);
-    results.push({ fbGroupId: id, name });
-  });
-
-  return results;
+  if (Array.isArray(obj)) {
+    for (const item of obj) if (item && typeof item === "object") walkForGroups(item, map, depth + 1);
+    return;
+  }
+  for (const v of Object.values(obj)) {
+    if (v && typeof v === "object") walkForGroups(v, map, depth + 1);
+  }
 }
 
 function injectPost(content) {
