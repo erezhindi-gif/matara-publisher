@@ -35,7 +35,7 @@ export default function ProfilesPage() {
   const [showNew, setShowNew] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", fbUsername: "", edgeProfile: "Default", businessId: userBusinessId, businessName: "", dailyLimit: 150, whatsappPhone: "", workerEmail: "", workerPassword: "" });
-  const [businessFilter, setBusinessFilterState] = useState("all");
+  const [businessFilter, setBusinessFilterState] = useState(() => getBusinessFilter());
   const [waStatus, setWaStatus] = useState<Record<string, { status: string; qrDataUrl: string | null }>>({});
   const [serverOnline, setServerOnline] = useState<boolean | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);

@@ -32,10 +32,9 @@ export default function AnalyticsPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterProfileId, setFilterProfileId] = useState<string>("all");
-  const [businessFilter, setBusinessFilterState] = useState("all");
+  const [businessFilter, setBusinessFilterState] = useState(() => getBusinessFilter());
 
   useEffect(() => {
-    setBusinessFilterState(getBusinessFilter());
     const handler = () => setBusinessFilterState(getBusinessFilter());
     window.addEventListener("businessFilterChange", handler);
     return () => window.removeEventListener("businessFilterChange", handler);

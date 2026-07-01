@@ -20,14 +20,13 @@ export default function SettingsPage() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
-  const [businessFilter, setBusinessFilterState] = useState("all");
+  const [businessFilter, setBusinessFilterState] = useState(() => getBusinessFilter());
   const [form, setForm] = useState({ label: "", type: "whatsapp", value: "", businessId: "", isDefault: false });
   const [saving, setSaving] = useState(false);
   const [apiToken, setApiToken] = useState<string | null>(null);
   const [tokenCopied, setTokenCopied] = useState(false);
 
   useEffect(() => {
-    setBusinessFilterState(getBusinessFilter());
     const handler = () => setBusinessFilterState(getBusinessFilter());
     window.addEventListener("businessFilterChange", handler);
     return () => window.removeEventListener("businessFilterChange", handler);

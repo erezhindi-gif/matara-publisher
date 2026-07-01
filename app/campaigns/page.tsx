@@ -33,10 +33,9 @@ export default function CampaignsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [businessFilter, setBusinessFilterState] = useState("all");
+  const [businessFilter, setBusinessFilterState] = useState(() => getBusinessFilter());
 
   useEffect(() => {
-    setBusinessFilterState(getBusinessFilter());
     const handler = () => setBusinessFilterState(getBusinessFilter());
     window.addEventListener("businessFilterChange", handler);
     return () => window.removeEventListener("businessFilterChange", handler);

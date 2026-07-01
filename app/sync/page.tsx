@@ -9,7 +9,7 @@ type Profile = { id: string; name: string; businessId: string; userId: string | 
 export default function SyncPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedProfileId, setSelectedProfileId] = useState("");
-  const [businessFilter, setBusinessFilterState] = useState("all");
+  const [businessFilter, setBusinessFilterState] = useState(() => getBusinessFilter());
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<string | null>(null);
   const [groupCount, setGroupCount] = useState<number | null>(null);
@@ -18,7 +18,6 @@ export default function SyncPage() {
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    setBusinessFilterState(getBusinessFilter());
     const handler = () => setBusinessFilterState(getBusinessFilter());
     window.addEventListener("businessFilterChange", handler);
     return () => window.removeEventListener("businessFilterChange", handler);

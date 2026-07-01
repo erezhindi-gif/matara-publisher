@@ -84,10 +84,9 @@ export default function SchedulePage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
-  const [businessFilter, setBusinessFilterState] = useState("all");
+  const [businessFilter, setBusinessFilterState] = useState(() => getBusinessFilter());
 
   useEffect(() => {
-    setBusinessFilterState(getBusinessFilter());
     const handler = () => setBusinessFilterState(getBusinessFilter());
     window.addEventListener("businessFilterChange", handler);
     return () => window.removeEventListener("businessFilterChange", handler);

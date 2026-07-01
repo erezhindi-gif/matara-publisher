@@ -20,7 +20,7 @@ export default function TemplatesPage() {
   const [newName, setNewName] = useState("");
   const [newBusiness, setNewBusiness] = useState("");
   const [saving, setSaving] = useState(false);
-  const [businessFilter, setBusinessFilterState] = useState("all");
+  const [businessFilter, setBusinessFilterState] = useState(() => getBusinessFilter());
   const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
