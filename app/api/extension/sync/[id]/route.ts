@@ -25,8 +25,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const job = await prisma.syncJob.findUnique({ where: { id } });
     if (!job) return NextResponse.json({ ok: true });
 
+    // Find or create a template scoped to THIS user (not shared across users)
     let template = await prisma.groupTemplate.findFirst({
-      where: { businessId: job.businessId },
+      where: { businessId: job.businessId, userId: user.id },
     });
     if (!template) {
       template = await prisma.groupTemplate.create({
@@ -45,10 +46,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (!normalized.match(/^[\w.-]{2,}$/)) { skippedCount++; continue; }
       if (!g.name || g.name.length < 2 || g.name.length > 200) { skippedCount++; continue; }
 
-      const existing = await prisma.group.findUnique({ where: { fbGroupId: normalized } });
+      // Unique per (fbGroupId, templateId) - same group can exist in multiple users' templates
+      const existing = await prisma.group.findUnique({
+        where: { fbGroupId_templateId: { fbGroupId: normalized, templateId: template.id } },
+      });
       if (existing) {
         await prisma.group.update({
-          where: { fbGroupId: normalized },
+          where: { fbGroupId_templateId: { fbGroupId: normalized, templateId: template.id } },
           data: { name: g.name, lastSeenAt: now },
         });
         updatedCount++;
