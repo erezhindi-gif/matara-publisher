@@ -98,11 +98,22 @@ export default function TemplateDetailPage() {
     fetchTemplate();
   }
 
-  async function removeGroup(groupId: string) {
+  async function removeGroup(groupId: string, groupName: string) {
+    if (!confirm(`למחוק את הקבוצה "${groupName}"?`)) return;
     await fetch(`/api/templates/${id}/groups`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ groupId }),
+    });
+    fetchTemplate();
+  }
+
+  async function removeAllGroups() {
+    if (!confirm(`למחוק את כל ${template?.groups.length} הקבוצות מהתבנית?`)) return;
+    await fetch(`/api/templates/${id}/groups`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ all: true }),
     });
     fetchTemplate();
   }
@@ -136,12 +147,22 @@ export default function TemplateDetailPage() {
 
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-semibold">קבוצות בתבנית</h2>
-          <button
-            onClick={openPicker}
-            className="bg-blue-600 hover:bg-blue-700 rounded-xl px-4 py-2 text-sm font-semibold transition-colors"
-          >
-            + הוסף קבוצות
-          </button>
+          <div className="flex gap-2">
+            {template.groups.length > 0 && (
+              <button
+                onClick={removeAllGroups}
+                className="text-red-400 hover:text-red-300 border border-red-800 hover:border-red-600 rounded-xl px-3 py-2 text-sm transition-colors"
+              >
+                🗑 מחק הכל
+              </button>
+            )}
+            <button
+              onClick={openPicker}
+              className="bg-blue-600 hover:bg-blue-700 rounded-xl px-4 py-2 text-sm font-semibold transition-colors"
+            >
+              + הוסף קבוצות
+            </button>
+          </div>
         </div>
 
         {/* Picker מודאל */}
@@ -241,7 +262,7 @@ export default function TemplateDetailPage() {
                   )}
                 </div>
                 <button
-                  onClick={() => removeGroup(g.id)}
+                  onClick={() => removeGroup(g.id, g.name)}
                   className="text-gray-600 hover:text-red-400 transition-colors text-lg"
                 >
                   ✕
