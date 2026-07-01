@@ -24,8 +24,8 @@ export async function POST(req: NextRequest) {
   for (const g of groups) {
     try {
       await prisma.group.upsert({
-        where: { fbGroupId: g.fbGroupId },
-        update: { name: g.name, templateId: template.id },
+        where: { fbGroupId_templateId: { fbGroupId: g.fbGroupId, templateId: template.id } },
+        update: { name: g.name },
         create: { fbGroupId: g.fbGroupId, name: g.name, templateId: template.id },
       });
       count++;
