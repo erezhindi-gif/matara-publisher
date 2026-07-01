@@ -459,11 +459,13 @@ export default function NewCampaignPage() {
       }
     });
     fetch("/api/templates").then((r) => r.json()).then((data) => {
-      setTemplates(data);
-      // אסוף את כל הקבוצות מכל התבניות
+      const filter = getBusinessFilter();
+      const filtered = filter === "all" ? data : data.filter((t: { userId: string | null }) => t.userId === filter);
+      setTemplates(filtered);
+      // אסוף את כל הקבוצות מהתבניות המסוננות
       const seen = new Set<string>();
       const groups: { id: string; fbGroupId: string; name: string; memberCount: number | null }[] = [];
-      for (const t of data) {
+      for (const t of filtered) {
         for (const g of t.groups as { id: string; fbGroupId: string; name: string; memberCount: number | null }[]) {
           if (!seen.has(g.fbGroupId)) { seen.add(g.fbGroupId); groups.push(g); }
         }
