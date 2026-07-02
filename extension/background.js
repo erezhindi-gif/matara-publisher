@@ -122,10 +122,58 @@ async function publishPost(post, token) {
     });
     await sleep(600);
 
-    // שלח את כל הטקסט כולל שורות חדשות
-    // Facebook מקבל \n דרך insertText כשהelement ממוקד נכון
-    await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.insertText", { text: post.campaign.content }, resolve));
-    await sleep(3000);
+    // בנה את הטקסט המלא כולל קישור וואטסאפ
+    let fullText = post.campaign.content;
+    if (post.campaign.whatsappLink) fullText += `\n\n📱 ${post.campaign.whatsappLink}`;
+    if (post.campaign.emailLink) fullText += `\n✉️ ${post.campaign.emailLink}`;
+
+    await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.insertText", { text: fullText }, resolve));
+    await sleep(2000);
+
+    // העלאת תמונה אם יש
+    if (post.campaign.imageUrls && post.campaign.imageUrls.length > 0) {
+      try {
+        // לחץ על כפתור תמונה בדיאלוג
+        const imgBtnResult = await chrome.scripting.executeScript({
+          target: { tabId },
+          func: () => {
+            const btn = Array.from(document.querySelectorAll('[aria-label="תמונה/סרטון"], [aria-label="Photo/video"], [aria-label="Photo"], [aria-label="תמונה"]'))
+              .find(el => el.tagName !== 'INPUT');
+            if (btn) { btn.click(); return true; }
+            // נסה למצוא לפי אייקון תמונה
+            const allBtns = Array.from(document.querySelectorAll('[role="button"]'));
+            const photoBtn = allBtns.find(el => el.querySelector('img[src*="photo"]') || (el.getAttribute('aria-label') || '').includes('תמונ') || (el.getAttribute('aria-label') || '').includes('Photo'));
+            if (photoBtn) { photoBtn.click(); return true; }
+            return false;
+          },
+        });
+        if (imgBtnResult?.[0]?.result) {
+          await sleep(2000);
+          // העלה את התמונה הראשונה דרך fetch → blob → file input
+          const imageUrl = post.campaign.imageUrls[0];
+          await chrome.scripting.executeScript({
+            target: { tabId },
+            func: async (url) => {
+              try {
+                const res = await fetch(url);
+                const blob = await res.blob();
+                const file = new File([blob], 'image.jpg', { type: blob.type });
+                const input = document.querySelector('input[type="file"][accept*="image"]');
+                if (input) {
+                  const dt = new DataTransfer();
+                  dt.items.add(file);
+                  Object.defineProperty(input, 'files', { value: dt.files });
+                  input.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+              } catch {}
+            },
+            args: [imageUrl],
+          });
+          await sleep(3000);
+        }
+      } catch {}
+    }
+    await sleep(1000);
 
     // מצא את כפתור פרסום וקבל את המיקום שלו
     let error = null;
