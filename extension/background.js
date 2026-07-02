@@ -319,36 +319,56 @@ function injectPost(content) {
   return new Promise(async (resolve) => {
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     try {
-      await sleep(3000);
-      let writeBox = document.querySelector('[role="textbox"][contenteditable="true"]')
-        || document.querySelector('div[contenteditable="true"]');
+      await sleep(4000);
 
+      // פתח את תיבת הכתיבה אם לא פתוחה
+      let writeBox = document.querySelector('[role="textbox"][contenteditable="true"]');
       if (!writeBox) {
         const writeBtn = Array.from(document.querySelectorAll('[role="button"]'))
-          .find(el => el.textContent?.includes("כתוב") || el.textContent?.includes("Write"));
-        if (writeBtn) { writeBtn.click(); await sleep(2000); }
-        writeBox = document.querySelector('[role="textbox"][contenteditable="true"]')
-          || document.querySelector('div[contenteditable="true"]');
+          .find(el => {
+            const t = el.textContent?.trim();
+            return t === "כתוב משהו..." || t === "Write something..." || t === "כתוב פוסט..." || t?.includes("כתוב");
+          });
+        if (writeBtn) { writeBtn.click(); await sleep(2500); }
+        writeBox = document.querySelector('[role="textbox"][contenteditable="true"]');
       }
 
       if (!writeBox) { resolve({ success: false, error: "לא נמצאה תיבת כתיבה" }); return; }
 
       writeBox.click();
-      await sleep(500);
+      await sleep(600);
       writeBox.focus();
-      document.execCommand("insertText", false, content);
-      await sleep(1500);
+      await sleep(400);
 
-      const submitBtn = Array.from(document.querySelectorAll('[role="button"]'))
-        .find(el => {
-          const text = el.textContent?.trim();
-          return (text === "פרסם" || text === "Post" || text === "שתף" || text === "Share")
-            && !el.hasAttribute("disabled");
-        });
+      // הדבקה דרך clipboard API - פייסבוק מזהה אותה כהקלדה אמיתית
+      try {
+        await navigator.clipboard.writeText(content);
+        document.execCommand("paste");
+      } catch {
+        // fallback - DataTransfer
+        const dt = new DataTransfer();
+        dt.setData("text/plain", content);
+        writeBox.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true }));
+      }
+      await sleep(2000);
 
-      if (!submitBtn) { resolve({ success: false, error: "לא נמצא כפתור פרסם" }); return; }
+      // חכה שהכפתור יהיה enabled (עד 5 שניות)
+      let submitBtn = null;
+      for (let i = 0; i < 10; i++) {
+        submitBtn = Array.from(document.querySelectorAll('[role="button"]'))
+          .find(el => {
+            const text = el.textContent?.trim();
+            return (text === "פרסם" || text === "Post" || text === "שתף" || text === "Share")
+              && !el.getAttribute("aria-disabled")
+              && el.getAttribute("aria-disabled") !== "true";
+          });
+        if (submitBtn) break;
+        await sleep(500);
+      }
+
+      if (!submitBtn) { resolve({ success: false, error: "לא נמצא כפתור פרסם (הטקסט אולי לא נכנס)" }); return; }
       submitBtn.click();
-      await sleep(3000);
+      await sleep(4000);
       resolve({ success: true });
     } catch (err) {
       resolve({ success: false, error: err.message });
