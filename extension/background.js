@@ -145,7 +145,7 @@ async function publishPost(post, token) {
           const btn = Array.from(dialog.querySelectorAll('[role="button"]'))
             .find(el => {
               const t = el.textContent?.trim();
-              return (t === "פרסם" || t === "Post" || t === "שתף" || t === "Share")
+              return (t === "פרסם" || t === "פרסום" || t === "Post" || t === "שתף" || t === "Share")
                 && el.getAttribute("aria-disabled") !== "true"
                 && !el.closest('[aria-hidden="true"]');
             });
