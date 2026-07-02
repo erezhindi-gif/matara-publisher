@@ -444,6 +444,7 @@ export default function NewCampaignPage() {
   const [templateMode, setTemplateMode] = useState<"template" | "groups">("template");
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
   const [allGroups, setAllGroups] = useState<{ id: string; fbGroupId: string; name: string; memberCount: number | null }[]>([]);
+  const [groupSearch, setGroupSearch] = useState("");
   const [backgroundIndex, setBackgroundIndex] = useState<number | null>(null);
 
   useEffect(() => {
@@ -824,16 +825,23 @@ export default function NewCampaignPage() {
             {/* מצב קבוצות ידנית */}
             {templateMode === "groups" && (
               <>
-                <p className="text-gray-700">בחר קבוצות לפרסום חד-פעמי:</p>
-                {selectedGroupIds.length > 0 && (
-                  <div className="text-sm text-blue-600 font-medium">{selectedGroupIds.length} קבוצות נבחרו</div>
-                )}
+                <div className="flex items-center gap-3">
+                  <input
+                    className="flex-1 border border-gray-300 rounded-xl px-4 py-2 text-sm"
+                    placeholder="חפש קבוצה..."
+                    value={groupSearch}
+                    onChange={(e) => setGroupSearch(e.target.value)}
+                  />
+                  {selectedGroupIds.length > 0 && (
+                    <div className="text-sm text-blue-600 font-medium whitespace-nowrap">{selectedGroupIds.length} נבחרו</div>
+                  )}
+                </div>
                 <div className="space-y-2 max-h-96 overflow-y-auto">
                   {allGroups.length === 0 ? (
                     <div className="text-center text-gray-500 bg-white rounded-2xl p-8 border border-gray-200">
                       אין קבוצות - <a href="/templates" target="_blank" className="text-blue-500 hover:underline">הוסף קבוצות לתבנית</a>
                     </div>
-                  ) : allGroups.map((g) => (
+                  ) : allGroups.filter((g) => !groupSearch.trim() || g.name.toLowerCase().includes(groupSearch.toLowerCase())).map((g) => (
                     <div
                       key={g.fbGroupId}
                       onClick={() => setSelectedGroupIds((prev) => prev.includes(g.fbGroupId) ? prev.filter((id) => id !== g.fbGroupId) : [...prev, g.fbGroupId])}
