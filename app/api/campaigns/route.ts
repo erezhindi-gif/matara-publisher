@@ -9,8 +9,10 @@ export async function GET() {
     const session = await getServerSession(authOptions);
     const isAdmin = (session?.user as { role?: string })?.role === "admin";
     const userId = (session?.user as { id?: string })?.id;
+    const businessId = (session?.user as { businessId?: string })?.businessId;
 
-    const where = (!session || isAdmin) ? {} : { userId };
+    // אדמין רואה הכל, משתמש רגיל רואה קמפיינים של העסק שלו
+    const where = (!session || isAdmin) ? {} : businessId ? { businessId } : { userId };
 
     const campaigns = await prisma.campaign.findMany({
       where,
