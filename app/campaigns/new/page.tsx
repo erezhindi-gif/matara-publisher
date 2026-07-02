@@ -490,6 +490,14 @@ export default function NewCampaignPage() {
     content: "",
   });
 
+  // עדכן whatsappLink אוטומטי כשמשתנה businessId או contactLinks
+  useEffect(() => {
+    if (!contactLinks.length) return;
+    const waLink = contactLinks.find((l) => l.type === "whatsapp" && l.businessId === form.businessId)
+      || contactLinks.find((l) => l.type === "whatsapp");
+    if (waLink) setForm((f) => ({ ...f, whatsappLink: waLink.value }));
+  }, [form.businessId, contactLinks]);
+
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [uploadingImages, setUploadingImages] = useState(false);

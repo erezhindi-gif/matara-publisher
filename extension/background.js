@@ -167,9 +167,10 @@ async function publishPost(post, token) {
         const clickResult = await chrome.scripting.executeScript({
           target: { tabId },
           func: () => {
-            // נסה aria-label מדויק
+            // נסה aria-label מדויק - כולל "תמונה או סרטון" (הנוסח בעברית)
+            const LABELS = ['תמונה או סרטון','תמונה/סרטון','Photo/video','Photo or video','Photo','תמונה','Image','Add photos/videos','תמונות/סרטונים'];
             const exact = Array.from(document.querySelectorAll('[aria-label]'))
-              .find(el => el.tagName !== 'INPUT' && ['תמונה/סרטון','Photo/video','Photo','תמונה','Image','Add photos/videos'].includes(el.getAttribute('aria-label')));
+              .find(el => el.tagName !== 'INPUT' && LABELS.includes(el.getAttribute('aria-label')));
             if (exact) { exact.click(); return 'exact:' + exact.getAttribute('aria-label'); }
 
             // נסה חלקי
