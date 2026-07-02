@@ -73,6 +73,7 @@ async function tick() {
 async function publishPost(post, token) {
   const url = `https://www.facebook.com/groups/${post.fbGroupId}`;
   let tabId = null;
+  let success = false;
   try {
     const tab = await new Promise((resolve) => chrome.tabs.create({ url, active: false }, resolve));
     tabId = tab.id;
@@ -121,21 +122,12 @@ async function publishPost(post, token) {
     });
     await sleep(600);
 
-    // שלח טקסט שורה אחר שורה - Input.insertText לא מטפל ב-\n בפייסבוק
-    const lines = post.campaign.content.split('\n');
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i]) {
-        await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.insertText", { text: lines[i] }, resolve));
-      }
-      if (i < lines.length - 1) {
-        await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", keyCode: 13, windowsVirtualKeyCode: 13 }, resolve));
-        await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", keyCode: 13, windowsVirtualKeyCode: 13 }, resolve));
-      }
-    }
-    await sleep(2000);
+    // שלח את כל הטקסט כולל שורות חדשות
+    // Facebook מקבל \n דרך insertText כשהelement ממוקד נכון
+    await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.insertText", { text: post.campaign.content }, resolve));
+    await sleep(3000);
 
     // מצא את כפתור פרסום וקבל את המיקום שלו
-    let success = false;
     let error = null;
     for (let i = 0; i < 12; i++) {
       const results = await chrome.scripting.executeScript({
@@ -165,16 +157,21 @@ async function publishPost(post, token) {
       await sleep(500);
     }
     if (!success) error = "לא נמצא כפתור פרסום";
-    await sleep(5000);
+    if (success) {
+      // פייסבוק צריך זמן לעבד ולסגור את הדיאלוג לאחר הלחיצה
+      await sleep(7000);
+    }
     await updatePostStatus(post.id, success ? "published" : "failed", error, token);
   } catch (err) {
     await updatePostStatus(post.id, "failed", err.message, token);
   } finally {
     try { await new Promise((resolve) => chrome.debugger.detach({ tabId }, resolve)); } catch {}
     if (tabId) {
-      // נווט ל-about:blank לפני סגירה - מונע דיאלוג "האם לעזוב?"
-      try { await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Page.navigate", { url: "about:blank" }, resolve)); } catch {}
-      await sleep(1000);
+      if (!success) {
+        // רק אם נכשל - נווט ל-blank כדי להימנע מדיאלוג עזיבה
+        try { await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Page.navigate", { url: "about:blank" }, resolve)); } catch {}
+        await sleep(500);
+      }
       chrome.tabs.remove(tabId);
     }
   }
