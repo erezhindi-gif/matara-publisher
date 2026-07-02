@@ -384,15 +384,32 @@ export default function CampaignDetailPage() {
 
             {campaign.posts.length > 0 && (
               <div className="bg-white border border-gray-200 rounded-2xl p-5">
-                <div className="text-sm text-gray-500 mb-3">
-                  {campaign.posts.filter(p => p.status === "published").length}/{campaign.posts.length} קבוצות פורסמו
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-sm text-gray-500">
+                    {campaign.posts.filter(p => p.status === "published").length}/{campaign.posts.length} קבוצות פורסמו
+                  </div>
+                  {campaign.posts.some(p => p.status === "failed") && (
+                    <button
+                      onClick={async () => {
+                        await fetch(`/api/campaigns/${id}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ retryFailed: true }),
+                        });
+                        fetchCampaign();
+                      }}
+                      className="text-xs bg-orange-100 hover:bg-orange-200 text-orange-700 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      🔄 נסה שוב נכשלים
+                    </button>
+                  )}
                 </div>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {campaign.posts.map((p) => (
                     <div key={p.id} className="flex items-center justify-between text-sm">
                       <span className="text-gray-700">{p.groupName}</span>
-                      <span className={p.status === "published" ? "text-green-600" : p.status === "failed" ? "text-red-600" : "text-gray-400"}>
-                        {p.status === "published" ? "✓ פורסם" : p.status === "failed" ? "✗ נכשל" : "ממתין"}
+                      <span className={p.status === "published" ? "text-green-600" : p.status === "failed" ? "text-red-600" : p.status === "running" ? "text-purple-600" : "text-gray-400"}>
+                        {p.status === "published" ? "✓ פורסם" : p.status === "failed" ? "✗ נכשל" : p.status === "running" ? "⏳ מפרסם..." : "ממתין"}
                       </span>
                     </div>
                   ))}

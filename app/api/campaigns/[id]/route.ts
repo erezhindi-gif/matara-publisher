@@ -19,7 +19,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (Array.isArray(body.templateIds)) data.templateIds = JSON.stringify(body.templateIds);
   if (Array.isArray(body.groupIds)) data.groupIds = JSON.stringify(body.groupIds);
 
-  const campaign = await prisma.campaign.update({ where: { id }, data, include: { posts: true } });
+  // אפס פוסטים נכשלים אם ביקשו retry
+  if (body.retryFailed) {
+    await prisma.post.updateMany({
+      where: { campaignId: id, status: "failed" },
+      data: { status: "pending", claimedBy: null, error: null },
+    });
+  }
+
+  const campaign = await prisma.campaign.update({ where: { id }, data: Object.fromEntries(Object.entries(data).filter(([k]) => k !== "retryFailed")), include: { posts: true } });
 
   // כשמאשרים קמפיין - צור Post לכל קבוצה אם עדיין אין
   if (body.status === "approved" && campaign.posts.length === 0) {
