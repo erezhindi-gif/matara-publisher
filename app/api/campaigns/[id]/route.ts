@@ -18,7 +18,47 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.scheduledAt) data.scheduledAt = new Date(body.scheduledAt);
   if (Array.isArray(body.templateIds)) data.templateIds = JSON.stringify(body.templateIds);
   if (Array.isArray(body.groupIds)) data.groupIds = JSON.stringify(body.groupIds);
-  const campaign = await prisma.campaign.update({ where: { id }, data });
+
+  const campaign = await prisma.campaign.update({ where: { id }, data, include: { posts: true } });
+
+  // כשמאשרים קמפיין - צור Post לכל קבוצה אם עדיין אין
+  if (body.status === "approved" && campaign.posts.length === 0) {
+    const groupIds: string[] = (() => {
+      try { return JSON.parse(campaign.groupIds || "[]"); } catch { return []; }
+    })();
+    const templateIds: string[] = (() => {
+      try { return JSON.parse(campaign.templateIds || "[]"); } catch { return []; }
+    })();
+
+    const groupsFromTemplates = templateIds.length > 0
+      ? await prisma.group.findMany({ where: { templateId: { in: templateIds } } })
+      : [];
+
+    const directGroups = groupIds.length > 0
+      ? await prisma.group.findMany({ where: { fbGroupId: { in: groupIds } } })
+      : [];
+
+    const allGroups = [...groupsFromTemplates, ...directGroups];
+    const seen = new Set<string>();
+    const unique = allGroups.filter((g) => {
+      if (seen.has(g.fbGroupId)) return false;
+      seen.add(g.fbGroupId);
+      return true;
+    });
+
+    if (unique.length > 0) {
+      await prisma.post.createMany({
+        data: unique.map((g) => ({
+          campaignId: id,
+          fbGroupId: g.fbGroupId,
+          groupName: g.name,
+          status: "pending",
+        })),
+        skipDuplicates: true,
+      });
+    }
+  }
+
   return NextResponse.json(campaign);
 }
 
