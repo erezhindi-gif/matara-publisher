@@ -81,17 +81,29 @@ async function publishPost(post, token) {
     // חבר debugger לשליחת קלט אמיתי (React מזהה Input.insertText)
     await new Promise((resolve) => chrome.debugger.attach({ tabId }, "1.3", resolve));
 
-    // לחץ על כפתור "כתוב משהו" לפתיחת דיאלוג פוסט חדש
+    // לחץ על אזור הכתיבה הראשי של הקבוצה (לא תגובה)
     await chrome.scripting.executeScript({
       target: { tabId },
       func: () => {
-        // חפש את כפתור "כתוב משהו..." - תיבת הפוסט הראשית (לא תגובה)
-        const writeBtn = Array.from(document.querySelectorAll('[role="button"]'))
-          .find(el => {
-            const t = el.textContent?.trim();
-            return t === "כתוב משהו..." || t === "Write something..." || t === "מה תרצה לשתף?" || t === "What's on your mind?";
+        // נסה למצוא את תיבת "כאן כותבים" / "כתוב משהו" - תמיד בחלק העליון של הדף
+        // מחפש placeholder טקסט באזורי כתיבה ראשיים
+        const PLACEHOLDERS = ["כאן כותבים", "כתוב משהו", "Write something", "What's on your mind", "מה תרצה לשתף"];
+
+        // אפשרות 1: contenteditable עם placeholder
+        let target = Array.from(document.querySelectorAll('[contenteditable]')).find(el => {
+          const ph = el.getAttribute('aria-placeholder') || el.getAttribute('placeholder') || el.textContent || '';
+          return PLACEHOLDERS.some(p => ph.includes(p));
+        });
+
+        // אפשרות 2: כפתור עם טקסט מתאים
+        if (!target) {
+          target = Array.from(document.querySelectorAll('[role="button"]')).find(el => {
+            const t = el.textContent?.trim() || '';
+            return PLACEHOLDERS.some(p => t.includes(p));
           });
-        if (writeBtn) writeBtn.click();
+        }
+
+        if (target) target.click();
       },
     });
     await sleep(3000);
@@ -100,7 +112,6 @@ async function publishPost(post, token) {
     await chrome.scripting.executeScript({
       target: { tabId },
       func: () => {
-        // תיבת הכתיבה בדיאלוג הפוסט - חפש בתוך dialog או aria-modal
         const dialog = document.querySelector('[role="dialog"]') || document.querySelector('[aria-modal="true"]');
         const box = dialog
           ? dialog.querySelector('[role="textbox"][contenteditable="true"]')
