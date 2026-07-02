@@ -131,47 +131,94 @@ async function publishPost(post, token) {
     await sleep(2000);
 
     // העלאת תמונה אם יש
+    let imgLog = [];
     if (post.campaign.imageUrls && post.campaign.imageUrls.length > 0) {
       try {
-        // לחץ על כפתור תמונה בדיאלוג
-        const imgBtnResult = await chrome.scripting.executeScript({
+        const imageUrl = post.campaign.imageUrls[0];
+        imgLog.push("1.התחיל העלאת תמונה: " + imageUrl);
+
+        // הורד תמונה לקובץ מקומי
+        const localPath = await downloadImageToLocal(imageUrl);
+        imgLog.push("2.הורד לנתיב: " + localPath);
+
+        // המר נתיב Windows ל-forward slashes (CDP דורש זאת)
+        const cdpPath = localPath.replace(/\\/g, '/');
+
+        // הפעל יירוט דיאלוג קבצים לפני הלחיצה
+        let interceptErr = null;
+        await new Promise(resolve =>
+          chrome.debugger.sendCommand({ tabId }, "Page.setInterceptFileChooserDialog", { enabled: true }, () => {
+            if (chrome.runtime.lastError) interceptErr = chrome.runtime.lastError.message;
+            resolve();
+          })
+        );
+        imgLog.push("3.יירוט דיאלוג: " + (interceptErr || "OK"));
+
+        // הכן listener לאירוע fileChooserOpened
+        let fileChooserResolve;
+        const fileChooserPromise = new Promise(r => fileChooserResolve = r);
+        const onFileChooser = (source, method) => {
+          if (source.tabId !== tabId) return;
+          if (method === "Page.fileChooserOpened") { imgLog.push("4.fileChooserOpened!"); fileChooserResolve(true); }
+        };
+        chrome.debugger.onEvent.addListener(onFileChooser);
+
+        // לחץ על כפתור תמונה - חפש aria-labels שונים
+        const clickResult = await chrome.scripting.executeScript({
           target: { tabId },
           func: () => {
-            const btn = Array.from(document.querySelectorAll('[aria-label="תמונה/סרטון"], [aria-label="Photo/video"], [aria-label="Photo"], [aria-label="תמונה"]'))
-              .find(el => el.tagName !== 'INPUT');
-            if (btn) { btn.click(); return true; }
-            // נסה למצוא לפי אייקון תמונה
-            const allBtns = Array.from(document.querySelectorAll('[role="button"]'));
-            const photoBtn = allBtns.find(el => el.querySelector('img[src*="photo"]') || (el.getAttribute('aria-label') || '').includes('תמונ') || (el.getAttribute('aria-label') || '').includes('Photo'));
-            if (photoBtn) { photoBtn.click(); return true; }
-            return false;
+            // נסה aria-label מדויק
+            const exact = Array.from(document.querySelectorAll('[aria-label]'))
+              .find(el => el.tagName !== 'INPUT' && ['תמונה/סרטון','Photo/video','Photo','תמונה','Image','Add photos/videos'].includes(el.getAttribute('aria-label')));
+            if (exact) { exact.click(); return 'exact:' + exact.getAttribute('aria-label'); }
+
+            // נסה חלקי
+            const partial = Array.from(document.querySelectorAll('[aria-label]'))
+              .find(el => el.tagName !== 'INPUT' && /(תמונ|photo|image|video)/i.test(el.getAttribute('aria-label') || ''));
+            if (partial) { partial.click(); return 'partial:' + partial.getAttribute('aria-label'); }
+
+            // הצג כל aria-labels שיש
+            const labels = Array.from(document.querySelectorAll('[aria-label]')).map(el => el.getAttribute('aria-label')).filter(Boolean).slice(0,20);
+            return 'notfound:' + labels.join('|');
           },
         });
-        if (imgBtnResult?.[0]?.result) {
-          await sleep(2000);
-          // העלה את התמונה הראשונה דרך fetch → blob → file input
-          const imageUrl = post.campaign.imageUrls[0];
-          await chrome.scripting.executeScript({
-            target: { tabId },
-            func: async (url) => {
-              try {
-                const res = await fetch(url);
-                const blob = await res.blob();
-                const file = new File([blob], 'image.jpg', { type: blob.type });
-                const input = document.querySelector('input[type="file"][accept*="image"]');
-                if (input) {
-                  const dt = new DataTransfer();
-                  dt.items.add(file);
-                  Object.defineProperty(input, 'files', { value: dt.files });
-                  input.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-              } catch {}
-            },
-            args: [imageUrl],
-          });
-          await sleep(3000);
+        imgLog.push("5.כפתור תמונה: " + (clickResult?.[0]?.result || 'null'));
+
+        // המתן לפתיחת בורר הקבצים (עד 6 שניות)
+        const opened = await Promise.race([
+          fileChooserPromise,
+          new Promise(r => setTimeout(() => r(false), 6000))
+        ]);
+        chrome.debugger.onEvent.removeListener(onFileChooser);
+        imgLog.push("6.fileChooser נפתח: " + opened);
+
+        if (opened) {
+          let handleErr = null;
+          await new Promise(resolve =>
+            chrome.debugger.sendCommand({ tabId }, "Page.handleFileChooser", {
+              action: "accept",
+              files: [cdpPath]
+            }, () => {
+              if (chrome.runtime.lastError) handleErr = chrome.runtime.lastError.message;
+              resolve();
+            })
+          );
+          imgLog.push("7.handleFileChooser: " + (handleErr || "OK"));
+          await sleep(4000);
         }
-      } catch {}
+
+        // בטל יירוט
+        await new Promise(resolve =>
+          chrome.debugger.sendCommand({ tabId }, "Page.setInterceptFileChooserDialog", { enabled: false }, resolve)
+        );
+      } catch (imgErr) {
+        imgLog.push("שגיאה: " + imgErr.message);
+      }
+      console.log("IMG_LOG:", imgLog.join(" | "));
+      // שלח לוג לשרת כדי לאבחן
+      if (imgLog.length > 0) {
+        await updatePostNote(post.id, imgLog.join(" | "), token);
+      }
     }
     await sleep(1000);
 
@@ -505,6 +552,58 @@ function injectPost(content) {
       resolve({ success: false, error: err.message });
     }
   });
+}
+
+async function downloadImageToLocal(imageUrl) {
+  const response = await fetch(imageUrl);
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+
+  return new Promise((resolve, reject) => {
+    let downloadId;
+
+    const onChange = (delta) => {
+      if (delta.id !== downloadId) return;
+      if (delta.state?.current === 'complete') {
+        chrome.downloads.onChanged.removeListener(onChange);
+        chrome.downloads.search({ id: downloadId }, (items) => {
+          URL.revokeObjectURL(objectUrl);
+          if (items[0]?.filename) resolve(items[0].filename);
+          else reject(new Error('לא נמצא שם קובץ לאחר הורדה'));
+        });
+      } else if (delta.state?.current === 'interrupted') {
+        chrome.downloads.onChanged.removeListener(onChange);
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('הורדה הופסקה'));
+      }
+    };
+
+    chrome.downloads.onChanged.addListener(onChange);
+
+    chrome.downloads.download({
+      url: objectUrl,
+      filename: 'matara_image.jpg',
+      conflictAction: 'overwrite',
+      saveAs: false,
+    }, (id) => {
+      if (chrome.runtime.lastError) {
+        chrome.downloads.onChanged.removeListener(onChange);
+        URL.revokeObjectURL(objectUrl);
+        reject(chrome.runtime.lastError);
+        return;
+      }
+      downloadId = id;
+    });
+  });
+}
+
+async function updatePostNote(postId, note, token) {
+  const { deviceId } = await chrome.storage.local.get("deviceId");
+  await fetch(`${API_BASE}/api/extension/jobs/${postId}?token=${token}&deviceId=${deviceId || ""}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ note }),
+  }).catch(() => {});
 }
 
 async function updatePostStatus(postId, status, error, token) {

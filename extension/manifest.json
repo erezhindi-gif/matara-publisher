@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Matara Publisher",
-  "version": "2.11.0",
+  "version": "2.13.0",
   "description": "פרסום אוטומטי לקבוצות פייסבוק",
-  "permissions": ["tabs", "storage", "alarms", "scripting", "notifications", "debugger"],
+  "permissions": ["tabs", "storage", "alarms", "scripting", "notifications", "debugger", "downloads"],
   "host_permissions": [
     "https://matara-publisher.vercel.app/*",
     "https://www.facebook.com/*",

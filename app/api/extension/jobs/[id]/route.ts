@@ -9,7 +9,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const user = await prisma.user.findUnique({ where: { apiToken: token } });
   if (!user) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
 
-  const { status, error } = await req.json();
+  const { status, error, note } = await req.json();
+
+  // note בלבד - שמור ב-error field לצורך דיאגנוסטיקה, ללא שינוי סטטוס
+  if (note && !status) {
+    await prisma.post.update({ where: { id }, data: { error: note } });
+    return NextResponse.json({ ok: true });
+  }
 
   const post = await prisma.post.update({
     where: { id },
