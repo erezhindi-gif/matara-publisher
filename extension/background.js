@@ -121,8 +121,17 @@ async function publishPost(post, token) {
     });
     await sleep(600);
 
-    // שלח טקסט אמיתי דרך Input.insertText - React מזהה זאת כקלט אמיתי
-    await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.insertText", { text: post.campaign.content }, resolve));
+    // שלח טקסט שורה אחר שורה - Input.insertText לא מטפל ב-\n בפייסבוק
+    const lines = post.campaign.content.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i]) {
+        await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.insertText", { text: lines[i] }, resolve));
+      }
+      if (i < lines.length - 1) {
+        await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", keyCode: 13, windowsVirtualKeyCode: 13 }, resolve));
+        await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", keyCode: 13, windowsVirtualKeyCode: 13 }, resolve));
+      }
+    }
     await sleep(2000);
 
     // חכה שכפתור פרסם יהיה פעיל ולחץ עליו (חיפוש בתוך הדיאלוג בלבד)
@@ -155,9 +164,9 @@ async function publishPost(post, token) {
   } finally {
     try { await new Promise((resolve) => chrome.debugger.detach({ tabId }, resolve)); } catch {}
     if (tabId) {
-      // בטל beforeunload לפני סגירה כדי למנוע דיאלוג "האם לעזוב את האתר?"
-      try { await chrome.scripting.executeScript({ target: { tabId }, func: () => { window.onbeforeunload = null; } }); } catch {}
-      await sleep(500);
+      // נווט ל-about:blank לפני סגירה - מונע דיאלוג "האם לעזוב?"
+      try { await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Page.navigate", { url: "about:blank" }, resolve)); } catch {}
+      await sleep(1000);
       chrome.tabs.remove(tabId);
     }
   }
