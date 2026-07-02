@@ -81,32 +81,34 @@ async function publishPost(post, token) {
     // חבר debugger לשליחת קלט אמיתי (React מזהה Input.insertText)
     await new Promise((resolve) => chrome.debugger.attach({ tabId }, "1.3", resolve));
 
-    // פתח תיבת כתיבה אם לא פתוחה
+    // לחץ על כפתור "כתוב משהו" לפתיחת דיאלוג פוסט חדש
     await chrome.scripting.executeScript({
       target: { tabId },
       func: () => {
-        const writeBox = document.querySelector('[role="textbox"][contenteditable="true"]');
-        if (!writeBox) {
-          const btn = Array.from(document.querySelectorAll('[role="button"]'))
-            .find(el => { const t = el.textContent?.trim(); return t === "כתוב משהו..." || t === "Write something..." || t?.includes("כתוב"); });
-          if (btn) btn.click();
-        } else {
-          writeBox.click();
-          writeBox.focus();
-        }
+        // חפש את כפתור "כתוב משהו..." - תיבת הפוסט הראשית (לא תגובה)
+        const writeBtn = Array.from(document.querySelectorAll('[role="button"]'))
+          .find(el => {
+            const t = el.textContent?.trim();
+            return t === "כתוב משהו..." || t === "Write something..." || t === "מה תרצה לשתף?" || t === "What's on your mind?";
+          });
+        if (writeBtn) writeBtn.click();
       },
     });
-    await sleep(2500);
+    await sleep(3000);
 
-    // לחץ על תיבת הכתיבה דרך debugger
+    // וודא שה-focus על תיבת הכתיבה בדיאלוג (לא תגובה)
     await chrome.scripting.executeScript({
       target: { tabId },
       func: () => {
-        const box = document.querySelector('[role="textbox"][contenteditable="true"]');
+        // תיבת הכתיבה בדיאלוג הפוסט - חפש בתוך dialog או aria-modal
+        const dialog = document.querySelector('[role="dialog"]') || document.querySelector('[aria-modal="true"]');
+        const box = dialog
+          ? dialog.querySelector('[role="textbox"][contenteditable="true"]')
+          : document.querySelector('[role="textbox"][contenteditable="true"]');
         if (box) { box.click(); box.focus(); }
       },
     });
-    await sleep(500);
+    await sleep(600);
 
     // שלח טקסט אמיתי דרך Input.insertText - React מזהה זאת כקלט אמיתי
     await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.insertText", { text: post.campaign.content }, resolve));
