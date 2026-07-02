@@ -121,27 +121,17 @@ async function publishPost(post, token) {
     });
     await sleep(600);
 
-    // הפעל Page events כדי לטפל בדיאלוגים (כגון "האם לעזוב את האתר?")
-    await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Page.enable", {}, resolve));
-    chrome.debugger.onEvent.addListener(function dialogHandler(source, method, params) {
-      if (source.tabId !== tabId) return;
-      if (method === "Page.javascriptDialogOpening") {
-        chrome.debugger.sendCommand({ tabId }, "Page.handleJavaScriptDialog", { accept: true });
-      }
-    });
-
     // שלח טקסט אמיתי דרך Input.insertText - React מזהה זאת כקלט אמיתי
     await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.insertText", { text: post.campaign.content }, resolve));
     await sleep(2000);
 
-    // חכה שכפתור פרסם יהיה פעיל ולחץ עליו
+    // חכה שכפתור פרסם יהיה פעיל ולחץ עליו (חיפוש בתוך הדיאלוג בלבד)
     let success = false;
     let error = null;
     for (let i = 0; i < 12; i++) {
       const results = await chrome.scripting.executeScript({
         target: { tabId },
         func: () => {
-          // חפש בתוך הדיאלוג הפתוח (חלון כתיבת פוסט)
           const dialog = document.querySelector('[role="dialog"]') || document.querySelector('[aria-modal="true"]') || document;
           const btn = Array.from(dialog.querySelectorAll('[role="button"]'))
             .find(el => {
@@ -150,11 +140,7 @@ async function publishPost(post, token) {
                 && el.getAttribute("aria-disabled") !== "true"
                 && !el.closest('[aria-hidden="true"]');
             });
-          if (btn) {
-            btn.scrollIntoView();
-            btn.click();
-            return { clicked: true, text: btn.textContent?.trim() };
-          }
+          if (btn) { btn.scrollIntoView(); btn.click(); return { clicked: true }; }
           return { clicked: false };
         },
       });
@@ -168,7 +154,12 @@ async function publishPost(post, token) {
     await updatePostStatus(post.id, "failed", err.message, token);
   } finally {
     try { await new Promise((resolve) => chrome.debugger.detach({ tabId }, resolve)); } catch {}
-    if (tabId) { await sleep(1000); chrome.tabs.remove(tabId); }
+    if (tabId) {
+      // בטל beforeunload לפני סגירה כדי למנוע דיאלוג "האם לעזוב את האתר?"
+      try { await chrome.scripting.executeScript({ target: { tabId }, func: () => { window.onbeforeunload = null; } }); } catch {}
+      await sleep(500);
+      chrome.tabs.remove(tabId);
+    }
   }
 }
 
