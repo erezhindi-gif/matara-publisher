@@ -354,9 +354,32 @@ export default function CampaignDetailPage() {
             )}
 
             {campaign.status === "paused" && (
-              <button onClick={() => updateStatus("approved")} className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl p-4 font-semibold transition-colors mb-5">
-                ▶ המשך פרסום
-              </button>
+              <div className="mb-5 space-y-3">
+                <div className="bg-white border border-gray-200 rounded-2xl p-4">
+                  <label className="block text-sm text-gray-500 mb-2">תאריך ושעה לפרסום</label>
+                  <input
+                    type="datetime-local"
+                    className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900"
+                    value={editScheduledAt}
+                    onChange={(e) => setEditScheduledAt(e.target.value)}
+                  />
+                </div>
+                <button onClick={async () => {
+                  setSaving(true);
+                  await fetch(`/api/campaigns/${id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      status: "approved",
+                      ...(editScheduledAt ? { scheduledAt: new Date(editScheduledAt).toISOString() } : {}),
+                    }),
+                  });
+                  setSaving(false);
+                  fetchCampaign();
+                }} disabled={saving} className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl p-4 font-semibold transition-colors">
+                  {saving ? "שומר..." : "▶ המשך פרסום"}
+                </button>
+              </div>
             )}
 
             {campaign.posts.length > 0 && (
