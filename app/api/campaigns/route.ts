@@ -9,10 +9,8 @@ export async function GET() {
     const session = await getServerSession(authOptions);
     const isAdmin = (session?.user as { role?: string })?.role === "admin";
     const userId = (session?.user as { id?: string })?.id;
-    const businessId = (session?.user as { businessId?: string })?.businessId;
-
-    // אדמין רואה הכל, משתמש רגיל רואה קמפיינים של העסק שלו
-    const where = (!session || isAdmin) ? {} : businessId ? { businessId } : { userId };
+    // אדמין רואה הכל, משתמש רגיל רואה רק קמפיינים שלו
+    const where = (!session || isAdmin) ? {} : { userId };
 
     const campaigns = await prisma.campaign.findMany({
       where,
@@ -28,8 +26,10 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  const userId = (session?.user as { id?: string })?.id;
+  const sessionUserId = (session?.user as { id?: string })?.id;
   const body = await req.json();
+  // אם אדמין שלח ownerUserId (פרופיל נבחר בסרגל), השתמש בו
+  const userId = body.ownerUserId || sessionUserId;
 
   let business = await prisma.business.findFirst({
     where: { id: body.businessId },

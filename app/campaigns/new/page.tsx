@@ -582,6 +582,9 @@ export default function NewCampaignPage() {
       }
 
       const scheduledDates = buildScheduledDates();
+      // אם אדמין בחר פרופיל ספציפי בסרגל - הקמפיין ישויך לאותו פרופיל
+      const sidebarFilter = getBusinessFilter();
+      const ownerUserId = (isAdmin && sidebarFilter !== "all") ? sidebarFilter : undefined;
       for (const scheduledAt of scheduledDates) {
         await fetch("/api/campaigns", {
           method: "POST",
@@ -598,6 +601,7 @@ export default function NewCampaignPage() {
             templateIds: templateMode === "template" ? selectedTemplates : [],
             groupIds: templateMode === "groups" ? selectedGroupIds : [],
             backgroundIndex,
+            ownerUserId,
           }),
         });
       }
