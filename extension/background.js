@@ -121,24 +121,40 @@ async function publishPost(post, token) {
     });
     await sleep(600);
 
+    // הפעל Page events כדי לטפל בדיאלוגים (כגון "האם לעזוב את האתר?")
+    await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Page.enable", {}, resolve));
+    chrome.debugger.onEvent.addListener(function dialogHandler(source, method, params) {
+      if (source.tabId !== tabId) return;
+      if (method === "Page.javascriptDialogOpening") {
+        chrome.debugger.sendCommand({ tabId }, "Page.handleJavaScriptDialog", { accept: true });
+      }
+    });
+
     // שלח טקסט אמיתי דרך Input.insertText - React מזהה זאת כקלט אמיתי
     await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.insertText", { text: post.campaign.content }, resolve));
     await sleep(2000);
 
-    // חכה שכפתור פרסם יהיה פעיל
+    // חכה שכפתור פרסם יהיה פעיל ולחץ עליו
     let success = false;
     let error = null;
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 12; i++) {
       const results = await chrome.scripting.executeScript({
         target: { tabId },
         func: () => {
-          const btn = Array.from(document.querySelectorAll('[role="button"]'))
+          // חפש בתוך הדיאלוג הפתוח (חלון כתיבת פוסט)
+          const dialog = document.querySelector('[role="dialog"]') || document.querySelector('[aria-modal="true"]') || document;
+          const btn = Array.from(dialog.querySelectorAll('[role="button"]'))
             .find(el => {
               const t = el.textContent?.trim();
               return (t === "פרסם" || t === "Post" || t === "שתף" || t === "Share")
-                && el.getAttribute("aria-disabled") !== "true";
+                && el.getAttribute("aria-disabled") !== "true"
+                && !el.closest('[aria-hidden="true"]');
             });
-          if (btn) { btn.click(); return { clicked: true }; }
+          if (btn) {
+            btn.scrollIntoView();
+            btn.click();
+            return { clicked: true, text: btn.textContent?.trim() };
+          }
           return { clicked: false };
         },
       });
@@ -146,7 +162,7 @@ async function publishPost(post, token) {
       await sleep(500);
     }
     if (!success) error = "לא נמצא כפתור פרסם";
-    await sleep(4000);
+    await sleep(5000);
     await updatePostStatus(post.id, success ? "published" : "failed", error, token);
   } catch (err) {
     await updatePostStatus(post.id, "failed", err.message, token);
