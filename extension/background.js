@@ -72,26 +72,75 @@ async function tick() {
 
 async function publishPost(post, token) {
   const url = `https://www.facebook.com/groups/${post.fbGroupId}`;
-  return new Promise((resolve) => {
-    chrome.tabs.create({ url, active: false }, async (tab) => {
-      await sleep(6000);
-      try {
-        const results = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: injectPost,
-          args: [post.campaign.content],
-        });
-        const result = results?.[0]?.result;
-        await updatePostStatus(post.id, result?.success ? "published" : "failed", result?.error || null, token);
-      } catch (err) {
-        await updatePostStatus(post.id, "failed", err.message, token);
-      } finally {
-        await sleep(2000);
-        chrome.tabs.remove(tab.id);
-        resolve();
-      }
+  let tabId = null;
+  try {
+    const tab = await new Promise((resolve) => chrome.tabs.create({ url, active: false }, resolve));
+    tabId = tab.id;
+    await sleep(7000);
+
+    // חבר debugger לשליחת קלט אמיתי (React מזהה Input.insertText)
+    await new Promise((resolve) => chrome.debugger.attach({ tabId }, "1.3", resolve));
+
+    // פתח תיבת כתיבה אם לא פתוחה
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const writeBox = document.querySelector('[role="textbox"][contenteditable="true"]');
+        if (!writeBox) {
+          const btn = Array.from(document.querySelectorAll('[role="button"]'))
+            .find(el => { const t = el.textContent?.trim(); return t === "כתוב משהו..." || t === "Write something..." || t?.includes("כתוב"); });
+          if (btn) btn.click();
+        } else {
+          writeBox.click();
+          writeBox.focus();
+        }
+      },
     });
-  });
+    await sleep(2500);
+
+    // לחץ על תיבת הכתיבה דרך debugger
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const box = document.querySelector('[role="textbox"][contenteditable="true"]');
+        if (box) { box.click(); box.focus(); }
+      },
+    });
+    await sleep(500);
+
+    // שלח טקסט אמיתי דרך Input.insertText - React מזהה זאת כקלט אמיתי
+    await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.insertText", { text: post.campaign.content }, resolve));
+    await sleep(2000);
+
+    // חכה שכפתור פרסם יהיה פעיל
+    let success = false;
+    let error = null;
+    for (let i = 0; i < 10; i++) {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => {
+          const btn = Array.from(document.querySelectorAll('[role="button"]'))
+            .find(el => {
+              const t = el.textContent?.trim();
+              return (t === "פרסם" || t === "Post" || t === "שתף" || t === "Share")
+                && el.getAttribute("aria-disabled") !== "true";
+            });
+          if (btn) { btn.click(); return { clicked: true }; }
+          return { clicked: false };
+        },
+      });
+      if (results?.[0]?.result?.clicked) { success = true; break; }
+      await sleep(500);
+    }
+    if (!success) error = "לא נמצא כפתור פרסם";
+    await sleep(4000);
+    await updatePostStatus(post.id, success ? "published" : "failed", error, token);
+  } catch (err) {
+    await updatePostStatus(post.id, "failed", err.message, token);
+  } finally {
+    try { await new Promise((resolve) => chrome.debugger.detach({ tabId }, resolve)); } catch {}
+    if (tabId) { await sleep(1000); chrome.tabs.remove(tabId); }
+  }
 }
 
 // סנכרון קבוצות ברמת רשת - לא תלוי במבנה ה-DOM של פייסבוק, עובד זהה על כל פרופיל
