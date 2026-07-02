@@ -134,29 +134,37 @@ async function publishPost(post, token) {
     }
     await sleep(2000);
 
-    // חכה שכפתור פרסם יהיה פעיל ולחץ עליו (חיפוש בתוך הדיאלוג בלבד)
+    // מצא את כפתור פרסום וקבל את המיקום שלו
     let success = false;
     let error = null;
     for (let i = 0; i < 12; i++) {
       const results = await chrome.scripting.executeScript({
         target: { tabId },
         func: () => {
-          const dialog = document.querySelector('[role="dialog"]') || document.querySelector('[aria-modal="true"]') || document;
-          const btn = Array.from(dialog.querySelectorAll('[role="button"]'))
+          // חפש בכל הדף - כפתור "פרסום" / "פרסם" / "Post"
+          const btn = Array.from(document.querySelectorAll('[role="button"], button'))
             .find(el => {
               const t = el.textContent?.trim();
               return (t === "פרסם" || t === "פרסום" || t === "Post" || t === "שתף" || t === "Share")
                 && el.getAttribute("aria-disabled") !== "true"
                 && !el.closest('[aria-hidden="true"]');
             });
-          if (btn) { btn.scrollIntoView(); btn.click(); return { clicked: true }; }
-          return { clicked: false };
+          if (!btn) return null;
+          const r = btn.getBoundingClientRect();
+          return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
         },
       });
-      if (results?.[0]?.result?.clicked) { success = true; break; }
+      const pos = results?.[0]?.result;
+      if (pos) {
+        // לחץ דרך debugger - עובד גם אם JavaScript click נחסם
+        await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", { type: "mousePressed", x: pos.x, y: pos.y, button: "left", clickCount: 1 }, resolve));
+        await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", { type: "mouseReleased", x: pos.x, y: pos.y, button: "left", clickCount: 1 }, resolve));
+        success = true;
+        break;
+      }
       await sleep(500);
     }
-    if (!success) error = "לא נמצא כפתור פרסם";
+    if (!success) error = "לא נמצא כפתור פרסום";
     await sleep(5000);
     await updatePostStatus(post.id, success ? "published" : "failed", error, token);
   } catch (err) {
