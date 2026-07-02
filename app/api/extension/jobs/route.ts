@@ -17,8 +17,15 @@ export async function GET(req: NextRequest) {
       where: {
         status: "pending",
         campaign: {
-          userId: user.id,
-          OR: [{ scheduledAt: null }, { scheduledAt: { lte: now } }],
+          AND: [
+            {
+              OR: [
+                { userId: user.id },
+                ...(user.businessId ? [{ businessId: user.businessId }] : []),
+              ],
+            },
+            { OR: [{ scheduledAt: null }, { scheduledAt: { lte: now } }] },
+          ],
         },
       },
       include: {
