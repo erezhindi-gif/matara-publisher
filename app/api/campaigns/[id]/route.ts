@@ -1,8 +1,31 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+
+// אימות + בעלות - זהה בעקרון לתיקון שכבר נעשה ב-app/api/campaigns/route.ts:
+// דחייה כברירת מחדל (401) כשאין session, ובנוסף כאן - וידוא ש-userId תואם
+// לבעל הקמפיין (לא רק "יש session כלשהו"), כי זה נגיש דרך מזהה קמפיין ישיר.
+// 404 (לא 403) גם כשהקמפיין קיים אך שייך למישהו אחר - כדי לא לחשוף את קיומו.
+async function requireOwnedCampaign(id: string) {
+  const session = await getServerSession(authOptions);
+  if (!session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  const isAdmin = (session.user as { role?: string })?.role === "admin";
+  const userId = (session.user as { id?: string })?.id;
+
+  const campaign = await prisma.campaign.findUnique({ where: { id } });
+  if (!campaign) return { error: NextResponse.json({ error: "Not found" }, { status: 404 }) };
+  if (!isAdmin && campaign.userId !== userId) {
+    return { error: NextResponse.json({ error: "Not found" }, { status: 404 }) };
+  }
+  return { campaign };
+}
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const auth = await requireOwnedCampaign(id);
+  if (auth.error) return auth.error;
+
   const campaign = await prisma.campaign.findUnique({
     where: { id },
     include: { business: true, posts: true },
@@ -13,6 +36,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const auth = await requireOwnedCampaign(id);
+  if (auth.error) return auth.error;
+
   const body = await req.json();
   const data: Record<string, unknown> = { ...body };
   if (body.scheduledAt) data.scheduledAt = new Date(body.scheduledAt);
@@ -72,6 +98,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const auth = await requireOwnedCampaign(id);
+  if (auth.error) return auth.error;
+
   await prisma.post.deleteMany({ where: { campaignId: id } });
   await prisma.campaign.delete({ where: { id } });
   return NextResponse.json({ ok: true });

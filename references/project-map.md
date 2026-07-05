@@ -3,11 +3,8 @@
 
 ## 📋 TODO — סבב הבא (2026-07-05, מסודר לפי עדיפות)
 
-1. **🔴 דחוף — חור אבטחה נוסף:** `app/api/campaigns/[id]/route.ts` — GET/PATCH/DELETE
-   בלי שום בדיקת session/userId. מי שיודע/מנחש campaign id יכול לקרוא/לשנות/למחוק
-   קמפיין של משתמש אחר. **תיקון:** להוסיף בדיוק את אותה בדיקת session שנוספה
-   ל-`app/api/campaigns/route.ts` (401 כשאין session, סינון לפי userId כשלא admin).
-   כבר תועד כפריט פתוח למעלה ("נמצא אך לא טופל").
+1. ~~🔴 דחוף — חור אבטחה נוסף~~ **✅ תוקן ב-2026-07-05** — `app/api/campaigns/[id]/route.ts`
+   ראה סעיף "🔒 תוקן" למעלה. **עדיין לא deployed** - צריך git push לשילוב.
 
 2. **סריקה שיטתית של כל app/api/:** הבאג הקודם היה "ברירת מחדל שגויה"
    (`where={}` כשאין session). לעבור על **כל** ה-routes תחת `app/api/` ולוודא
@@ -141,11 +138,12 @@ if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 
 const where = isAdmin ? {} : { userId };
 ```
 
-### ⚠️ נמצא אך לא טופל — אין auth בכלל ב-GET/PATCH/DELETE של /api/campaigns/[id]
-`app/api/campaigns/[id]/route.ts` — שלוש הפעולות (GET, PATCH, DELETE) **אין
-בהן שום בדיקת session או userId בכלל.** מי שיודע campaign id יכול לקרוא/לעדכן/
-למחוק קמפיין של כל משתמש. זה מעבר לתיקון שהתבקש הפעם (המיקוד היה על
-`GET /api/campaigns` הכללי) — **לא תוקן, דורש החלטה נפרדת.**
+### 🔒 תוקן ב-2026-07-05 — auth ב-GET/PATCH/DELETE של /api/campaigns/[id]
+`app/api/campaigns/[id]/route.ts` — נוספה `requireOwnedCampaign(id)`: דוחה
+(401) כשאין session, ומוודאת (404 - לא 403, כדי לא לחשוף קיום) ש-`campaign.userId`
+תואם ל-`session.user.id` (אלא אם admin). מיושמת בכל שלוש הפעולות.
+**אומת שלא שובר את זרימת האישור** — קישור המייל (`lib/email.ts:21`) מפנה
+ל-`/campaigns/[id]` (עמוד רגיל שדורש login), לא ל-API ישירות בלי session.
 
 ## שדות nullable בעייתיים
 
