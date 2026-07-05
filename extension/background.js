@@ -137,7 +137,7 @@ async function publishPost(post, token, expectedUser) {
     await sleep(7000);
 
     await new Promise((resolve) => chrome.debugger.attach({ tabId }, "1.3", resolve));
-    await updatePostNote(post.id, "v2.45.0 - debugger attached", token);
+    await updatePostNote(post.id, "v2.46.0 - debugger attached", token);
 
     // דוחה אוטומטית כל דיאלוג "האם לעזוב את האתר?" (beforeunload) לפני שהוא נתקע.
     // חייבים להאזין ל-Page.javascriptDialogOpening ולהגיב לפני שמנווטים/סוגרים,
@@ -395,16 +395,26 @@ async function publishPost(post, token, expectedUser) {
                 "פעילות חריגה", "spam", "ספאם",
               ];
               const matchedHints = RATE_LIMIT_HINTS.filter(h => fullText.includes(h));
+              // זיהוי שאלון חברות של הקבוצה (לא באג - דורש מענה אנושי חד-פעמי)
+              const MEMBERSHIP_HINTS = ["בדיקת השתתפות", "שאלות אלה יעזרו למנהלים", "מקבל את כללי הקבוצה"];
+              const isMembershipGate = MEMBERSHIP_HINTS.some(h => fullText.includes(h));
               // חפש גם באנר/toast מיוחד שפייסבוק מציגה מחוץ לדיאלוג (למשל חסימה זמנית)
               const toastEl = document.querySelector('[role="alert"], [data-testid*="toast"], [data-testid*="error"]');
               const toastText = toastEl?.textContent?.slice(0, 300) || null;
-              return { open: true, fullText, matchedHints, toastText };
+              return { open: true, fullText, matchedHints, isMembershipGate, toastText };
             },
           });
           dr = dialogStillOpen?.[0]?.result;
           if (!dr?.open) { dialogClosed = true; break; }
+          if (dr.isMembershipGate) break; // אין טעם להמשיך לבדוק - זה לא ישתנה
         }
         if (!dialogClosed) {
+          if (dr?.isMembershipGate) {
+            // לא כישלון טכני - הקבוצה דורשת מענה אנושי על שאלות הצטרפות/פרסום
+            publishError = "🔒 קבוצה דורשת מענה על שאלות הצטרפות - יש לענות ידנית בפייסבוק ואז לנסות שוב";
+            await updatePostStatus(post.id, "needs_membership_answer", publishError, token);
+            return; // יוצאים לגמרי מ-publishPost - לא ממשיכים לupdatePostStatus הרגיל בסוף
+          }
           const hintsStr = dr?.matchedHints?.length ? `רמזי הגבלה: ${dr.matchedHints.join(",")} | ` : "אין רמזי הגבלה בטקסט | ";
           publishError = `הדיאלוג נשאר פתוח אחרי 10 שניות מהקליק | ${hintsStr}toast: ${dr?.toastText || "אין"} | טקסט דיאלוג: ${dr?.fullText?.slice(0, 400)}`;
           await updatePostNote(post.id, publishError, token);
