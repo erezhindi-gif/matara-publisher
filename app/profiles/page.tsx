@@ -36,34 +36,8 @@ export default function ProfilesPage() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", fbUsername: "", edgeProfile: "Default", businessId: userBusinessId, businessName: "", dailyLimit: 150, whatsappPhone: "", workerEmail: "", workerPassword: "" });
   const [businessFilter, setBusinessFilterState] = useState(() => getBusinessFilter());
-  const [waStatus, setWaStatus] = useState<Record<string, { status: string; qrDataUrl: string | null }>>({});
-  const [serverOnline, setServerOnline] = useState<boolean | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ name: "", fbUsername: "", edgeProfile: "Default", dailyLimit: 150, whatsappPhone: "" });
-
-  useEffect(() => {
-    const fetchWaStatus = () => {
-      fetch("http://localhost:3333/whatsapp-status")
-        .then((r) => r.json())
-        .then((data) => { setWaStatus(data); setServerOnline(true); })
-        .catch(() => setServerOnline(false));
-    };
-    fetchWaStatus();
-    const interval = setInterval(fetchWaStatus, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  async function connectWhatsApp(profileId: string) {
-    if (!serverOnline) {
-      alert("השרת המקומי לא פועל! פתח חלון שחור והרץ: node local-server.js");
-      return;
-    }
-    await fetch("http://localhost:3333/whatsapp-connect", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profileId }),
-    }).catch(() => {});
-  }
 
   useEffect(() => {
     setBusinessFilterState(getBusinessFilter());
@@ -322,30 +296,6 @@ export default function ProfilesPage() {
                   <span>מגבלה: <span className="font-medium text-gray-700">{p.dailyLimit}</span>/יום</span>
                   <span>היום: <span className={`font-medium ${(p.postsToday || 0) > p.dailyLimit * 0.8 ? "text-red-600" : "text-gray-700"}`}>{p.postsToday || 0}</span></span>
                 </div>
-                {/* וואטסאפ */}
-                {(() => {
-                  const wa = waStatus[p.id];
-                  const status = wa?.status;
-                  if (status === "connected") return (
-                    <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
-                      <span className="w-2 h-2 bg-green-500 rounded-full inline-block" /> וואטסאפ מחובר
-                    </span>
-                  );
-                  if (status === "qr_ready" && wa?.qrDataUrl) return (
-                    <div className="flex flex-col items-center gap-1">
-                      <img src={wa.qrDataUrl} className="w-52 h-52 rounded-lg border border-gray-200" />
-                      <span className="text-xs text-gray-500">סרוק עם הטלפון</span>
-                    </div>
-                  );
-                  if (status === "connecting") return (
-                    <span className="text-xs text-yellow-600">מתחבר...</span>
-                  );
-                  return (
-                    <button onClick={() => connectWhatsApp(p.id)} className="flex items-center gap-1.5 text-xs bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-lg px-3 py-1.5 transition-colors">
-                      📱 חבר וואטסאפ
-                    </button>
-                  );
-                })()}
               </div>
             </>
             )}

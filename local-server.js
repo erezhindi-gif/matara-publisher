@@ -13,9 +13,6 @@ const path = require("path");
 const os = require("os");
 const fs = require("fs");
 const https = require("https");
-const { Client, LocalAuth } = require("whatsapp-web.js");
-const qrcode = require("qrcode-terminal");
-const QRCode = require("qrcode");
 
 const PORT = 3333;
 const API_BASE = "https://matara-publisher.vercel.app";
@@ -45,78 +42,16 @@ const SKIP_IDS = new Set([
 // פירוט מלא: references/project-map.md.
 // חלקי הוואטסאפ (למטה) נשארים פעילים - הם לא קשורים לבעיה ולא הוסרו.
 
-// ====== וואטסאפ - סשן לכל פרופיל ======
-// profileId → { client, status, qrDataUrl, phoneNumber }
-const WA_SESSIONS = {};
+// ====== וואטסאפ - הוסר במפורש ב-2026-07-05 ======
+// כל ניהול סשן WhatsApp-Web.js (initWhatsApp/sendWhatsApp/WA_SESSIONS +
+// המסלולים whatsapp-status/whatsapp-connect/send-whatsapp/init-whatsapp)
+// הוסר כי לא היה בשימוש בפועל: קישורי wa.me בפוסטים נשמרים כמחרוזת רגילה
+// על Campaign.whatsappLink, ולא תלויים בכלל בסשן WhatsApp-Web מחובר.
+// הסיבה הישירה להסרה: launch של Puppeteer/Edge (ש-WhatsApp-Web.js דורש
+// מאחורי הקלעים) נכשל תמיד כששירות Windows רץ ב-Session 0 (אין desktop
+// אינטראקטיבי) - "Failed to launch the browser process: Code: 1002".
+// הסרת התלות הזו פותרת את בעיית ההתקנה כשירות 24/7 בבת אחת.
 let isRunning = false;
-
-function initWhatsApp(profileId, phoneNumber) {
-  if (WA_SESSIONS[profileId]?.status === "connected") return;
-
-  console.log(`\n[וואטסאפ] מאתחל סשן עבור פרופיל: ${profileId}`);
-
-  // נקה סשן קיים
-  if (WA_SESSIONS[profileId]?.client) {
-    try { WA_SESSIONS[profileId].client.destroy(); } catch {}
-  }
-
-  WA_SESSIONS[profileId] = { status: "connecting", qrDataUrl: null, phoneNumber };
-
-  const client = new Client({
-    authStrategy: new LocalAuth({ clientId: `matara-${profileId}` }),
-    puppeteer: { executablePath: EDGE_PATH, headless: true, args: ["--no-sandbox"] },
-  });
-
-  client.on("qr", async (qr) => {
-    console.log(`[וואטסאפ] QR מוכן לפרופיל: ${profileId}`);
-    qrcode.generate(qr, { small: true });
-    try {
-      const dataUrl = await QRCode.toDataURL(qr, { width: 500, margin: 2 });
-      WA_SESSIONS[profileId].qrDataUrl = dataUrl;
-      WA_SESSIONS[profileId].status = "qr_ready";
-    } catch {}
-  });
-
-  client.on("ready", () => {
-    console.log(`[וואטסאפ] מחובר! פרופיל: ${profileId}`);
-    WA_SESSIONS[profileId].status = "connected";
-    WA_SESSIONS[profileId].qrDataUrl = null;
-  });
-
-  client.on("disconnected", (reason) => {
-    console.log(`[וואטסאפ] התנתק: ${profileId} (${reason}) - מנסה חיבור מחדש בעוד 15 שניות...`);
-    WA_SESSIONS[profileId].status = "disconnected";
-    WA_SESSIONS[profileId].client = null;
-    // חיבור מחדש אוטומטי
-    setTimeout(() => {
-      if (WA_SESSIONS[profileId]?.status === "disconnected") {
-        console.log(`[וואטסאפ] מתחבר מחדש: ${profileId}`);
-        initWhatsApp(profileId, WA_SESSIONS[profileId]?.phoneNumber);
-      }
-    }, 15000);
-  });
-
-  client.initialize();
-  WA_SESSIONS[profileId].client = client;
-}
-
-async function sendWhatsApp(profileId, phoneNumbers, message) {
-  const session = WA_SESSIONS[profileId];
-  if (!session || session.status !== "connected") {
-    console.log(`[וואטסאפ] פרופיל ${profileId} לא מחובר`);
-    return;
-  }
-
-  for (const phone of phoneNumbers) {
-    try {
-      const formatted = phone.replace(/\D/g, "").replace(/^0/, "972") + "@c.us";
-      await session.client.sendMessage(formatted, message);
-      console.log(`[וואטסאפ] נשלח ל-${phone}`);
-    } catch (err) {
-      console.error(`[וואטסאפ] שגיאה בשליחה ל-${phone}:`, err.message);
-    }
-  }
-}
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -306,71 +241,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // סטטוס וואטסאפ לכל הפרופילים
-  if (req.url === "/whatsapp-status" && req.method === "GET") {
-    const status = {};
-    for (const [id, s] of Object.entries(WA_SESSIONS)) {
-      status[id] = { status: s.status, qrDataUrl: s.qrDataUrl };
-    }
-    res.writeHead(200);
-    res.end(JSON.stringify(status));
-    return;
-  }
-
-  // חיבור / חיבור מחדש לפרופיל
-  if (req.url === "/whatsapp-connect" && req.method === "POST") {
-    let body = "";
-    req.on("data", (chunk) => { body += chunk; });
-    req.on("end", () => {
-      try {
-        const { profileId, phoneNumber } = JSON.parse(body || "{}");
-        initWhatsApp(profileId, phoneNumber);
-        res.writeHead(200);
-        res.end(JSON.stringify({ ok: true }));
-      } catch (err) {
-        res.writeHead(500);
-        res.end(JSON.stringify({ ok: false, error: err.message }));
-      }
-    });
-    return;
-  }
-
-  // שליחת הודעת וואטסאפ
-  if (req.url === "/send-whatsapp" && req.method === "POST") {
-    let body = "";
-    req.on("data", (chunk) => { body += chunk; });
-    req.on("end", async () => {
-      try {
-        const { businessType, phoneNumbers, message } = JSON.parse(body || "{}");
-        await sendWhatsApp(businessType, phoneNumbers, message);
-        res.writeHead(200);
-        res.end(JSON.stringify({ ok: true }));
-      } catch (err) {
-        res.writeHead(500);
-        res.end(JSON.stringify({ ok: false, error: err.message }));
-      }
-    });
-    return;
-  }
-
-  // אתחול סשן וואטסאפ עסק
-  if (req.url === "/init-whatsapp" && req.method === "POST") {
-    let body = "";
-    req.on("data", (chunk) => { body += chunk; });
-    req.on("end", () => {
-      try {
-        const { businessType } = JSON.parse(body || "{}");
-        initWhatsApp(businessType);
-        res.writeHead(200);
-        res.end(JSON.stringify({ ok: true, message: `מאתחל סשן עבור ${businessType} - בדוק את הטרמינל לסריקת קוד QR` }));
-      } catch (err) {
-        res.writeHead(500);
-        res.end(JSON.stringify({ ok: false, error: err.message }));
-      }
-    });
-    return;
-  }
-
   res.writeHead(404);
   res.end(JSON.stringify({ error: "Not found" }));
 });
@@ -378,22 +248,5 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, async () => {
   console.log("=== שרת מקומי של מטרה Publisher ===");
   console.log(`פועל על פורט ${PORT}`);
-  console.log("[פרסום] בודק קמפיינים כל 5 דקות אוטומטית");
-
-  // חבר אוטומטית וואטסאפ לכל פרופיל שיש לו סשן שמור
-  try {
-    const profiles = await fetch(`${API_BASE}/api/profiles`).then(r => r.json()).catch(() => []);
-    const authDir = path.join(__dirname, ".wwebjs_auth");
-    for (const profile of profiles) {
-      const sessionDir = path.join(authDir, `session-matara-${profile.id}`);
-      if (fs.existsSync(sessionDir)) {
-        console.log(`[וואטסאפ] מתחבר אוטומטית לפרופיל: ${profile.name}`);
-        initWhatsApp(profile.id, profile.whatsappPhone);
-      }
-    }
-  } catch (err) {
-    console.error("[וואטסאפ] שגיאה בטעינה אוטומטית:", err.message);
-  }
-
-  // publisherLoop הוסר ב-2026-07-05 - ראה הערה בתחילת הקובץ ו-project-map.md
+  // חיבור אוטומטי לוואטסאפ ו-publisherLoop הוסרו ב-2026-07-05 - ראה הערות למעלה ו-project-map.md
 });

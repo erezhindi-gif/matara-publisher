@@ -1,5 +1,4 @@
 import { Resend } from "resend";
-import { prisma } from "@/lib/prisma";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -8,7 +7,6 @@ const EMAILS_BY_BUSINESS: Record<string, string[]> = {
   carpentry: ["erezhindi@gmail.com"],
 };
 
-const LOCAL_SERVER = "http://localhost:3333";
 const BASE_URL = "https://matara-publisher.vercel.app";
 
 export async function sendApprovalEmail(campaign: {
@@ -20,13 +18,6 @@ export async function sendApprovalEmail(campaign: {
 }) {
   const approveUrl = `${BASE_URL}/campaigns/${campaign.id}`;
   const toEmails = EMAILS_BY_BUSINESS[campaign.business.type] || ["erezhindi@gmail.com"];
-
-  // שלוף מספרי וואטסאפ מהפרופילים של העסק
-  const profiles = await prisma.profile.findMany({
-    where: { businessId: campaign.business.id, isActive: true, whatsappPhone: { not: null } },
-    select: { id: true, whatsappPhone: true },
-  });
-  const whatsappPhones = profiles.map((p) => p.whatsappPhone!).filter(Boolean);
 
   const html = `
     <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0f0f0f; color: #fff; border-radius: 12px; overflow: hidden;">
@@ -53,21 +44,4 @@ export async function sendApprovalEmail(campaign: {
     subject: `קמפיין חדש ממתין לאישור: ${campaign.title}`,
     html,
   });
-
-  // שלח וואטסאפ לכל פרופיל פעיל עם מספר
-  if (whatsappPhones.length > 0) {
-    const waMessage = `📢 *קמפיין חדש ממתין לאישור*\n\n*${campaign.title}*\n${campaign.business.name}${campaign.scheduledAt ? `\n📅 ${new Date(campaign.scheduledAt).toLocaleString("he-IL")}` : ""}\n\n🔗 ${approveUrl}`;
-    for (const profile of profiles) {
-      try {
-        await fetch(`${LOCAL_SERVER}/send-whatsapp`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ profileId: profile.id, phoneNumbers: [profile.whatsappPhone], message: waMessage }),
-          signal: AbortSignal.timeout(5000),
-        });
-      } catch {
-        // השרת המקומי לא פעיל
-      }
-    }
-  }
 }

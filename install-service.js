@@ -7,7 +7,9 @@ const svc = new Service({
   script: path.join(__dirname, "local-server.js"),
   nodeOptions: [],
   workingDirectory: __dirname,
-  allowServiceLogon: true,
+  // allowServiceLogon: true הוסר - Windows 11 Home אין secedit/Local Security
+  // Policy, וההענקה של "Log on as a service" נכשלת (LookupAccountName 1332).
+  // בלי זה, השירות ירוץ כ-LocalSystem שכבר יש לו את ההרשאה מובנית.
 });
 
 svc.on("install", () => {
