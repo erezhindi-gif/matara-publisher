@@ -3,8 +3,11 @@
 
 ## 📋 TODO — סבב הבא (2026-07-05, מסודר לפי עדיפות)
 
-1. ~~🔴 דחוף — חור אבטחה נוסף~~ **✅ תוקן ב-2026-07-05** — `app/api/campaigns/[id]/route.ts`
-   ראה סעיף "🔒 תוקן" למעלה. **עדיין לא deployed** - צריך git push לשילוב.
+1. ~~🔴 דחוף — חור אבטחה נוסף~~ **✅ תוקן ומשולב (deployed) ב-2026-07-05** —
+   `app/api/campaigns/[id]/route.ts`. ראה סעיף "🔒 תוקן" למעלה.
+
+1.5. ~~syncGroups הישן~~ **✅ נמחק ב-2026-07-05** (כולל וואטסאפ + השירות
+   כ-Windows Service מותקן ורץ). ראה סעיפים ייעודיים למעלה.
 
 2. **סריקה שיטתית של כל app/api/:** הבאג הקודם היה "ברירת מחדל שגויה"
    (`where={}` כשאין session). לעבור על **כל** ה-routes תחת `app/api/` ולוודא
@@ -76,18 +79,29 @@ Extension tick() → GET /api/extension/sync?token=X  (מחזיר job)
     → שומר GroupTemplate "קבוצות מסונכרנות" per (userId+businessId)
 ```
 
-### ⚠️ SUSPECTED DEAD — Local Server Sync (הישן) — עדיין לא טופל
+### 🗑️ נמחק במפורש ב-2026-07-05 — Local Server Sync (הישן)
 ```
 sync-groups.js (node script) → local-server.js (proxy)
   → POST /api/sync-groups  (session auth, לא apiToken)
     → שומר GroupTemplate "🔄 מסונכרן מפייסבוק" per (userId+businessId)
 ```
-**קבצים:** `local-server.js` (`syncGroups()`), `sync-groups.js`, `app/api/sync-groups/route.ts`
-**סטטוס:** לא נקראים מה-UI הנוכחי (app/sync/page.tsx משתמש בנתיב החדש), אבל
-**עדיין קיימים ופעילים בפועל אם מריצים אותם ידנית.** בשונה מ-publisherLoop
-(ראה למטה) — זה **לא הוסר**, כי לא התבקש הסרה מפורשת עדיין. שיקול לבירור:
-שווה למחוק גם את זה, כי אותה בעיית "שני צינורות מקבילים" חלה עליו באותה מידה.
-**סיכון פתוח:** אם עדיין רץ במקביל לextension sync → שני GroupTemplates שונים לאותו user.
+**קבצים שנמחקו:** `local-server.js` (`syncGroups()` + endpoint `/sync-groups` +
+`isRunning`/`sleep()`/`EDGE_PATH`/`EDGE_USER_DATA`/`SKIP_IDS`/`puppeteer-core`
+require), `sync-groups.js` (הקובץ כולו), `app/api/sync-groups/route.ts` (הקובץ כולו).
+
+**אימות לפני מחיקה (לא ניחוש, בדיוק כמו `publisherLoop`):**
+- `grep -rn "3333" --include=*.ts --include=*.tsx . | grep -v node_modules | grep -v .next`
+  → **אפס תוצאות** — אין קובץ TypeScript חי שמכיר את local-server.js בכלל.
+- `app/sync/page.tsx` (המסך החי) קורא אך ורק ל-`/api/extension/sync/[jobId]`.
+- `app/api/sync-groups/route.ts` נקרא רק מ-`local-server.js`/`sync-groups.js` עצמם.
+- `sync-groups.js` לא מופעל משום npm script/scheduled task/batch file.
+- המסלול החדש אומת עובד: `SyncJob` עם `status="done"` וספירות אמיתיות
+  (938, 233, 1866 קבוצות) לאחרונה ב-1.7.2026.
+
+**גם הוסרו מ-`package.json`:** `puppeteer-core`, `qrcode`, `qrcode-terminal`,
+`whatsapp-web.js` (כולם לא בשימוש בשום מקום אחר בריפו - אומת ב-grep).
+**⚠️ טרם הורץ `npm install`** לסנכרון `package-lock.json` בפועל.
+**הסיכון (שני GroupTemplates שונים לאותו user) נסגר** - הצינור הישן נמחק לגמרי.
 
 ### 🗑️ נמחק במפורש ב-2026-07-05 — Publisher Loop (local-server.js)
 ```
@@ -109,7 +123,9 @@ local-server.js: setInterval(publisherLoop, 60*1000)  [שורות 399-400 לשע
 **מה נעשה:** `postToFacebookGroup`, `processCampaign`, `publisherLoop`,
 `downloadImages`, `updateCampaignStatus`, `updatePostStatus` **נמחקו לגמרי**
 מ-`local-server.js` (לא רק disabled) + הוסרו קריאות ה-`setTimeout`/`setInterval`.
-**חלקי הוואטסאפ ו-`syncGroups()` נשארו פעילים ולא נגעתי בהם** — לא קשורים לבעיה.
+**עדכון 2026-07-05 מאוחר יותר:** גם הוואטסאפ וגם `syncGroups()` נמחקו לגמרי
+בסבבים נפרדים (ראה סעיפים ייעודיים למעלה) - `local-server.js` נשאר כשרת
+HTTP מינימלי עם `/ping` בלבד.
 
 **גיבוי לפני מחיקה:** הקובץ המקורי (718 שורות, לפני המחיקה) קיים בשני מקומות:
 1. Git history — `git show ab09123:local-server.js` (הקומיט האחרון שהכיל את הגרסה המלאה)
@@ -156,10 +172,11 @@ const where = isAdmin ? {} : { userId };
 |---|---|---|
 | `extension/background.js:injectPost()` | הוסר ב-2.23.0 | ✅ נמחק |
 | `extension/background.js:downloadImageToLocal()` | הוסר ב-2.23.0 | ✅ נמחק |
-| `app/api/sync-groups/route.ts` | נתיב סנכרון ישן | SUSPECTED DEAD - לא טופל |
+| `app/api/sync-groups/route.ts` | נתיב סנכרון ישן, מאומת קוד מת | ✅ נמחק ב-2026-07-05 |
 | `local-server.js` — publisherLoop/processCampaign/postToFacebookGroup | צינור פרסום מקביל לתוסף, ללא claim אטומי | ✅ נמחק ב-2026-07-05 |
-| `local-server.js` — syncGroups() | סנכרון קבוצות ישן | SUSPECTED DEAD - לא טופל |
-| `sync-groups.js` | סקריפט סנכרון ישן | SUSPECTED DEAD - לא טופל |
+| `local-server.js` — syncGroups()/isRunning/sleep()/EDGE_PATH וכו' | סנכרון קבוצות ישן, מאומת קוד מת | ✅ נמחק ב-2026-07-05 |
+| `local-server.js` — WA_SESSIONS/initWhatsApp/sendWhatsApp | חוסם Windows Service ב-Session 0 | ✅ נמחק ב-2026-07-05 |
+| `sync-groups.js` | סקריפט סנכרון ישן, מאומת קוד מת | ✅ נמחק ב-2026-07-05 |
 
 ## נקודות concurrency
 
