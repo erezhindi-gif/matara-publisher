@@ -7,10 +7,12 @@ import { authOptions } from "@/lib/auth";
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    const isAdmin = (session?.user as { role?: string })?.role === "admin";
-    const userId = (session?.user as { id?: string })?.id;
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const isAdmin = (session.user as { role?: string })?.role === "admin";
+    const userId = (session.user as { id?: string })?.id;
     // אדמין רואה הכל, משתמש רגיל רואה רק קמפיינים שלו
-    const where = (!session || isAdmin) ? {} : { userId };
+    // ברירת מחדל היא דחייה (401) כשאין session - לא "הכל" כמו שהיה קודם
+    const where = isAdmin ? {} : { userId };
 
     const campaigns = await prisma.campaign.findMany({
       where,
