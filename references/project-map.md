@@ -13,14 +13,47 @@
    (`where={}` כשאין session). לעבור על **כל** ה-routes תחת `app/api/` ולוודא
    שאין עוד מקום עם אותה טעות, במקום לגלות כל אחד בנפרד כשמישהו ניזוק ממנו.
 
-3. **apiToken — קשירה למכשיר:** כרגע `crypto.randomBytes(32).toString("hex")`
-   בלי תוקף ובלי קשירה ל-device/installation. להוסיף תוקף (expiry) + קשירה
-   ל-deviceId (שכבר קיים ב-storage אך לא נאכף), כדי שהעתקת token בין מכונות
-   לא תיתן זהות חינם. כבר תועד ב"זהות פרופיל" למעלה כפריט משני.
+3. ~~apiToken — קשירה למכשיר~~ **✅ תוקן ב-2026-07-05** — ראה סעיף ייעודי למטה.
 
 4. **הפצת עדכוני extension:** לבדוק אפשרות ל-`update_url` עצמאי (חנות פרטית/
    self-hosted update manifest) במקום `edge://extensions` + טעינה ידנית בכל
    מחשב — כדי שתיקון עתידי יגיע אוטומטית לכולם. כבר תועד למעלה כפריט פתוח.
+
+## 🔒 apiToken — קשירה למכשיר + תוקף (תוקן ב-2026-07-05)
+
+**מה השתנה בסכימה** (`prisma/schema.prisma`, `User` model) — הוספת שני שדות
+nullable (שינוי additive, לא הרסני): `apiTokenDeviceId String?` ו-
+`apiTokenExpiresAt DateTime?`. **הורץ `prisma db push`** ישירות (לא
+`migrate dev`) - `prisma/migrations/migration_lock.toml` הצביע על `sqlite`
+בעוד הסכימה/DB בפועל הם `postgresql` (Neon) - migration history שבורה/לא
+בשימוש מעולם. `db push` עוקף את זה ומסנכרן ישירות, בטוח לשינוי additive כזה.
+
+**לוגיקה חדשה** (`lib/apiToken.ts`, פונקציה `validateApiToken(token, deviceId)`):
+- Trust On First Use (TOFU): `apiTokenDeviceId` מתחיל `null` (גם ליוזרים
+  קיימים - ארז ונועה - אחרי ה-migration). **בשימוש הראשון בפועל** של הטוקן
+  (קריאה ל-jobs/sync), המכשיר שממנו הגיעה הקריאה נקשר אוטומטית - בלי צורך
+  בפעולה ידנית מהמשתמשים הקיימים.
+- קריאה שנייה עם `deviceId` שונה מזה שנקשר → **401 "Token bound to a
+  different device"**.
+- `apiTokenExpiresAt` נקבע ל-90 יום מרגע ההנפקה/החידוש (`newTokenExpiry()`).
+  טוקן שפג תוקפו → 401 "Token expired". חידוש טוקן (`POST /api/extension/token`)
+  מאפס גם את `apiTokenDeviceId` ל-`null` - הטוקן החדש נתפס מחדש ע"י המכשיר
+  הבא שישתמש בו (בד"כ המשתמש עצמו, אחרי שהחליט לחדש).
+
+**הוחל בכל 4 ה-routes שהתוסף קורא להם:** `jobs/route.ts`, `jobs/[id]/route.ts`,
+`sync/route.ts`, `sync/[id]/route.ts` - כולם עוברים עכשיו דרך `validateApiToken`
+במקום `prisma.user.findUnique({ where: { apiToken } })` ישיר.
+
+**⚠️ ממצא אגבי שתוקן תוך כדי:** `extension/background.js`'s `syncGroups()`
+**לא שלח `deviceId` בכלל** בשלוש קריאות ה-`POST /api/extension/sync/[id]`
+(רק `jobs/[id]` שלח). לו לא היה מתוקן, זה היה שובר את כל דיווח ההתקדמות
+של סנכרון קבוצות ברגע שה-validation הפך לדרוש deviceId. תוקן: `deviceId`
+מועבר כפרמטר מ-`tick()` ל-`syncGroups(job, token, deviceId)` ומוצמד לכל
+שלוש הקריאות.
+
+**⚠️ נבדק type-check (`tsc --noEmit`) - עבר נקי. טרם נבדק end-to-end בפועל**
+(הרצת פרסום/סנכרון אמיתית אחרי deploy) - צריך לוודא שארז ונועה עדיין מצליחים
+לפרסם אחרי ה-deploy, ושה-deviceId שלהם נקשר נכון בפעם הראשונה.
 
 5. **מנגנון רמזור/קצב פרסום (כשיתחיל להיבנות):** הלוגיקה של מכסה יומית/קצב
    פרסום **חייבת לשבת במקום אחד משותף בשרת** (API route), לא משוכפלת בקוד

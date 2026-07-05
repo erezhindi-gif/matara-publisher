@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { validateApiToken } from "@/lib/apiToken";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -6,10 +7,10 @@ import { authOptions } from "@/lib/auth";
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
   const deviceId = req.nextUrl.searchParams.get("deviceId");
-  if (!token) return NextResponse.json({ error: "Missing token" }, { status: 401 });
 
-  const user = await prisma.user.findUnique({ where: { apiToken: token } });
-  if (!user) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+  const auth = await validateApiToken(token, deviceId);
+  if ("error" in auth) return auth.error;
+  const user = auth.user;
 
   // תפוס משימה אטומית
   const job = await prisma.$transaction(async (tx) => {

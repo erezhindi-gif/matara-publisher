@@ -115,7 +115,7 @@ async function tick() {
       const syncRes = await fetch(`${API_BASE}/api/extension/sync?token=${apiToken}&deviceId=${deviceId || ""}`);
       if (syncRes.ok) {
         const { job } = await syncRes.json();
-        if (job) await syncGroups(job, apiToken);
+        if (job) await syncGroups(job, apiToken, deviceId);
       }
     } catch (err) {
       console.error("שגיאה:", err);
@@ -144,7 +144,7 @@ async function publishPost(post, token, expectedUser) {
     await sleep(7000);
 
     await new Promise((resolve) => chrome.debugger.attach({ tabId }, "1.3", resolve));
-    await updatePostNote(post.id, "v2.50.0 - debugger attached", token);
+    await updatePostNote(post.id, "v2.51.0 - debugger attached", token);
 
     // דוחה אוטומטית כל דיאלוג "האם לעזוב את האתר?" (beforeunload) לפני שהוא נתקע.
     // חייבים להאזין ל-Page.javascriptDialogOpening ולהגיב לפני שמנווטים/סוגרים,
@@ -480,7 +480,7 @@ async function publishPost(post, token, expectedUser) {
 }
 
 // סנכרון קבוצות ברמת רשת - לא תלוי במבנה ה-DOM של פייסבוק, עובד זהה על כל פרופיל
-async function syncGroups(job, token) {
+async function syncGroups(job, token, deviceId) {
   let tabId = null;
   try {
     // נווט בדיוק כמו גלישה רגילה: בית → קבוצות → הקבוצות שלך → כל הקבוצות שהצטרפת אליהן
@@ -574,7 +574,7 @@ async function syncGroups(job, token) {
       if (found.size > lastReportedSize) {
         noNewCount = 0;
         lastReportedSize = found.size;
-        await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}`, {
+        await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}&deviceId=${deviceId || ""}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: "running", groupsFound: found.size }),
@@ -589,7 +589,7 @@ async function syncGroups(job, token) {
     await new Promise((resolve) => chrome.debugger.detach({ tabId }, resolve));
 
     const groups = Array.from(found.values());
-    await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}`, {
+    await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}&deviceId=${deviceId || ""}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "done", groups, groupsFound: groups.length }),
@@ -601,7 +601,7 @@ async function syncGroups(job, token) {
       message: `נמצאו ${groups.length} קבוצות`,
     });
   } catch (err) {
-    await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}`, {
+    await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}&deviceId=${deviceId || ""}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "failed", error: err.message }),

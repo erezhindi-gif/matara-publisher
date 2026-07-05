@@ -84,14 +84,16 @@ model CampaignProfile {
 }
 
 model User {
-  id         String   @id @default(cuid())
-  name       String
-  email      String   @unique
-  password   String
-  role       String   @default("user")
-  businessId String?
-  apiToken   String?  @unique
-  createdAt  DateTime @default(now())
+  id                String    @id @default(cuid())
+  name              String
+  email             String    @unique
+  password          String
+  role              String    @default("user")
+  businessId        String?
+  apiToken          String?   @unique
+  apiTokenDeviceId  String?   // נקשר אוטומטית למכשיר הראשון שמשתמש בטוקן (TOFU) - ריק = עדיין לא נתפס
+  apiTokenExpiresAt DateTime? // תוקף קבוע מרגע ההנפקה/החידוש - טוקן שהעתיקו למכונה אחרת לא יעבוד לנצח
+  createdAt         DateTime  @default(now())
 }
 
 model ContactLink {
