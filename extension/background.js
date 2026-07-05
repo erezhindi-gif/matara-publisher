@@ -144,7 +144,7 @@ async function publishPost(post, token, expectedUser) {
     await sleep(7000);
 
     await new Promise((resolve) => chrome.debugger.attach({ tabId }, "1.3", resolve));
-    await updatePostNote(post.id, "v2.49.0 - debugger attached", token);
+    await updatePostNote(post.id, "v2.50.0 - debugger attached", token);
 
     // דוחה אוטומטית כל דיאלוג "האם לעזוב את האתר?" (beforeunload) לפני שהוא נתקע.
     // חייבים להאזין ל-Page.javascriptDialogOpening ולהגיב לפני שמנווטים/סוגרים,
@@ -157,6 +157,18 @@ async function publishPost(post, token, expectedUser) {
     };
     chrome.debugger.onEvent.addListener(dialogListener);
     await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Page.enable", {}, resolve));
+
+    // בדיקה מוקדמת: קבוצה מושהית ע"י מנהל (לא באג - החלטה של מנהלי הקבוצה,
+    // כמו שאלון חברות). מוצג כבאנר בראש דף הקבוצה, עוד לפני פתיחת תיבת
+    // הכתיבה - עוצרים כאן כדי לא לבזבז זמן על תמונה/טקסט לקבוצה שחסומה ממילא.
+    const suspendedCheck = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => document.body?.innerText?.includes("הקבוצה מושהית") || document.body?.innerText?.includes("Group paused"),
+    });
+    if (suspendedCheck?.[0]?.result) {
+      await updatePostStatus(post.id, "group_suspended", "🛑 הקבוצה מושהית ע\"י מנהל - לא ניתן לפרסם", token);
+      return;
+    }
 
     // 1. פתח תיבת כתיבה
     await chrome.scripting.executeScript({

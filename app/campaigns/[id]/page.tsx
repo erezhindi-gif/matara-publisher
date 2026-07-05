@@ -408,8 +408,8 @@ export default function CampaignDetailPage() {
                   {campaign.posts.map((p) => (
                     <div key={p.id} className="flex items-center justify-between text-sm">
                       <span className="text-gray-700">{p.groupName}</span>
-                      <span className={p.status === "published" ? "text-green-600" : p.status === "failed" ? "text-red-600" : p.status === "running" ? "text-purple-600" : p.status === "needs_membership_answer" ? "text-orange-600" : "text-gray-400"}>
-                        {p.status === "published" ? "✓ פורסם" : p.status === "failed" ? "✗ נכשל" : p.status === "running" ? "⏳ מפרסם..." : p.status === "needs_membership_answer" ? "🔒 דורש מענה על שאלות הצטרפות" : "ממתין"}
+                      <span className={p.status === "published" ? "text-green-600" : p.status === "failed" ? "text-red-600" : p.status === "running" ? "text-purple-600" : p.status === "needs_membership_answer" ? "text-orange-600" : p.status === "group_suspended" ? "text-orange-600" : "text-gray-400"}>
+                        {p.status === "published" ? "✓ פורסם" : p.status === "failed" ? "✗ נכשל" : p.status === "running" ? "⏳ מפרסם..." : p.status === "needs_membership_answer" ? "🔒 דורש מענה על שאלות הצטרפות" : p.status === "group_suspended" ? "🛑 הקבוצה מושהית" : "ממתין"}
                       </span>
                     </div>
                   ))}
