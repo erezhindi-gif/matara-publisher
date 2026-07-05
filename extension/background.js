@@ -84,32 +84,44 @@ function sendDebuggerCommand(tabId, method, params = {}) {
   });
 }
 
-async function tick() {
-  await autoLogin();
-  const { apiToken, deviceId } = await chrome.storage.local.get(["apiToken", "deviceId"]);
-  if (!apiToken) return;
+// נעילה נגד הרצות tick() חופפות. ה-alarm יורה כל 30 שניות, אבל publishPost()
+// בודד לוקח בקלות 20-40+ שניות (המתנות מובנות) - בלי הנעילה הזו, tick() הבא
+// יכול להתחיל בזמן שהקודם עדיין באמצע, ולפתוח כמה טאבים שמפרסמים במקביל
+// מאותו חשבון פייסבוק - בדיוק הדפוס שגורם ל-FB לחסום/לחשוד בספאם.
+let isTicking = false;
 
+async function tick() {
+  if (isTicking) return;
+  isTicking = true;
   try {
-    // בדוק פוסטים
-    const jobsRes = await fetch(`${API_BASE}/api/extension/jobs?token=${apiToken}&deviceId=${deviceId || ""}`);
-    if (jobsRes.ok) {
-      const { posts, user } = await jobsRes.json();
-      if (posts && posts.length > 0) {
-        for (const post of posts) {
-          await publishPost(post, apiToken, user);
-          await sleep(5000);
+    await autoLogin();
+    const { apiToken, deviceId } = await chrome.storage.local.get(["apiToken", "deviceId"]);
+    if (!apiToken) return;
+
+    try {
+      // בדוק פוסטים
+      const jobsRes = await fetch(`${API_BASE}/api/extension/jobs?token=${apiToken}&deviceId=${deviceId || ""}`);
+      if (jobsRes.ok) {
+        const { posts, user } = await jobsRes.json();
+        if (posts && posts.length > 0) {
+          for (const post of posts) {
+            await publishPost(post, apiToken, user);
+            await sleep(5000);
+          }
         }
       }
-    }
 
-    // בדוק סנכרון
-    const syncRes = await fetch(`${API_BASE}/api/extension/sync?token=${apiToken}&deviceId=${deviceId || ""}`);
-    if (syncRes.ok) {
-      const { job } = await syncRes.json();
-      if (job) await syncGroups(job, apiToken);
+      // בדוק סנכרון
+      const syncRes = await fetch(`${API_BASE}/api/extension/sync?token=${apiToken}&deviceId=${deviceId || ""}`);
+      if (syncRes.ok) {
+        const { job } = await syncRes.json();
+        if (job) await syncGroups(job, apiToken);
+      }
+    } catch (err) {
+      console.error("שגיאה:", err);
     }
-  } catch (err) {
-    console.error("שגיאה:", err);
+  } finally {
+    isTicking = false;
   }
 }
 
@@ -125,7 +137,7 @@ async function publishPost(post, token, expectedUser) {
     await sleep(7000);
 
     await new Promise((resolve) => chrome.debugger.attach({ tabId }, "1.3", resolve));
-    await updatePostNote(post.id, "v2.42.0 - debugger attached", token);
+    await updatePostNote(post.id, "v2.43.0 - debugger attached", token);
 
     // דוחה אוטומטית כל דיאלוג "האם לעזוב את האתר?" (beforeunload) לפני שהוא נתקע.
     // חייבים להאזין ל-Page.javascriptDialogOpening ולהגיב לפני שמנווטים/סוגרים,
