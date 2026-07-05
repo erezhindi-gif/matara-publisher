@@ -41,6 +41,49 @@ async function autoLogin() {
   } catch {}
 }
 
+// מוריד תמונה מ-URL לקובץ זמני בדיסק - נדרש כי DOM.setFileInputFiles (CDP)
+// מקבל רק path מקומי, לא Blob/URL. הורדה עוקפת גם CORS.
+async function downloadToTempFile(url) {
+  const downloadId = await new Promise((resolve, reject) => {
+    chrome.downloads.download(
+      { url, filename: `matara_tmp_${Date.now()}.jpg`, conflictAction: "uniquify", saveAs: false },
+      (id) => (chrome.runtime.lastError || !id) ? reject(new Error(chrome.runtime.lastError?.message || "download failed")) : resolve(id)
+    );
+  });
+  const filename = await new Promise((resolve, reject) => {
+    const listener = (delta) => {
+      if (delta.id !== downloadId) return;
+      if (delta.state?.current === "complete") {
+        chrome.downloads.onChanged.removeListener(listener);
+        chrome.downloads.search({ id: downloadId }, (results) => resolve(results[0]?.filename));
+      } else if (delta.state?.current === "interrupted") {
+        chrome.downloads.onChanged.removeListener(listener);
+        reject(new Error("download interrupted"));
+      }
+    };
+    chrome.downloads.onChanged.addListener(listener);
+    // ייתכן שההורדה כבר הושלמה לפני שהתחברנו למאזין
+    chrome.downloads.search({ id: downloadId }, (results) => {
+      if (results[0]?.state === "complete") {
+        chrome.downloads.onChanged.removeListener(listener);
+        resolve(results[0].filename);
+      }
+    });
+  });
+  return { downloadId, filename };
+}
+
+// עוטף chrome.debugger.sendCommand - קורא chrome.runtime.lastError בתוך ה-callback
+// (חובה! אחרי await הערך כבר מתאפס ותמיד יראה "תקין" גם כשיש שגיאה)
+function sendDebuggerCommand(tabId, method, params = {}) {
+  return new Promise((resolve) => {
+    chrome.debugger.sendCommand({ tabId }, method, params, (result) => {
+      const err = chrome.runtime.lastError?.message || null;
+      resolve({ result, err });
+    });
+  });
+}
+
 async function tick() {
   await autoLogin();
   const { apiToken, deviceId } = await chrome.storage.local.get(["apiToken", "deviceId"]);
@@ -50,10 +93,10 @@ async function tick() {
     // בדוק פוסטים
     const jobsRes = await fetch(`${API_BASE}/api/extension/jobs?token=${apiToken}&deviceId=${deviceId || ""}`);
     if (jobsRes.ok) {
-      const { posts } = await jobsRes.json();
+      const { posts, user } = await jobsRes.json();
       if (posts && posts.length > 0) {
         for (const post of posts) {
-          await publishPost(post, apiToken);
+          await publishPost(post, apiToken, user);
           await sleep(5000);
         }
       }
@@ -70,206 +113,244 @@ async function tick() {
   }
 }
 
-async function publishPost(post, token) {
+async function publishPost(post, token, expectedUser) {
   const url = `https://www.facebook.com/groups/${post.fbGroupId}`;
   let tabId = null;
   let success = false;
+  let publishError = null;
+  let dialogListener = null; // מוצהר כאן (לא בתוך try) כדי שה-finally יוכל להסיר אותו
   try {
-    const tab = await new Promise((resolve) => chrome.tabs.create({ url, active: false }, resolve));
+    const tab = await new Promise((resolve) => chrome.tabs.create({ url, active: true }, resolve));
     tabId = tab.id;
     await sleep(7000);
 
-    // חבר debugger לשליחת קלט אמיתי (React מזהה Input.insertText)
     await new Promise((resolve) => chrome.debugger.attach({ tabId }, "1.3", resolve));
+    await updatePostNote(post.id, "v2.40.0 - debugger attached", token);
 
-    // לחץ על אזור הכתיבה הראשי של הקבוצה (לא תגובה)
+    // דוחה אוטומטית כל דיאלוג "האם לעזוב את האתר?" (beforeunload) לפני שהוא נתקע.
+    // חייבים להאזין ל-Page.javascriptDialogOpening ולהגיב לפני שמנווטים/סוגרים,
+    // לא אחרי - אחרת הדיאלוג כבר תפוס ומחכה לקלט אנושי.
+    dialogListener = (source, method) => {
+      if (source.tabId !== tabId) return;
+      if (method === "Page.javascriptDialogOpening") {
+        chrome.debugger.sendCommand({ tabId }, "Page.handleJavaScriptDialog", { accept: true });
+      }
+    };
+    chrome.debugger.onEvent.addListener(dialogListener);
+    await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Page.enable", {}, resolve));
+
+    // בדיקת בטיחות: מי מחובר לפייסבוק בפועל בטאב הזה, לעומת מי אמור להיות מחובר
+    // הוחזר להתרעה בלבד (לא חוסם) ב-2026-07-05 - הסלקטור הקודם תפס בטעות את
+    // כפתור "אפשרויות והגדרות של חשבון" (תפריט כללי, לא שם היוזר) וחסם פרסום
+    // תקין לגמרי. הסלקטור עדיין לא אומת מול DOM אמיתי - אסור להחזיר לחסימה
+    // קשיחה עד שיימצא סלקטור שבאמת מזהה את שם החשבון המחובר, לא תפריט כללי.
+    if (expectedUser?.name) {
+      const identityCheck = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => {
+          const el = document.querySelector('[aria-label*="חשבון"], [aria-label*="Your profile"], [aria-label*="profile"]');
+          return el?.getAttribute('aria-label') || el?.textContent || null;
+        },
+      });
+      const detectedIdentity = identityCheck?.[0]?.result;
+      const nameMatches = detectedIdentity && detectedIdentity.includes(expectedUser.name.split(' ')[0]);
+      if (detectedIdentity && !nameMatches) {
+        await updatePostNote(post.id, `אזהרת זהות (לא חוסם): צפוי "${expectedUser.name}" אך זוהה "${detectedIdentity}"`, token);
+      }
+    }
+
+    // 1. פתח תיבת כתיבה
     await chrome.scripting.executeScript({
       target: { tabId },
       func: () => {
-        // נסה למצוא את תיבת "כאן כותבים" / "כתוב משהו" - תמיד בחלק העליון של הדף
-        // מחפש placeholder טקסט באזורי כתיבה ראשיים
         const PLACEHOLDERS = ["כאן כותבים", "כתוב משהו", "Write something", "What's on your mind", "מה תרצה לשתף"];
-
-        // אפשרות 1: contenteditable עם placeholder
         let target = Array.from(document.querySelectorAll('[contenteditable]')).find(el => {
           const ph = el.getAttribute('aria-placeholder') || el.getAttribute('placeholder') || el.textContent || '';
           return PLACEHOLDERS.some(p => ph.includes(p));
         });
-
-        // אפשרות 2: כפתור עם טקסט מתאים
         if (!target) {
-          target = Array.from(document.querySelectorAll('[role="button"]')).find(el => {
-            const t = el.textContent?.trim() || '';
-            return PLACEHOLDERS.some(p => t.includes(p));
-          });
+          target = Array.from(document.querySelectorAll('[role="button"]')).find(el =>
+            PLACEHOLDERS.some(p => (el.textContent?.trim() || '').includes(p))
+          );
         }
-
         if (target) target.click();
       },
     });
     await sleep(3000);
 
-    // וודא שה-focus על תיבת הכתיבה בדיאלוג (לא תגובה)
+    // 2. תמונה - הורדה לדיסק זמנית + הזרקה דרך CDP DOM.setFileInputFiles
+    // חשוב: לא לוחצים על כפתור "העלאה ממחשב" - זה פותח בורר קבצים של מערכת ההפעלה
+    // וחוסם את כל התהליך. setFileInputFiles מזריק ישירות ל-input בלי לפתוח כלום.
+    let imageDiagnostics = ""; // נשמר גם אם הפרסום מצליח - סטטוס "published" מוחק את שדה error
+    if (post.campaign.imageUrls?.length > 0) {
+      let tempDownloadId = null;
+      try {
+        const imageUrl = post.campaign.imageUrls[0];
+        const { downloadId, filename } = await downloadToTempFile(imageUrl);
+        tempDownloadId = downloadId;
+        if (!filename) throw new Error("הורדה נכשלה - אין filename");
+        imageDiagnostics += `הורדה: OK (${filename.split(/[\\/]/).pop()}) | `;
+
+        const domEnable = await sendDebuggerCommand(tabId, "DOM.enable");
+        if (domEnable.err) imageDiagnostics += `DOM.enable שגיאה: ${domEnable.err} | `;
+        await sendDebuggerCommand(tabId, "Runtime.enable");
+        await sendDebuggerCommand(tabId, "DOM.getDocument", { depth: -1, pierce: true }); // מפעיל מעקב DOM, נדרש לפני requestNode
+
+        // מוצאים את ה-nodeId של הדיאלוג הפתוח (תיבת הכתיבה) דרך Runtime.evaluate
+        // (מחזיר objectId) ואז DOM.requestNode - כדי לחפש file input *בתוכו בלבד*.
+        // בדף פייסבוק יש כמה input[type=file] נסתרים (תמונת פרופיל, תמונת קבוצה
+        // וכו') - querySelector גלובלי על כל המסמך עלול לתפוס את הלא-נכון.
+        const evalDialog = await sendDebuggerCommand(tabId, "Runtime.evaluate", {
+          expression: `(function(){
+            const d = Array.from(document.querySelectorAll('[role="dialog"],[aria-modal="true"]'))
+              .find(x => x.querySelector('[role="textbox"]'));
+            return d || document.body;
+          })()`,
+          returnByValue: false,
+        });
+        const dialogObjectId = evalDialog.result?.result?.objectId;
+        if (evalDialog.err) imageDiagnostics += `Runtime.evaluate שגיאה: ${evalDialog.err} | `;
+
+        let dialogNodeId = null;
+        if (dialogObjectId) {
+          const reqNode = await sendDebuggerCommand(tabId, "DOM.requestNode", { objectId: dialogObjectId });
+          dialogNodeId = reqNode.result?.nodeId || null;
+          if (!dialogNodeId && reqNode.err) imageDiagnostics += `requestNode שגיאה: ${reqNode.err} | `;
+        }
+
+        let nodeId = null;
+        if (dialogNodeId) {
+          const q = await sendDebuggerCommand(tabId, "DOM.querySelector", { nodeId: dialogNodeId, selector: 'input[type="file"]' });
+          nodeId = q.result?.nodeId || null;
+          if (!nodeId && q.err) imageDiagnostics += `querySelector שגיאה: ${q.err} | `;
+        }
+
+        if (!nodeId) {
+          imageDiagnostics += "לא נמצא file input בתוך הדיאלוג";
+        } else {
+          const setFiles = await sendDebuggerCommand(tabId, "DOM.setFileInputFiles", { files: [filename], nodeId });
+          imageDiagnostics += setFiles.err ? `setFileInputFiles שגיאה: ${setFiles.err}` : "setFileInputFiles: OK";
+          await sleep(5000); // המתן לפייסבוק לעבד את התמונה
+
+          // אימות: img[src^="blob:"] הוא סימן אמין (URL מקומי שנוצר ברגע ההעלאה) -
+          // לא scontent (זה יתפוס גם תמונת פרופיל קיימת - false positive)
+          const verify = await chrome.scripting.executeScript({
+            target: { tabId },
+            func: () => {
+              const dialog = Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"]')).find(d => d.querySelector('[role="textbox"]'));
+              return !!dialog?.querySelector('img[src^="blob:"]');
+            },
+          });
+          imageDiagnostics += ` | blob-preview בדיאלוג: ${verify?.[0]?.result ? "כן" : "לא"}`;
+        }
+      } catch (e) {
+        imageDiagnostics += `חריגה: ${e.message}`;
+      } finally {
+        if (tempDownloadId != null) {
+          try { chrome.downloads.removeFile(tempDownloadId, () => {}); } catch {}
+          try { chrome.downloads.erase({ id: tempDownloadId }); } catch {}
+        }
+      }
+      await updatePostNote(post.id, `תמונה: ${imageDiagnostics}`, token);
+    }
+
+    // 3. פוקוס על textbox בדיאלוג (אחרי re-render - תיבה חדשה וריקה)
     await chrome.scripting.executeScript({
       target: { tabId },
       func: () => {
-        const dialog = document.querySelector('[role="dialog"]') || document.querySelector('[aria-modal="true"]');
-        const box = dialog
-          ? dialog.querySelector('[role="textbox"][contenteditable="true"]')
-          : document.querySelector('[role="textbox"][contenteditable="true"]');
+        const dialog = Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"]')).find(d => d.querySelector('[role="textbox"]')) || document.querySelector('[role="dialog"]') || document.querySelector('[aria-modal="true"]');
+        const box = dialog?.querySelector('[role="textbox"][contenteditable="true"]');
         if (box) { box.click(); box.focus(); }
       },
     });
     await sleep(600);
 
-    // בנה את הטקסט המלא כולל קישור וואטסאפ
+    // 4. הכנס טקסט מלא - תוכן + WhatsApp + email - אחרי ה-re-render, לתיבה נקייה
+    // הקישור מוכנס כטקסט רגיל בתוך התוכן - פייסבוק הופך אותו אוטומטית לקישור
+    // כחול לחיץ. לא מנסים ליצור/להסיר כרטיס תצוגה מקדימה - זה גרם לבעיות
+    // (קליק על אלמנט לא נכון, טעינה חלקית) בלי תועלת אמיתית.
     let fullText = post.campaign.content;
-    if (post.campaign.whatsappLink) fullText += `\n\n📱 ${post.campaign.whatsappLink}`;
-    if (post.campaign.emailLink) fullText += `\n✉️ ${post.campaign.emailLink}`;
-
+    if (post.campaign.whatsappLink) fullText += `\n\n📱 ליצירת קשר בוואטסאפ: ${post.campaign.whatsappLink}`;
+    if (post.campaign.emailLink)    fullText += `\n✉️ שלח קו"ח: ${post.campaign.emailLink}`;
     await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.insertText", { text: fullText }, resolve));
     await sleep(2000);
 
-    // העלאת תמונה אם יש
-    let imgLog = [];
-    if (post.campaign.imageUrls && post.campaign.imageUrls.length > 0) {
-      try {
-        const imageUrl = post.campaign.imageUrls[0];
-        imgLog.push("1.התחיל העלאת תמונה: " + imageUrl);
-
-        // הורד תמונה לקובץ מקומי
-        const localPath = await downloadImageToLocal(imageUrl);
-        imgLog.push("2.הורד לנתיב: " + localPath);
-
-        // המר נתיב Windows ל-forward slashes (CDP דורש זאת)
-        const cdpPath = localPath.replace(/\\/g, '/');
-
-        // הפעל יירוט דיאלוג קבצים לפני הלחיצה
-        let interceptErr = null;
-        await new Promise(resolve =>
-          chrome.debugger.sendCommand({ tabId }, "Page.setInterceptFileChooserDialog", { enabled: true }, () => {
-            if (chrome.runtime.lastError) interceptErr = chrome.runtime.lastError.message;
-            resolve();
-          })
-        );
-        imgLog.push("3.יירוט דיאלוג: " + (interceptErr || "OK"));
-
-        // הכן listener לאירוע fileChooserOpened
-        let fileChooserResolve;
-        const fileChooserPromise = new Promise(r => fileChooserResolve = r);
-        const onFileChooser = (source, method) => {
-          if (source.tabId !== tabId) return;
-          if (method === "Page.fileChooserOpened") { imgLog.push("4.fileChooserOpened!"); fileChooserResolve(true); }
-        };
-        chrome.debugger.onEvent.addListener(onFileChooser);
-
-        // לחץ על כפתור תמונה - חפש aria-labels שונים
-        const clickResult = await chrome.scripting.executeScript({
-          target: { tabId },
-          func: () => {
-            // נסה aria-label מדויק - כולל "תמונה או סרטון" (הנוסח בעברית)
-            const LABELS = ['תמונה או סרטון','תמונה/סרטון','Photo/video','Photo or video','Photo','תמונה','Image','Add photos/videos','תמונות/סרטונים'];
-            const exact = Array.from(document.querySelectorAll('[aria-label]'))
-              .find(el => el.tagName !== 'INPUT' && LABELS.includes(el.getAttribute('aria-label')));
-            if (exact) { exact.click(); return 'exact:' + exact.getAttribute('aria-label'); }
-
-            // נסה חלקי
-            const partial = Array.from(document.querySelectorAll('[aria-label]'))
-              .find(el => el.tagName !== 'INPUT' && /(תמונ|photo|image|video)/i.test(el.getAttribute('aria-label') || ''));
-            if (partial) { partial.click(); return 'partial:' + partial.getAttribute('aria-label'); }
-
-            // הצג כל aria-labels שיש
-            const labels = Array.from(document.querySelectorAll('[aria-label]')).map(el => el.getAttribute('aria-label')).filter(Boolean).slice(0,20);
-            return 'notfound:' + labels.join('|');
-          },
-        });
-        imgLog.push("5.כפתור תמונה: " + (clickResult?.[0]?.result || 'null'));
-
-        // המתן לפתיחת בורר הקבצים (עד 6 שניות)
-        const opened = await Promise.race([
-          fileChooserPromise,
-          new Promise(r => setTimeout(() => r(false), 6000))
-        ]);
-        chrome.debugger.onEvent.removeListener(onFileChooser);
-        imgLog.push("6.fileChooser נפתח: " + opened);
-
-        if (opened) {
-          let handleErr = null;
-          await new Promise(resolve =>
-            chrome.debugger.sendCommand({ tabId }, "Page.handleFileChooser", {
-              action: "accept",
-              files: [cdpPath]
-            }, () => {
-              if (chrome.runtime.lastError) handleErr = chrome.runtime.lastError.message;
-              resolve();
-            })
-          );
-          imgLog.push("7.handleFileChooser: " + (handleErr || "OK"));
-          await sleep(4000);
-        }
-
-        // בטל יירוט
-        await new Promise(resolve =>
-          chrome.debugger.sendCommand({ tabId }, "Page.setInterceptFileChooserDialog", { enabled: false }, resolve)
-        );
-      } catch (imgErr) {
-        imgLog.push("שגיאה: " + imgErr.message);
-      }
-      console.log("IMG_LOG:", imgLog.join(" | "));
-      // שלח לוג לשרת כדי לאבחן
-      if (imgLog.length > 0) {
-        await updatePostNote(post.id, imgLog.join(" | "), token);
-      }
-    }
-    await sleep(1000);
-
-    // מצא את כפתור פרסום וקבל את המיקום שלו
-    let error = null;
-    for (let i = 0; i < 12; i++) {
-      const results = await chrome.scripting.executeScript({
+    // 5. מצא ולחץ כפתור פרסום
+    // הערה: aria-disabled=true בזמן טעינת תצוגת wa.me - ממתינים עד שמופיע enabled
+    let lastButtonDebug = '';
+    for (let i = 0; i < 20; i++) {
+      const clicked = await chrome.scripting.executeScript({
         target: { tabId },
         func: () => {
-          // חפש בכל הדף - כפתור "פרסום" / "פרסם" / "Post"
-          const btn = Array.from(document.querySelectorAll('[role="button"], button'))
-            .find(el => {
-              const t = el.textContent?.trim();
-              return (t === "פרסם" || t === "פרסום" || t === "Post" || t === "שתף" || t === "Share")
-                && el.getAttribute("aria-disabled") !== "true"
-                && !el.closest('[aria-hidden="true"]');
-            });
-          if (!btn) return null;
+          // חיפוש בכל המסמך - לא רק בdialog (הdialog הראשון עלול להיות לוח התראות!)
+          const allBtns = Array.from(document.querySelectorAll('[role="button"], button'));
+          // סנן כפתורים שיש להם טקסט (לא ריק)
+          const namedBtns = allBtns.filter(el => el.textContent?.trim().length > 0);
+          const debug = namedBtns.slice(0, 15).map(el => {
+            const r = el.getBoundingClientRect();
+            return `"${el.textContent?.trim().slice(0,15)}" dis=${el.getAttribute('aria-disabled')} w=${Math.round(r.width)}`;
+          }).join(' | ');
+
+          // ניסיון ראשון: כפתור enabled
+          let btn = allBtns.find(el => {
+            const t = el.textContent?.trim() || '';
+            if (!["פרסם","פרסום","Post","שתף","Share"].some(w => t === w || t.startsWith(w))) return false;
+            if (el.getAttribute("aria-disabled") === "true") return false;
+            if (el.closest('[aria-hidden="true"]')) return false;
+            return true;
+          });
+          // ניסיון שני: גם אם disabled
+          if (!btn) btn = allBtns.find(el => {
+            const t = el.textContent?.trim() || '';
+            return ["פרסם","פרסום","Post","שתף","Share"].some(w => t === w || t.startsWith(w)) && !el.closest('[aria-hidden="true"]');
+          });
+
+          if (!btn) return { found: false, debug };
+          btn.scrollIntoView({ block: 'center', behavior: 'instant' });
           const r = btn.getBoundingClientRect();
-          return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+          const disabled = btn.getAttribute('aria-disabled');
+          return { found: true, x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), w: Math.round(r.width), h: Math.round(r.height), disabled, debug };
         },
       });
-      const pos = results?.[0]?.result;
-      if (pos) {
-        // לחץ דרך debugger - עובד גם אם JavaScript click נחסם
-        await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", { type: "mousePressed", x: pos.x, y: pos.y, button: "left", clickCount: 1 }, resolve));
-        await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", { type: "mouseReleased", x: pos.x, y: pos.y, button: "left", clickCount: 1 }, resolve));
+      const res = clicked?.[0]?.result;
+      if (res?.debug) lastButtonDebug = res.debug.slice(0, 400);
+      if (res?.found) {
+        await updatePostNote(post.id, `כפתור נמצא: x=${res.x} y=${res.y} w=${res.w} disabled=${res.disabled}`, token);
+        await sleep(300);
+        if (res.x > 0 && res.y > 0) {
+          await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", { type: "mousePressed", x: res.x, y: res.y, button: "left", clickCount: 1, buttons: 1 }, resolve));
+          await sleep(50);
+          await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", { type: "mouseReleased", x: res.x, y: res.y, button: "left", clickCount: 1, buttons: 0 }, resolve));
+        } else {
+          await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 }, resolve));
+          await sleep(50);
+          await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 }, resolve));
+        }
         success = true;
         break;
       }
       await sleep(500);
     }
-    if (!success) error = "לא נמצא כפתור פרסום";
-    if (success) {
-      // פייסבוק צריך זמן לעבד ולסגור את הדיאלוג לאחר הלחיצה
-      await sleep(7000);
-    }
-    await updatePostStatus(post.id, success ? "published" : "failed", error, token);
+    if (!success) publishError = `לא נמצא כפתור פרסום | כפתורים: ${lastButtonDebug}`;
+    if (success) await sleep(7000);
+    // גם בהצלחה שומרים את דיאגנוסטיקת התמונה בשדה error - אחרת updatePostStatus מוחק אותה
+    const finalNote = success
+      ? (imageDiagnostics ? `הצליח | תמונה: ${imageDiagnostics}` : null)
+      : `${publishError} | תמונה: ${imageDiagnostics}`;
+    await updatePostStatus(post.id, success ? "published" : "failed", finalNote, token);
   } catch (err) {
     await updatePostStatus(post.id, "failed", err.message, token);
   } finally {
-    try { await new Promise((resolve) => chrome.debugger.detach({ tabId }, resolve)); } catch {}
     if (tabId) {
-      if (!success) {
-        // רק אם נכשל - נווט ל-blank כדי להימנע מדיאלוג עזיבה
-        try { await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Page.navigate", { url: "about:blank" }, resolve)); } catch {}
-        await sleep(500);
-      }
-      chrome.tabs.remove(tabId);
+      // נווט ל-about:blank - dialogListener עדיין פעיל בשלב הזה, אז כל
+      // beforeunload שנפתח כתוצאה מהניווט נדחה אוטומטית מיד, לא אחרי שהוא כבר תקוע
+      try { await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Page.navigate", { url: "about:blank" }, resolve)); } catch {}
+      await sleep(2000);
     }
+    // מסירים את המאזין רק אחרי הניווט - זה השלב היחיד שעלול להפעיל beforeunload
+    if (dialogListener) { try { chrome.debugger.onEvent.removeListener(dialogListener); } catch {} }
+    try { await new Promise((resolve) => chrome.debugger.detach({ tabId }, resolve)); } catch {}
+    if (tabId) chrome.tabs.remove(tabId);
   }
 }
 
@@ -492,110 +573,6 @@ function walkForGroups(obj, map, depth) {
   for (const v of Object.values(obj)) {
     if (v && typeof v === "object") walkForGroups(v, map, depth + 1);
   }
-}
-
-function injectPost(content) {
-  return new Promise(async (resolve) => {
-    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-    try {
-      await sleep(4000);
-
-      // פתח את תיבת הכתיבה אם לא פתוחה
-      let writeBox = document.querySelector('[role="textbox"][contenteditable="true"]');
-      if (!writeBox) {
-        const writeBtn = Array.from(document.querySelectorAll('[role="button"]'))
-          .find(el => {
-            const t = el.textContent?.trim();
-            return t === "כתוב משהו..." || t === "Write something..." || t === "כתוב פוסט..." || t?.includes("כתוב");
-          });
-        if (writeBtn) { writeBtn.click(); await sleep(2500); }
-        writeBox = document.querySelector('[role="textbox"][contenteditable="true"]');
-      }
-
-      if (!writeBox) { resolve({ success: false, error: "לא נמצאה תיבת כתיבה" }); return; }
-
-      writeBox.click();
-      await sleep(600);
-      writeBox.focus();
-      await sleep(400);
-
-      // הדבקה דרך clipboard API - פייסבוק מזהה אותה כהקלדה אמיתית
-      try {
-        await navigator.clipboard.writeText(content);
-        document.execCommand("paste");
-      } catch {
-        // fallback - DataTransfer
-        const dt = new DataTransfer();
-        dt.setData("text/plain", content);
-        writeBox.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true }));
-      }
-      await sleep(2000);
-
-      // חכה שהכפתור יהיה enabled (עד 5 שניות)
-      let submitBtn = null;
-      for (let i = 0; i < 10; i++) {
-        submitBtn = Array.from(document.querySelectorAll('[role="button"]'))
-          .find(el => {
-            const text = el.textContent?.trim();
-            return (text === "פרסם" || text === "Post" || text === "שתף" || text === "Share")
-              && !el.getAttribute("aria-disabled")
-              && el.getAttribute("aria-disabled") !== "true";
-          });
-        if (submitBtn) break;
-        await sleep(500);
-      }
-
-      if (!submitBtn) { resolve({ success: false, error: "לא נמצא כפתור פרסם (הטקסט אולי לא נכנס)" }); return; }
-      submitBtn.click();
-      await sleep(4000);
-      resolve({ success: true });
-    } catch (err) {
-      resolve({ success: false, error: err.message });
-    }
-  });
-}
-
-async function downloadImageToLocal(imageUrl) {
-  const response = await fetch(imageUrl);
-  const blob = await response.blob();
-  const objectUrl = URL.createObjectURL(blob);
-
-  return new Promise((resolve, reject) => {
-    let downloadId;
-
-    const onChange = (delta) => {
-      if (delta.id !== downloadId) return;
-      if (delta.state?.current === 'complete') {
-        chrome.downloads.onChanged.removeListener(onChange);
-        chrome.downloads.search({ id: downloadId }, (items) => {
-          URL.revokeObjectURL(objectUrl);
-          if (items[0]?.filename) resolve(items[0].filename);
-          else reject(new Error('לא נמצא שם קובץ לאחר הורדה'));
-        });
-      } else if (delta.state?.current === 'interrupted') {
-        chrome.downloads.onChanged.removeListener(onChange);
-        URL.revokeObjectURL(objectUrl);
-        reject(new Error('הורדה הופסקה'));
-      }
-    };
-
-    chrome.downloads.onChanged.addListener(onChange);
-
-    chrome.downloads.download({
-      url: objectUrl,
-      filename: 'matara_image.jpg',
-      conflictAction: 'overwrite',
-      saveAs: false,
-    }, (id) => {
-      if (chrome.runtime.lastError) {
-        chrome.downloads.onChanged.removeListener(onChange);
-        URL.revokeObjectURL(objectUrl);
-        reject(chrome.runtime.lastError);
-        return;
-      }
-      downloadId = id;
-    });
-  });
 }
 
 async function updatePostNote(postId, note, token) {
