@@ -137,7 +137,7 @@ async function publishPost(post, token, expectedUser) {
     await sleep(7000);
 
     await new Promise((resolve) => chrome.debugger.attach({ tabId }, "1.3", resolve));
-    await updatePostNote(post.id, "v2.44.0 - debugger attached", token);
+    await updatePostNote(post.id, "v2.45.0 - debugger attached", token);
 
     // דוחה אוטומטית כל דיאלוג "האם לעזוב את האתר?" (beforeunload) לפני שהוא נתקע.
     // חייבים להאזין ל-Page.javascriptDialogOpening ולהגיב לפני שמנווטים/סוגרים,
@@ -373,34 +373,40 @@ async function publishPost(post, token, expectedUser) {
           await sleep(50);
           await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 }, resolve));
         }
-        // הקליק נשלח - זה עדיין לא הוכחה שהפרסום הצליח. ממתינים ואז מאמתים
-        // בפועל שהדיאלוג נסגר (אם הפרסום נכשל מסיבה כלשהי - הדיאלוג בד"כ
-        // נשאר פתוח עם הודעת שגיאה). לא סומכים רק על "הקליק לא זרק שגיאה".
-        await sleep(4000);
-        const dialogStillOpen = await chrome.scripting.executeScript({
-          target: { tabId },
-          func: () => {
-            const dialog = Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"]')).find(d => d.querySelector('[role="textbox"]'));
-            if (!dialog) return { open: false };
-            // דיאגנוסטיקה: קרא את כל הטקסט בדיאלוג + חפש הודעות שגיאה/הגבלה
-            // נפוצות של פייסבוק (rate limit / spam block / זמני)
-            const fullText = dialog.textContent?.slice(0, 800) || "";
-            const RATE_LIMIT_HINTS = [
-              "זמנית", "חסום", "חסומה", "הגבל", "later", "temporarily", "blocked",
-              "try again", "נסה שוב", "מוגבל", "too many", "unusual activity",
-              "פעילות חריגה", "spam", "ספאם",
-            ];
-            const matchedHints = RATE_LIMIT_HINTS.filter(h => fullText.includes(h));
-            // חפש גם באנר/toast מיוחד שפייסבוק מציגה מחוץ לדיאלוג (למשל חסימה זמנית)
-            const toastEl = document.querySelector('[role="alert"], [data-testid*="toast"], [data-testid*="error"]');
-            const toastText = toastEl?.textContent?.slice(0, 300) || null;
-            return { open: true, fullText, matchedHints, toastText };
-          },
-        });
-        const dr = dialogStillOpen?.[0]?.result;
-        if (dr?.open) {
-          const hintsStr = dr.matchedHints?.length ? `רמזי הגבלה: ${dr.matchedHints.join(",")} | ` : "אין רמזי הגבלה בטקסט | ";
-          publishError = `הדיאלוג נשאר פתוח אחרי הקליק | ${hintsStr}toast: ${dr.toastText || "אין"} | טקסט דיאלוג: ${dr.fullText?.slice(0, 400)}`;
+        // הקליק נשלח - זה עדיין לא הוכחה שהפרסום הצליח. מאמתים בפועל שהדיאלוג
+        // נסגר (אם הפרסום נכשל - הדיאלוג בד"כ נשאר פתוח). בדיקה יחידה אחרי
+        // 4 שניות הייתה לפעמים מוקדמת מדי (קבוצה גדולה/רשת איטית) - עכשיו
+        // בודקים כמה פעמים על פני עד 10 שניות לפני שמסמנים כישלון.
+        let dialogClosed = false;
+        let dr = null;
+        for (let closeCheck = 0; closeCheck < 5; closeCheck++) {
+          await sleep(2000);
+          const dialogStillOpen = await chrome.scripting.executeScript({
+            target: { tabId },
+            func: () => {
+              const dialog = Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"]')).find(d => d.querySelector('[role="textbox"]'));
+              if (!dialog) return { open: false };
+              // דיאגנוסטיקה: קרא את כל הטקסט בדיאלוג + חפש הודעות שגיאה/הגבלה
+              // נפוצות של פייסבוק (rate limit / spam block / זמני)
+              const fullText = dialog.textContent?.slice(0, 800) || "";
+              const RATE_LIMIT_HINTS = [
+                "זמנית", "חסום", "חסומה", "הגבל", "later", "temporarily", "blocked",
+                "try again", "נסה שוב", "מוגבל", "too many", "unusual activity",
+                "פעילות חריגה", "spam", "ספאם",
+              ];
+              const matchedHints = RATE_LIMIT_HINTS.filter(h => fullText.includes(h));
+              // חפש גם באנר/toast מיוחד שפייסבוק מציגה מחוץ לדיאלוג (למשל חסימה זמנית)
+              const toastEl = document.querySelector('[role="alert"], [data-testid*="toast"], [data-testid*="error"]');
+              const toastText = toastEl?.textContent?.slice(0, 300) || null;
+              return { open: true, fullText, matchedHints, toastText };
+            },
+          });
+          dr = dialogStillOpen?.[0]?.result;
+          if (!dr?.open) { dialogClosed = true; break; }
+        }
+        if (!dialogClosed) {
+          const hintsStr = dr?.matchedHints?.length ? `רמזי הגבלה: ${dr.matchedHints.join(",")} | ` : "אין רמזי הגבלה בטקסט | ";
+          publishError = `הדיאלוג נשאר פתוח אחרי 10 שניות מהקליק | ${hintsStr}toast: ${dr?.toastText || "אין"} | טקסט דיאלוג: ${dr?.fullText?.slice(0, 400)}`;
           await updatePostNote(post.id, publishError, token);
           break; // לא מסמנים success
         }
