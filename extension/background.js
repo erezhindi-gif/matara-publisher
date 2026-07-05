@@ -131,13 +131,20 @@ async function publishPost(post, token, expectedUser) {
   let success = false;
   let publishError = null;
   let dialogListener = null; // מוצהר כאן (לא בתוך try) כדי שה-finally יוכל להסיר אותו
+
+  // Keepalive ל-service worker: ריצת פרסום בודדת לוקחת 30-60+ שניות עם הרבה
+  // sleep() (setTimeout רגיל) - Chrome MV3 הורג service workers שלא "פעילים"
+  // כ-30 שניות, גם באמצע Promise שעדיין ממתין. setTimeout לא נחשב פעילות.
+  // קריאת API טריוויאלית (chrome.storage) כל 20 שניות מאפסת את טיימר ה-idle
+  // ומונעת את זה. בלי זה - הרצה נהרגת בשקט: אין שגיאה, אין טאב, "לא קורה כלום".
+  const keepAlive = setInterval(() => { chrome.storage.local.get("deviceId", () => {}); }, 20000);
   try {
     const tab = await new Promise((resolve) => chrome.tabs.create({ url, active: true }, resolve));
     tabId = tab.id;
     await sleep(7000);
 
     await new Promise((resolve) => chrome.debugger.attach({ tabId }, "1.3", resolve));
-    await updatePostNote(post.id, "v2.48.0 - debugger attached", token);
+    await updatePostNote(post.id, "v2.49.0 - debugger attached", token);
 
     // דוחה אוטומטית כל דיאלוג "האם לעזוב את האתר?" (beforeunload) לפני שהוא נתקע.
     // חייבים להאזין ל-Page.javascriptDialogOpening ולהגיב לפני שמנווטים/סוגרים,
@@ -446,6 +453,7 @@ async function publishPost(post, token, expectedUser) {
   } catch (err) {
     await updatePostStatus(post.id, "failed", err.message, token);
   } finally {
+    clearInterval(keepAlive);
     if (tabId) {
       // נווט ל-about:blank - dialogListener עדיין פעיל בשלב הזה, אז כל
       // beforeunload שנפתח כתוצאה מהניווט נדחה אוטומטית מיד, לא אחרי שהוא כבר תקוע
