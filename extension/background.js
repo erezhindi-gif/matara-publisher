@@ -137,7 +137,7 @@ async function publishPost(post, token, expectedUser) {
     await sleep(7000);
 
     await new Promise((resolve) => chrome.debugger.attach({ tabId }, "1.3", resolve));
-    await updatePostNote(post.id, "v2.46.0 - debugger attached", token);
+    await updatePostNote(post.id, "v2.47.0 - debugger attached", token);
 
     // דוחה אוטומטית כל דיאלוג "האם לעזוב את האתר?" (beforeunload) לפני שהוא נתקע.
     // חייבים להאזין ל-Page.javascriptDialogOpening ולהגיב לפני שמנווטים/סוגרים,
@@ -150,26 +150,6 @@ async function publishPost(post, token, expectedUser) {
     };
     chrome.debugger.onEvent.addListener(dialogListener);
     await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Page.enable", {}, resolve));
-
-    // בדיקת בטיחות: מי מחובר לפייסבוק בפועל בטאב הזה, לעומת מי אמור להיות מחובר
-    // הוחזר להתרעה בלבד (לא חוסם) ב-2026-07-05 - הסלקטור הקודם תפס בטעות את
-    // כפתור "אפשרויות והגדרות של חשבון" (תפריט כללי, לא שם היוזר) וחסם פרסום
-    // תקין לגמרי. הסלקטור עדיין לא אומת מול DOM אמיתי - אסור להחזיר לחסימה
-    // קשיחה עד שיימצא סלקטור שבאמת מזהה את שם החשבון המחובר, לא תפריט כללי.
-    if (expectedUser?.name) {
-      const identityCheck = await chrome.scripting.executeScript({
-        target: { tabId },
-        func: () => {
-          const el = document.querySelector('[aria-label*="חשבון"], [aria-label*="Your profile"], [aria-label*="profile"]');
-          return el?.getAttribute('aria-label') || el?.textContent || null;
-        },
-      });
-      const detectedIdentity = identityCheck?.[0]?.result;
-      const nameMatches = detectedIdentity && detectedIdentity.includes(expectedUser.name.split(' ')[0]);
-      if (detectedIdentity && !nameMatches) {
-        await updatePostNote(post.id, `אזהרת זהות (לא חוסם): צפוי "${expectedUser.name}" אך זוהה "${detectedIdentity}"`, token);
-      }
-    }
 
     // 1. פתח תיבת כתיבה
     await chrome.scripting.executeScript({
@@ -189,6 +169,42 @@ async function publishPost(post, token, expectedUser) {
       },
     });
     await sleep(3000);
+
+    // בדיקת בטיחות: מי מחובר לפייסבוק בפועל, לעומת מי אמור להיות מחובר.
+    // חסימה קשיחה (2026-07-05, גרסה שנייה) - הניסיון הקודם (v2.37.0) נכשל כי
+    // חיפש aria-label בכל המסמך ותפס בטעות את כפתור "אפשרויות והגדרות של
+    // חשבון" (תפריט כללי). הפעם: מחפשים *בתוך הדיאלוג של תיבת הכתיבה בלבד*
+    // (נפתח בשלב 1, ממש למעלה) את תמונת האווטאר של הכותב - יש לה alt עם השם
+    // המלא, זה בדיוק השם שיוצג כמפרסם הפוסט. נראה חוזר בעקביות בצילומי מסך
+    // רבים לאורך הפרויקט (למשל "Milana Noa Erez" ליד האווטאר, מעל "קבוצה
+    // ציבורית"). חוסמים רק כשהזיהוי "נראה כמו שם" (2-4 מילים, רק אותיות/רווחים) -
+    // לא חוסמים על alt ריק/גיבריש, כדי לא לחזור על טעות ה-false positive הקודמת.
+    if (expectedUser?.name) {
+      const identityCheck = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => {
+          const dialog = Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"]')).find(d => d.querySelector('[role="textbox"]'));
+          if (!dialog) return null;
+          // alt-texts גנריים שנראים "כמו שם" (2-4 מילים, רק אותיות) אבל אינם -
+          // חייבים לסנן אותם במפורש, אחרת false positive (למשל "תמונת פרופיל")
+          const GENERIC_ALTS = ["תמונת פרופיל", "profile picture", "profile photo", "avatar"];
+          const avatarImgs = Array.from(dialog.querySelectorAll('img[alt]'));
+          const candidate = avatarImgs.map(img => img.getAttribute('alt')?.trim()).find(alt => {
+            if (!alt) return false;
+            if (GENERIC_ALTS.some(g => alt.toLowerCase().includes(g.toLowerCase()))) return false;
+            const words = alt.split(/\s+/);
+            return words.length >= 2 && words.length <= 4 && /^[֐-׿a-zA-Z\s'’-]+$/.test(alt);
+          });
+          return candidate || null;
+        },
+      });
+      const detectedIdentity = identityCheck?.[0]?.result;
+      const nameMatches = detectedIdentity && detectedIdentity.includes(expectedUser.name.split(' ')[0]);
+      if (detectedIdentity && !nameMatches) {
+        throw new Error(`חסימת זהות: צפוי "${expectedUser.name}" אך זוהה "${detectedIdentity}" בדיאלוג הכתיבה - הפרסום נעצר`);
+      }
+      if (detectedIdentity) await updatePostNote(post.id, `זהות אומתה: "${detectedIdentity}"`, token);
+    }
 
     // 2. תמונה - הורדה לדיסק זמנית + הזרקה דרך CDP DOM.setFileInputFiles
     // חשוב: לא לוחצים על כפתור "העלאה ממחשב" - זה פותח בורר קבצים של מערכת ההפעלה
