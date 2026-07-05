@@ -137,7 +137,7 @@ async function publishPost(post, token, expectedUser) {
     await sleep(7000);
 
     await new Promise((resolve) => chrome.debugger.attach({ tabId }, "1.3", resolve));
-    await updatePostNote(post.id, "v2.47.0 - debugger attached", token);
+    await updatePostNote(post.id, "v2.48.0 - debugger attached", token);
 
     // דוחה אוטומטית כל דיאלוג "האם לעזוב את האתר?" (beforeunload) לפני שהוא נתקע.
     // חייבים להאזין ל-Page.javascriptDialogOpening ולהגיב לפני שמנווטים/סוגרים,
@@ -171,23 +171,19 @@ async function publishPost(post, token, expectedUser) {
     await sleep(3000);
 
     // בדיקת בטיחות: מי מחובר לפייסבוק בפועל, לעומת מי אמור להיות מחובר.
-    // חסימה קשיחה (2026-07-05, גרסה שנייה) - הניסיון הקודם (v2.37.0) נכשל כי
-    // חיפש aria-label בכל המסמך ותפס בטעות את כפתור "אפשרויות והגדרות של
-    // חשבון" (תפריט כללי). הפעם: מחפשים *בתוך הדיאלוג של תיבת הכתיבה בלבד*
-    // (נפתח בשלב 1, ממש למעלה) את תמונת האווטאר של הכותב - יש לה alt עם השם
-    // המלא, זה בדיוק השם שיוצג כמפרסם הפוסט. נראה חוזר בעקביות בצילומי מסך
-    // רבים לאורך הפרויקט (למשל "Milana Noa Erez" ליד האווטאר, מעל "קבוצה
-    // ציבורית"). חוסמים רק כשהזיהוי "נראה כמו שם" (2-4 מילים, רק אותיות/רווחים) -
-    // לא חוסמים על alt ריק/גיבריש, כדי לא לחזור על טעות ה-false positive הקודמת.
+    // הוחזר להתרעה בלבד ב-2026-07-05 (בפעם השנייה) - הניסיון "גרסה 2" (חיפוש
+    // img[alt] בתוך הדיאלוג) תפס בטעות אלמנט img עם alt="קבוצה ציבורית" (תג
+    // הפרטיות של הקבוצה, לא תמונת הפרופיל) וחסם 0/3 פרסומים תקינים. זו הפעם
+    // השנייה שניסיון "לתקן את הסלקטור" בלי ראייה חיה על ה-DOM האמיתי נכשל
+    // באופן שונה. לא לנסות שוב לחסימה קשיחה בלי לבדוק בפועל מול Facebook
+    // (למשל דרך browser tooling חי) אילו img/alt קיימים בדיאלוג בפועל.
     if (expectedUser?.name) {
       const identityCheck = await chrome.scripting.executeScript({
         target: { tabId },
         func: () => {
           const dialog = Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"]')).find(d => d.querySelector('[role="textbox"]'));
           if (!dialog) return null;
-          // alt-texts גנריים שנראים "כמו שם" (2-4 מילים, רק אותיות) אבל אינם -
-          // חייבים לסנן אותם במפורש, אחרת false positive (למשל "תמונת פרופיל")
-          const GENERIC_ALTS = ["תמונת פרופיל", "profile picture", "profile photo", "avatar"];
+          const GENERIC_ALTS = ["תמונת פרופיל", "profile picture", "profile photo", "avatar", "קבוצה ציבורית", "קבוצה פרטית", "public group", "private group"];
           const avatarImgs = Array.from(dialog.querySelectorAll('img[alt]'));
           const candidate = avatarImgs.map(img => img.getAttribute('alt')?.trim()).find(alt => {
             if (!alt) return false;
@@ -201,9 +197,8 @@ async function publishPost(post, token, expectedUser) {
       const detectedIdentity = identityCheck?.[0]?.result;
       const nameMatches = detectedIdentity && detectedIdentity.includes(expectedUser.name.split(' ')[0]);
       if (detectedIdentity && !nameMatches) {
-        throw new Error(`חסימת זהות: צפוי "${expectedUser.name}" אך זוהה "${detectedIdentity}" בדיאלוג הכתיבה - הפרסום נעצר`);
+        await updatePostNote(post.id, `אזהרת זהות (לא חוסם): צפוי "${expectedUser.name}" אך זוהה "${detectedIdentity}"`, token);
       }
-      if (detectedIdentity) await updatePostNote(post.id, `זהות אומתה: "${detectedIdentity}"`, token);
     }
 
     // 2. תמונה - הורדה לדיסק זמנית + הזרקה דרך CDP DOM.setFileInputFiles
