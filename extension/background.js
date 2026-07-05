@@ -137,7 +137,7 @@ async function publishPost(post, token, expectedUser) {
     await sleep(7000);
 
     await new Promise((resolve) => chrome.debugger.attach({ tabId }, "1.3", resolve));
-    await updatePostNote(post.id, "v2.43.0 - debugger attached", token);
+    await updatePostNote(post.id, "v2.44.0 - debugger attached", token);
 
     // דוחה אוטומטית כל דיאלוג "האם לעזוב את האתר?" (beforeunload) לפני שהוא נתקע.
     // חייבים להאזין ל-Page.javascriptDialogOpening ולהגיב לפני שמנווטים/סוגרים,
@@ -284,8 +284,43 @@ async function publishPost(post, token, expectedUser) {
     let fullText = post.campaign.content;
     if (post.campaign.whatsappLink) fullText += `\n\n📱 ליצירת קשר בוואטסאפ: ${post.campaign.whatsappLink}`;
     if (post.campaign.emailLink)    fullText += `\n✉️ שלח קו"ח: ${post.campaign.emailLink}`;
-    await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.insertText", { text: fullText }, resolve));
-    await sleep(2000);
+
+    // ממצא 2026-07-05: בריצות מרובות ברצף, הטקסט לפעמים לא נכנס בפועל -
+    // הדיאלוג נשאר עם ה-placeholder הריק ("יצירת פוסט ציבורי...") במקום
+    // התוכן, וכפתור "פרסום" לא עושה כלום כי אין מה לפרסם. במקום לגלות את
+    // זה רק בסוף (הדיאלוג "נשאר פתוח"), מאמתים מיד שהטקסט באמת נכנס,
+    // ומנסים שוב פעם אחת אם לא - לפני שממשיכים לשלב הכפתור.
+    const contentSnippet = post.campaign.content.slice(0, 20);
+    let textInserted = false;
+    for (let attempt = 0; attempt < 2 && !textInserted; attempt++) {
+      await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Input.insertText", { text: fullText }, resolve));
+      await sleep(2000);
+      const check = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: (snippet) => {
+          const dialog = Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"]')).find(d => d.querySelector('[role="textbox"]'));
+          const box = dialog?.querySelector('[role="textbox"][contenteditable="true"]');
+          return !!box?.textContent?.includes(snippet);
+        },
+        args: [contentSnippet],
+      });
+      textInserted = !!check?.[0]?.result;
+      if (!textInserted && attempt === 0) {
+        // נסיון שני: מיקוד מחדש לפני הכנסה חוזרת (ייתכן שהפוקוס אבד)
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          func: () => {
+            const dialog = Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"]')).find(d => d.querySelector('[role="textbox"]'));
+            const box = dialog?.querySelector('[role="textbox"][contenteditable="true"]');
+            if (box) { box.click(); box.focus(); }
+          },
+        });
+        await sleep(500);
+      }
+    }
+    if (!textInserted) {
+      throw new Error("הטקסט לא נכנס לתיבת הכתיבה אחרי 2 נסיונות - עוצרים לפני לחיצת פרסום על תיבה ריקה");
+    }
 
     // 5. מצא ולחץ כפתור פרסום
     // הערה: aria-disabled=true בזמן טעינת תצוגת wa.me - ממתינים עד שמופיע enabled
