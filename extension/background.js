@@ -102,11 +102,17 @@ async function tick() {
       // בדוק פוסטים
       const jobsRes = await fetch(`${API_BASE}/api/extension/jobs?token=${apiToken}&deviceId=${deviceId || ""}`);
       if (jobsRes.ok) {
-        const { posts, user } = await jobsRes.json();
+        const { posts, user, profile } = await jobsRes.json();
+        if (profile && profile.remaining <= 0) {
+          console.log(`[רמזור] מכסה יומית מוצתה (${profile.postsToday}/${profile.dailyLimit}) - לא מקבלים עבודות חדשות`);
+        }
         if (posts && posts.length > 0) {
           for (const post of posts) {
             await publishPost(post, apiToken, user);
-            await sleep(5000);
+            // עיכוב אקראי 2-5 דקות בין פרסומים לאותו פרופיל - לא מרווח קבוע,
+            // נראה יותר טבעי לפייסבוק מ"כל 5 שניות בדיוק"
+            const delayMs = (120 + Math.random() * 180) * 1000;
+            await sleep(delayMs);
           }
         }
       }
@@ -144,7 +150,7 @@ async function publishPost(post, token, expectedUser) {
     await sleep(7000);
 
     await new Promise((resolve) => chrome.debugger.attach({ tabId }, "1.3", resolve));
-    await updatePostNote(post.id, "v2.51.0 - debugger attached", token);
+    await updatePostNote(post.id, "v2.52.0 - debugger attached", token);
 
     // דוחה אוטומטית כל דיאלוג "האם לעזוב את האתר?" (beforeunload) לפני שהוא נתקע.
     // חייבים להאזין ל-Page.javascriptDialogOpening ולהגיב לפני שמנווטים/סוגרים,
