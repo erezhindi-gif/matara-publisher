@@ -57,7 +57,7 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-64 min-h-screen bg-[#12122a] text-white flex flex-col flex-shrink-0" dir="rtl">
+    <aside className="w-64 min-h-screen bg-[#1c1934] text-white flex flex-col flex-shrink-0" dir="rtl">
       {/* Logo - סמל משולש/play בגרדיאנט המותג, כמו סימן "פרסום/שידור" */}
       <div className="px-6 py-7 flex items-center gap-2">
         <span className="text-2xl font-extrabold tracking-tight">Matara</span>
@@ -101,7 +101,7 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center justify-between px-4 py-3 rounded-full text-sm font-medium transition-colors ${
+              className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
                 active ? "bg-blue-600 text-white" : "text-white/60 hover:text-white hover:bg-white/5"
               }`}
             >

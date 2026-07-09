@@ -51,49 +51,45 @@ const BG_GRADIENTS: Record<number, string> = {
 
 // מסגרת אייפון סביב התצוגה המקדימה - כדי שזה ייראה כמו שהפוסט באמת יופיע
 // במסך טלפון, לא רק כרטיס פייסבוק שטוח בתוך הדף.
+// מידות ומראה נלקחו ישירות מבדיקת DOM חיה של app.ezpost.co.il/app/campaign/new
+// (מסגרת דקה 3px zinc-700, לא bezel שחור עבה, רוחב 272px, rounded-[37px])
 function IPhoneFrame({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto w-[340px] relative">
-      {/* כפתורי צד - נותנים תחושה ריאליסטית יותר */}
-      <div className="absolute -right-[3px] top-28 w-[3px] h-16 bg-[#0a0e17] rounded-l" />
-      <div className="absolute -left-[3px] top-24 w-[3px] h-8 bg-[#0a0e17] rounded-r" />
-      <div className="absolute -left-[3px] top-36 w-[3px] h-12 bg-[#0a0e17] rounded-r" />
+    <div className="mx-auto w-[272px] relative">
+      <div className="relative w-full h-[560px] rounded-[37px] border-[3px] border-zinc-700 bg-white overflow-hidden shadow-2xl shadow-cyan-500/10">
+        {/* פס סטטוס */}
+        <div className="absolute top-0 inset-x-0 h-10 flex items-end justify-between px-6 pb-1.5 text-xs font-semibold text-gray-900 z-10">
+          <span>10:10</span>
+          <span className="flex items-center gap-1 text-[10px]">📶 🛜 🔋</span>
+        </div>
+        {/* מחריץ המצלמה (Dynamic Island) */}
+        <div className="absolute top-2 inset-x-0 flex justify-center z-10">
+          <div className="w-24 h-6 bg-[#0a0e17] rounded-full" />
+        </div>
 
-      <div className="relative rounded-[3rem] bg-[#0a0e17] p-3 shadow-2xl shadow-cyan-500/20">
-        <div className="relative rounded-[2.4rem] bg-white overflow-hidden">
-          {/* פס סטטוס */}
-          <div className="absolute top-0 inset-x-0 h-11 flex items-end justify-between px-7 pb-1.5 text-[13px] font-semibold text-gray-900 z-10">
-            <span>10:10</span>
-            <span className="flex items-center gap-1 text-[11px]">📶 🛜 🔋</span>
+        {/* שורת אפליקציית פייסבוק */}
+        <div className="pt-10 px-4 pb-2 flex items-center justify-between border-b border-gray-100">
+          <div className="flex items-center gap-3 text-gray-800">
+            <span className="text-base">💬</span>
+            <span className="text-base">🔍</span>
+            <span className="text-base">➕</span>
           </div>
-          {/* מחריץ המצלמה (Dynamic Island) */}
-          <div className="absolute top-2.5 inset-x-0 flex justify-center z-10">
-            <div className="w-28 h-7 bg-[#0a0e17] rounded-full" />
-          </div>
+          <div className="text-lg font-bold text-blue-600" style={{ fontFamily: "Georgia, serif" }}>facebook</div>
+        </div>
 
-          {/* שורת אפליקציית פייסבוק */}
-          <div className="pt-11 px-4 pb-2 flex items-center justify-between border-b border-gray-100">
-            <div className="flex items-center gap-3 text-gray-800">
-              <span className="text-lg">💬</span>
-              <span className="text-lg">🔍</span>
-              <span className="text-lg">➕</span>
-            </div>
-            <div className="text-xl font-bold text-blue-600" style={{ fontFamily: "Georgia, serif" }}>facebook</div>
-          </div>
+        <div className="px-2 pt-2 pb-6 h-[calc(560px-72px)] overflow-y-auto">
+          {children}
+        </div>
 
-          <div className="px-2 pt-2 pb-6 max-h-[520px] overflow-y-auto">
-            {children}
-          </div>
-
-          {/* פס הבית התחתון */}
-          <div className="pb-2 pt-1 flex justify-center">
-            <div className="w-32 h-1.5 bg-gray-900/80 rounded-full" />
-          </div>
+        {/* פס הבית התחתון */}
+        <div className="absolute bottom-2 inset-x-0 flex justify-center">
+          <div className="w-32 h-1.5 bg-gray-900/80 rounded-full" />
         </div>
       </div>
     </div>
   );
 }
+
 
 function FacebookPreview({ content, whatsappLink, whatsappMessage, imagePreviews, backgroundIndex }: { content: string; whatsappLink: string; whatsappMessage?: string; imagePreviews: string[]; backgroundIndex?: number | null }) {
   const bg = backgroundIndex && !imagePreviews.length ? BG_GRADIENTS[backgroundIndex] : null;
