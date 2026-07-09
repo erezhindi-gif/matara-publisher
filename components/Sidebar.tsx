@@ -57,15 +57,15 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-60 min-h-screen bg-[#181225] text-white flex flex-col flex-shrink-0" dir="ltr">
+    <aside className="w-60 min-h-screen bg-[#0a0e17] grid-backdrop text-white flex flex-col flex-shrink-0" dir="ltr">
       {/* Logo */}
-      <div className="px-5 py-6 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-2xl brand-gradient flex items-center justify-center text-white font-extrabold text-lg shadow-lg shadow-purple-900/40">
+      <div className="px-5 py-6 flex items-center gap-3 border-b border-cyan-400/10">
+        <div className="w-10 h-10 rounded-2xl brand-gradient brand-glow flex items-center justify-center text-white font-extrabold text-lg">
           M
         </div>
         <div>
           <div className="text-lg font-bold text-white tracking-wide leading-none">Matara</div>
-          <div className="text-xs text-white/40 mt-1">Publisher</div>
+          <div className="text-xs brand-gradient-text font-medium mt-1">Publisher</div>
         </div>
       </div>
 
@@ -77,7 +77,7 @@ export default function Sidebar() {
             <button
               onClick={() => handleFilterChange("all")}
               className={`w-full text-right px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                filter === "all" ? "brand-gradient text-white shadow-md shadow-purple-900/30" : "text-white/50 hover:text-white hover:bg-white/10"
+                filter === "all" ? "brand-gradient text-white shadow-md shadow-cyan-500/20" : "text-white/50 hover:text-white hover:bg-white/10"
               }`}
             >
               כל הפרופילים
@@ -87,7 +87,7 @@ export default function Sidebar() {
                 key={p.id}
                 onClick={() => handleFilterChange(p.userId || p.id)}
                 className={`w-full text-right px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                  filter === (p.userId || p.id) ? "brand-gradient text-white shadow-md shadow-purple-900/30" : "text-white/50 hover:text-white hover:bg-white/10"
+                  filter === (p.userId || p.id) ? "brand-gradient text-white shadow-md shadow-cyan-500/20" : "text-white/50 hover:text-white hover:bg-white/10"
                 }`}
               >
                 {p.name}
@@ -106,7 +106,7 @@ export default function Sidebar() {
               key={item.href}
               href={item.href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                active ? "brand-gradient text-white shadow-md shadow-purple-900/30" : "text-white/50 hover:text-white hover:bg-white/10"
+                active ? "brand-gradient text-white shadow-md shadow-cyan-500/20" : "text-white/50 hover:text-white hover:bg-white/10"
               }`}
             >
               <span className="text-base w-5 text-center">{item.icon}</span>
@@ -120,7 +120,7 @@ export default function Sidebar() {
       <div className="px-3 pb-3">
         <Link
           href="/campaigns/new"
-          className="flex items-center justify-center gap-2 w-full brand-gradient hover:opacity-90 text-white rounded-full px-4 py-3 text-sm font-semibold transition-opacity shadow-lg shadow-purple-900/40"
+          className="flex items-center justify-center gap-2 w-full brand-gradient hover:opacity-90 text-white rounded-full px-4 py-3 text-sm font-semibold transition-opacity shadow-lg shadow-cyan-500/20"
         >
           <span>+</span>
           <span>קמפיין חדש</span>

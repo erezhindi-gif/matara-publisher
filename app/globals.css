@@ -1,13 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f7fb;
-  --foreground: #1e1b2e;
+  --background: #f4f6fb;
+  --foreground: #0f1226;
 
-  /* פלטה חדשה: סגול-אינדיגו חם במקום כחול שטוח */
-  --brand-from: #6d28d9;
-  --brand-to: #ec4899;
-  --brand-solid: #7c3aed;
+  /* פלטה עתידנית: ציאן חשמלי -> סגול-אינדיגו נאון, במקום סגול-ורוד חם */
+  --brand-from: #06b6d4;
+  --brand-to: #7c3aed;
+  --brand-solid: #2dd4bf;
+  --brand-glow: rgba(45, 212, 191, 0.35);
 }
 
 @theme inline {
@@ -32,4 +33,17 @@ body {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+/* זוהר נאון עדין - לכפתורי CTA ולוגו, במקום צל סגול רגיל */
+.brand-glow {
+  box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.25), 0 8px 24px -4px var(--brand-glow);
+}
+
+/* רשת עדינה ברקע הסיידבר - מרגיש "לוח בקרה" יותר מרקע שטוח */
+.grid-backdrop {
+  background-image:
+    linear-gradient(rgba(45, 212, 191, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(45, 212, 191, 0.06) 1px, transparent 1px);
+  background-size: 24px 24px;
 }

@@ -54,7 +54,7 @@ const BG_GRADIENTS: Record<number, string> = {
 function IPhoneFrame({ children }: { children: React.ReactNode }) {
   return (
     <div className="mx-auto w-[300px]">
-      <div className="relative rounded-[2.5rem] bg-[#181225] p-2.5 shadow-2xl shadow-purple-900/30">
+      <div className="relative rounded-[2.5rem] bg-[#0a0e17] p-2.5 shadow-2xl shadow-cyan-500/20">
         {/* פס שעון עליון */}
         <div className="relative rounded-[2rem] bg-[#f7f7fb] overflow-hidden">
           <div className="absolute top-0 inset-x-0 h-8 flex items-center justify-between px-6 text-[10px] font-semibold text-gray-900 z-10">
@@ -63,7 +63,7 @@ function IPhoneFrame({ children }: { children: React.ReactNode }) {
           </div>
           {/* המחריץ (notch) */}
           <div className="absolute top-0 inset-x-0 flex justify-center z-10">
-            <div className="w-28 h-6 bg-[#181225] rounded-b-2xl" />
+            <div className="w-28 h-6 bg-[#0a0e17] rounded-b-2xl" />
           </div>
           <div className="pt-9 pb-3 px-2 max-h-[560px] overflow-y-auto">
             {children}
@@ -426,7 +426,7 @@ function ScheduleStep({
           <button
             onClick={onSave}
             disabled={loading || (scheduleDays.length > 0 && !scheduleStartDate) || scheduleDays.some(d => { const nd = new Date(scheduleStartDate || new Date()); nd.setDate(nd.getDate() + (d - nd.getDay() + 7) % 7); return isDayFull(nd); })}
-            className="flex-1 brand-gradient hover:opacity-90 disabled:opacity-40 disabled:bg-gray-300 text-white rounded-full p-3 font-semibold transition-opacity shadow-md shadow-purple-900/20"
+            className="flex-1 brand-gradient hover:opacity-90 disabled:opacity-40 disabled:bg-gray-300 text-white rounded-full p-3 font-semibold transition-opacity brand-glow"
           >
             {loading ? "שומר..." : "✓ שמור קמפיין"}
           </button>
@@ -799,7 +799,7 @@ export default function NewCampaignPage() {
               <button
                 onClick={() => setStep("templates")}
                 disabled={!form.jobTitle || !form.content}
-                className="w-full brand-gradient hover:opacity-90 disabled:opacity-40 disabled:bg-gray-300 text-white rounded-full p-4 font-semibold transition-opacity shadow-md shadow-purple-900/20"
+                className="w-full brand-gradient hover:opacity-90 disabled:opacity-40 disabled:bg-gray-300 text-white rounded-full p-4 font-semibold transition-opacity brand-glow"
               >
                 המשך לתבניות →
               </button>
@@ -906,7 +906,7 @@ export default function NewCampaignPage() {
               <button
                 onClick={() => setStep("schedule")}
                 disabled={templateMode === "template" ? selectedTemplates.length === 0 : selectedGroupIds.length === 0}
-                className="flex-1 brand-gradient hover:opacity-90 disabled:opacity-40 disabled:bg-gray-300 text-white rounded-full p-3 font-semibold transition-opacity shadow-md shadow-purple-900/20"
+                className="flex-1 brand-gradient hover:opacity-90 disabled:opacity-40 disabled:bg-gray-300 text-white rounded-full p-3 font-semibold transition-opacity brand-glow"
               >
                 המשך לתזמון →
               </button>
