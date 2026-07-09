@@ -121,7 +121,8 @@ async function tick() {
       const syncRes = await fetch(`${API_BASE}/api/extension/sync?token=${apiToken}&deviceId=${deviceId || ""}`);
       if (syncRes.ok) {
         const { job, user: syncUser } = await syncRes.json();
-        if (job) await syncGroups(job, apiToken, deviceId, syncUser);
+        if (job && job.type === "dedup") await mergeDuplicateGroups(job, apiToken, deviceId, syncUser);
+        else if (job) await syncGroups(job, apiToken, deviceId, syncUser);
       }
     } catch (err) {
       console.error("שגיאה:", err);
@@ -663,6 +664,110 @@ async function syncGroups(job, token, deviceId, expectedUser) {
   } finally {
     clearInterval(keepAlive);
     try { await new Promise((resolve) => chrome.debugger.detach({ tabId }, resolve)); } catch {}
+    if (tabId) chrome.tabs.remove(tabId);
+  }
+}
+
+// חילוץ מספר חברים מעמוד קבוצה בודד (לא מרשימת "הקבוצות שלי") - אימות שנייה
+// למיזוג כפילויות. תואם "‏55.3K‏‏ חברים בקבוצה" ו-"41.5K members" כאחד.
+function extractMemberCountText() {
+  const text = document.body.innerText || "";
+  const m = text.match(/([\d.,]+\s*[KMkm]?)\s*(?:חברים בקבוצה|members)/);
+  return m ? m[1].replace(/\s/g, "") : null;
+}
+
+// מיזוג כפילויות חד-פעמי (backfill) - מוחק כפילות רק אחרי אימות חי בדפדפן
+// (לא ניחוש לפי שם, בדיוק כמו הלקח מ-2026-07-10 project-map.md): לכל זוג
+// חשוד פותחים את שני עמודי הקבוצה בפועל ומשווים מספר חברים. תואם בדיוק ->
+// מיזוג אוטומטי לגרסה המספרית (יציבה יותר מ-slug). לא תואם/לא נטען -> משאירים
+// את שתי הרשומות כמו שהן (ברירת מחדל בטוחה, לא מנחשים).
+async function mergeDuplicateGroups(job, token, deviceId, expectedUser) {
+  let tabId = null;
+  const keepAlive = setInterval(() => { chrome.storage.local.get("deviceId", () => {}); }, 20000);
+  try {
+    const res = await fetch(`${API_BASE}/api/extension/groups/dedup-suspects?token=${token}&deviceId=${deviceId || ""}&businessId=${job.businessId}`);
+    if (!res.ok) throw new Error("שגיאה בטעינת רשימת הכפילויות החשודות");
+    const { suspects } = await res.json();
+
+    const tab = await new Promise((resolve) => chrome.tabs.create({ url: "https://www.facebook.com/", active: false }, resolve));
+    tabId = tab.id;
+    await sleep(3000);
+
+    if (expectedUser?.name) {
+      const identityCheck = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => {
+          const nav = document.querySelector('[role="banner"]') || document.querySelector('nav') || document;
+          const GENERIC_ALTS = ["תמונת פרופיל", "profile picture", "profile photo", "avatar", "קבוצה ציבורית", "קבוצה פרטית", "public group", "private group", "facebook"];
+          const imgs = Array.from(nav.querySelectorAll('img[alt]'));
+          const candidate = imgs.map(img => img.getAttribute('alt')?.trim()).find(alt => {
+            if (!alt) return false;
+            if (GENERIC_ALTS.some(g => alt.toLowerCase().includes(g.toLowerCase()))) return false;
+            const words = alt.split(/\s+/);
+            return words.length >= 2 && words.length <= 4 && /^[֐-׿a-zA-Z\s'’-]+$/.test(alt);
+          });
+          return candidate || null;
+        },
+      });
+      const detectedIdentity = identityCheck?.[0]?.result;
+      const nameMatches = detectedIdentity && detectedIdentity.includes(expectedUser.name.split(' ')[0]);
+      if (detectedIdentity && !nameMatches) {
+        throw new Error(`חסימת זהות בניקוי כפילויות: צפוי "${expectedUser.name}" אך זוהה "${detectedIdentity}" - הפעולה נעצרה`);
+      }
+    }
+
+    let mergedCount = 0, skippedCount = 0, processed = 0;
+    for (const s of suspects) {
+      await chrome.scripting.executeScript({ target: { tabId }, func: (id) => { location.href = `https://www.facebook.com/groups/${id}`; }, args: [s.numericFbGroupId] });
+      await sleep(4000 + Math.random() * 1500);
+      const rA = await chrome.scripting.executeScript({ target: { tabId }, func: extractMemberCountText });
+      const countA = rA?.[0]?.result;
+
+      await chrome.scripting.executeScript({ target: { tabId }, func: (id) => { location.href = `https://www.facebook.com/groups/${id}`; }, args: [s.slugFbGroupId] });
+      await sleep(4000 + Math.random() * 1500);
+      const rB = await chrome.scripting.executeScript({ target: { tabId }, func: extractMemberCountText });
+      const countB = rB?.[0]?.result;
+
+      const verified = !!countA && !!countB && countA === countB;
+      if (verified) mergedCount++; else skippedCount++;
+
+      await fetch(`${API_BASE}/api/extension/groups/dedup-resolve?token=${token}&deviceId=${deviceId || ""}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateId: s.templateId, keepFbGroupId: s.numericFbGroupId, removeFbGroupId: s.slugFbGroupId, verified }),
+      }).catch(() => {});
+
+      processed++;
+      await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}&deviceId=${deviceId || ""}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "running", groupsFound: processed }),
+      }).catch(() => {});
+
+      // עיכוב אקראי 4-7 שניות בין זוגות + פאוזה של דקה כל 50 קבוצות (לא להיראות רובוטי)
+      await sleep(4000 + Math.random() * 3000);
+      if (processed % 50 === 0) await sleep(60000);
+    }
+
+    await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}&deviceId=${deviceId || ""}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "done", groupsFound: processed }),
+    });
+
+    chrome.notifications.create({
+      type: "basic", iconUrl: "icon48.png",
+      title: "ניקוי כפילויות הושלם",
+      message: `${mergedCount} כפילויות אומתו ומוזגו, ${skippedCount} לא אומתו (נשארו ללא שינוי)`,
+    });
+  } catch (err) {
+    await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}&deviceId=${deviceId || ""}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "failed", error: err.message }),
+    });
+  } finally {
+    clearInterval(keepAlive);
     if (tabId) chrome.tabs.remove(tabId);
   }
 }

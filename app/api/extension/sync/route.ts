@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
   const sessionUserId = (session.user as { id: string }).id;
   const isAdmin = (session.user as { role?: string })?.role === "admin";
-  const { businessId, profileId } = await req.json();
+  const { businessId, profileId, type } = await req.json();
 
   // userId חייב להיות בעל הפרופיל שנבחר - לא המשתמש המחובר לדשבורד.
   // באג שגרם לג'וב תמיד לרוץ תחת זהות המנהל (session), גם כשנבחר פרופיל
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
   });
 
   const job = await prisma.syncJob.create({
-    data: { userId, businessId, status: "pending" },
+    data: { userId, businessId, status: "pending", type: type === "dedup" ? "dedup" : "sync" },
   });
 
   return NextResponse.json({ job });

@@ -110,6 +110,7 @@ model SyncJob {
   id          String   @id @default(cuid())
   userId      String
   businessId  String
+  type        String   @default("sync")
   status      String   @default("pending")
   groupCount  Int?
   groupsFound Int      @default(0)

@@ -11,6 +11,7 @@ export default function SyncPage() {
   const [selectedProfileId, setSelectedProfileId] = useState("");
   const [businessFilter, setBusinessFilterState] = useState(() => getBusinessFilter());
   const [jobId, setJobId] = useState<string | null>(null);
+  const [jobType, setJobType] = useState<string>("sync");
   const [jobStatus, setJobStatus] = useState<string | null>(null);
   const [groupCount, setGroupCount] = useState<number | null>(null);
   const [groupsFound, setGroupsFound] = useState<number>(0);
@@ -41,6 +42,7 @@ export default function SyncPage() {
       const res = await fetch(`/api/extension/sync/${jobId}`);
       const { job } = await res.json();
       setJobStatus(job.status);
+      setJobType(job.type || "sync");
       setGroupCount(job.groupCount);
       setGroupsFound(job.groupsFound || 0);
       if (job.error) setError(job.error);
@@ -51,18 +53,19 @@ export default function SyncPage() {
     return () => clearInterval(pollRef.current!);
   }, [jobId]);
 
-  async function startSync() {
+  async function startSync(type: "sync" | "dedup" = "sync") {
     const profile = profiles.find((p) => p.id === selectedProfileId);
     if (!profile) return;
     setError(null);
     setGroupCount(null);
     setGroupsFound(0);
+    setJobType(type);
     setJobStatus("waiting");
 
     const res = await fetch("/api/extension/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ businessId: profile.businessId, profileId: profile.id }),
+      body: JSON.stringify({ businessId: profile.businessId, profileId: profile.id, type }),
     });
     const { job } = await res.json();
     setJobId(job.id);
@@ -112,11 +115,20 @@ export default function SyncPage() {
 
         {/* כפתור סנכרון */}
         <button
-          onClick={startSync}
+          onClick={() => startSync("sync")}
           disabled={isRunning || !selectedProfileId}
           className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:from-gray-400 disabled:to-gray-400 rounded-2xl p-4 font-semibold text-lg text-white transition-all shadow-lg shadow-blue-500/20"
         >
-          {isRunning ? "מסנכרן..." : "סנכרן קבוצות עכשיו"}
+          {isRunning && jobType === "sync" ? "מסנכרן..." : "סנכרן קבוצות עכשיו"}
+        </button>
+
+        {/* כפתור ניקוי כפילויות - חד פעמי, פותח כל זוג חשוד בפייסבוק לאימות לפני מיזוג */}
+        <button
+          onClick={() => startSync("dedup")}
+          disabled={isRunning || !selectedProfileId}
+          className="w-full mt-3 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 rounded-2xl p-3 font-medium text-gray-700 transition-all"
+        >
+          {isRunning && jobType === "dedup" ? "מנקה כפילויות..." : "נקה כפילויות (חד פעמי, יכול לקחת עד שעה)"}
         </button>
 
         {/* סטטוס */}
@@ -130,26 +142,28 @@ export default function SyncPage() {
               <div>
                 <div className="text-2xl mb-2">⏳</div>
                 <div className="font-semibold text-blue-800">ממתין לתוסף...</div>
-                <div className="text-sm text-blue-600 mt-1">התוסף יתחיל לסרוק תוך 30 שניות</div>
+                <div className="text-sm text-blue-600 mt-1">התוסף יתחיל תוך 30 שניות</div>
               </div>
             )}
             {(jobStatus === "pending" || jobStatus === "running") && (
               <div>
                 <div className="text-2xl mb-2 animate-spin inline-block">⟳</div>
-                <div className="font-semibold text-blue-800">סורק קבוצות...</div>
+                <div className="font-semibold text-blue-800">{jobType === "dedup" ? "בודק כפילויות..." : "סורק קבוצות..."}</div>
                 {groupsFound > 0 && (
                   <div className="text-3xl font-bold text-blue-700 mt-2">{groupsFound}</div>
                 )}
                 <div className="text-sm text-blue-600 mt-1">
-                  {groupsFound > 0 ? `קבוצות נמצאו עד כה` : "פייסבוק נפתח ברקע"}
+                  {jobType === "dedup"
+                    ? (groupsFound > 0 ? "זוגות נבדקו עד כה" : "פייסבוק נפתח ברקע")
+                    : (groupsFound > 0 ? "קבוצות נמצאו עד כה" : "פייסבוק נפתח ברקע")}
                 </div>
               </div>
             )}
             {jobStatus === "done" && (
               <div>
                 <div className="text-4xl mb-2">✅</div>
-                <div className="font-semibold text-green-800">סנכרון הושלם!</div>
-                {groupCount && <div className="text-green-700 mt-1">{groupCount} קבוצות נוספו למערכת</div>}
+                <div className="font-semibold text-green-800">{jobType === "dedup" ? "ניקוי הכפילויות הושלם!" : "סנכרון הושלם!"}</div>
+                {jobType === "sync" && groupCount && <div className="text-green-700 mt-1">{groupCount} קבוצות נוספו למערכת</div>}
                 <Link href="/templates" className="block mt-3 text-blue-600 hover:underline text-sm">
                   צפה בקבוצות ←
                 </Link>
