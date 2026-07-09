@@ -150,7 +150,7 @@ async function publishPost(post, token, expectedUser) {
     await sleep(7000);
 
     await new Promise((resolve) => chrome.debugger.attach({ tabId }, "1.3", resolve));
-    await updatePostNote(post.id, "v2.55.0 - debugger attached", token);
+    await updatePostNote(post.id, "v2.56.0 - debugger attached", token);
 
     // דוחה אוטומטית כל דיאלוג "האם לעזוב את האתר?" (beforeunload) לפני שהוא נתקע.
     // חייבים להאזין ל-Page.javascriptDialogOpening ולהגיב לפני שמנווטים/סוגרים,
@@ -597,11 +597,7 @@ async function syncGroups(job, token, deviceId, expectedUser) {
     // ממצא 2026-07-10: על רשימות ענקיות (~2500 קבוצות) 200 גלילות / 6 גלילות
     // "בלי חדש" (15 שניות) עצרו מוקדם מדי - הועלו ל-500/15 (37.5 שניות
     // סבלנות) כדי לתת לרשימה הוירטואלית של פייסבוק זמן לטעון על חשבונות גדולים.
-    // dedupByName: מיפוי שם→fbGroupId ראשון שנראה - פייסבוק לפעמים מציג את
-    // אותה קבוצה פיזית עם href שונה (ID מספרי מול slug) בין רינדורים שונים
-    // באותה גלילה - בלי זה, אותה קבוצה נספרת פעמיים תחת שני fbGroupId.
     let noNewCount = 0;
-    const dedupByName = new Map(); // name מנורמל -> fbGroupId שכבר נשמר
     for (let i = 0; i < 500; i++) {
       // סרוק כרטיסים גלויים לפני הגלילה הבאה
       const domResult = await chrome.scripting.executeScript({
@@ -609,10 +605,6 @@ async function syncGroups(job, token, deviceId, expectedUser) {
         func: scrapeJoinedGroupCards,
       });
       for (const g of (domResult?.[0]?.result || [])) {
-        const nameKey = g.name.trim().toLowerCase();
-        const existingId = dedupByName.get(nameKey);
-        if (existingId && existingId !== g.fbGroupId) continue; // אותו שם, ID אחר - כנראה אותה קבוצה, מדלגים
-        dedupByName.set(nameKey, g.fbGroupId);
         found.set(g.fbGroupId, g);
       }
 
@@ -641,6 +633,14 @@ async function syncGroups(job, token, deviceId, expectedUser) {
 
     chrome.debugger.onEvent.removeListener(onEvent);
     await new Promise((resolve) => chrome.debugger.detach({ tabId }, resolve));
+
+    // דה-דופ לפי שם הוסר לגמרי ב-2026-07-10 (לא רק צומצם) - הכלל "בדיוק 2
+    // רשומות, אחת מספרית אחת slug" נבדק מול נתונים אמיתיים ומחק בטעות ~88
+    // קבוצות אמיתיות אצל ארז (701 בפועל אחרי מחיקה, מול 789 אמיתי - יותר
+    // מדי נמחק, לא פחות מדי). אין כרגע דרך אמינה להבחין "אותה קבוצה, href
+    // שונה" מ"שתי קבוצות אמיתיות עם שם דומה/גנרי" רק לפי (שם + פורמט ID).
+    // עדיף לספור כפילות מדי (בעיה קוסמטית) מאשר למחוק קבוצות אמיתיות (בעיה
+    // הרבה יותר גרועה וקשה לזיהוי). ראה project-map.md לניתוח מלא.
 
     const groups = Array.from(found.values());
     await fetch(`${API_BASE}/api/extension/sync/${job.id}?token=${token}&deviceId=${deviceId || ""}`, {
