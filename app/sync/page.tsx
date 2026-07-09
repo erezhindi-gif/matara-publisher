@@ -62,7 +62,7 @@ export default function SyncPage() {
     const res = await fetch("/api/extension/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ businessId: profile.businessId }),
+      body: JSON.stringify({ businessId: profile.businessId, profileId: profile.id }),
     });
     const { job } = await res.json();
     setJobId(job.id);

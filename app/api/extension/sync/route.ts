@@ -34,8 +34,25 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const userId = (session.user as { id: string }).id;
-  const { businessId } = await req.json();
+  const sessionUserId = (session.user as { id: string }).id;
+  const isAdmin = (session.user as { role?: string })?.role === "admin";
+  const { businessId, profileId } = await req.json();
+
+  // userId חייב להיות בעל הפרופיל שנבחר - לא המשתמש המחובר לדשבורד.
+  // באג שגרם לג'וב תמיד לרוץ תחת זהות המנהל (session), גם כשנבחר פרופיל
+  // אחר בתפריט - התוסף שהריץ את זה תמיד היה זה שמחזיק בטוקן של אותו
+  // session.user.id, בלי שום קשר לפרופיל שהוצג ב-UI.
+  let userId = sessionUserId;
+  if (profileId) {
+    const profile = await prisma.profile.findUnique({ where: { id: profileId } });
+    if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+    if (!profile.userId) return NextResponse.json({ error: "Profile has no linked user" }, { status: 400 });
+    // רק המנהל, או בעל הפרופיל עצמו, יכולים להפעיל סנכרון בשם הפרופיל הזה
+    if (!isAdmin && profile.userId !== sessionUserId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    userId = profile.userId;
+  }
 
   await prisma.syncJob.updateMany({
     where: { userId, status: { in: ["pending", "running"] } },
