@@ -109,9 +109,9 @@ async function tick() {
         if (posts && posts.length > 0) {
           for (const post of posts) {
             await publishPost(post, apiToken, user);
-            // עיכוב אקראי 2-5 דקות בין פרסומים לאותו פרופיל - לא מרווח קבוע,
-            // נראה יותר טבעי לפייסבוק מ"כל 5 שניות בדיוק"
-            const delayMs = (120 + Math.random() * 180) * 1000;
+            // עיכוב אקראי 20-60 שניות בין פרסומים לאותו פרופיל - לא מרווח קבוע.
+            // (היה 2-5 דקות - קוצר כי תבנית של 60 קבוצות הייתה לוקחת 3-4 שעות)
+            const delayMs = (20 + Math.random() * 40) * 1000;
             await sleep(delayMs);
           }
         }
@@ -150,7 +150,7 @@ async function publishPost(post, token, expectedUser) {
     await sleep(7000);
 
     await new Promise((resolve) => chrome.debugger.attach({ tabId }, "1.3", resolve));
-    await updatePostNote(post.id, "v2.52.0 - debugger attached", token);
+    await updatePostNote(post.id, "v2.53.0 - debugger attached", token);
 
     // דוחה אוטומטית כל דיאלוג "האם לעזוב את האתר?" (beforeunload) לפני שהוא נתקע.
     // חייבים להאזין ל-Page.javascriptDialogOpening ולהגיב לפני שמנווטים/סוגרים,

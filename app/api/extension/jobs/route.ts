@@ -13,6 +13,22 @@ export async function GET(req: NextRequest) {
 
   const now = new Date();
 
+  // התאוששות מעבודות תקועות: אם ה-service worker של התוסף נהרג באמצע ריצה
+  // (Chrome MV3 - ראה project-map.md), פוסט יכול להישאר "running" לצמיתות.
+  // כל פוסט "running" של המשתמש הזה שנתפס לפני יותר מ-10 דקות מוחזר ל-"pending"
+  // אוטומטית - לא נדרשת התערבות ידנית יותר.
+  const STALE_THRESHOLD_MS = 10 * 60 * 1000;
+  await prisma.post.updateMany({
+    where: {
+      status: "running",
+      campaign: { userId: user.id },
+      // claimedAt: null תופס גם פוסטים שנתפסו לפני שהשדה הזה נוצר (2026-07-08) -
+      // SQL "NULL < x" הוא NULL (לא true), אז lt לבד לא תופס אותם
+      OR: [{ claimedAt: { lt: new Date(now.getTime() - STALE_THRESHOLD_MS) } }, { claimedAt: null }],
+    },
+    data: { status: "pending", claimedBy: null, claimedAt: null },
+  });
+
   // מכסה יומית (חלון מתגלגל 24 שעות, לא איפוס-חצות) - נבדק לפני שתופסים
   // עבודות בכלל, כדי לא לתפוס פוסט ואז לנטוש אותו ב-status="running"
   const profile = await getProfileWithRollingReset(user.id);
@@ -50,7 +66,7 @@ export async function GET(req: NextRequest) {
     for (const post of pending) {
       const result = await tx.post.updateMany({
         where: { id: post.id, status: "pending" },
-        data: { status: "running", claimedBy: deviceId || "unknown" },
+        data: { status: "running", claimedBy: deviceId || "unknown", claimedAt: now },
       });
       if (result.count > 0) claimed.push(post);
     }

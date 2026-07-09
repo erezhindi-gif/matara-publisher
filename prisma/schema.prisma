@@ -127,6 +127,7 @@ model Post {
   groupName   String
   status      String    @default("pending")
   claimedBy   String?
+  claimedAt   DateTime? // מתי status עבר ל-"running" - נדרש כדי לזהות עבודות תקועות (createdAt לא מספיק, הוא נקבע ביצירת הפוסט, לא בתפיסה)
   publishedAt DateTime?
   error       String?
   createdAt   DateTime  @default(now())
