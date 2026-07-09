@@ -57,16 +57,12 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-60 min-h-screen bg-[#0a0e17] grid-backdrop text-white flex flex-col flex-shrink-0" dir="ltr">
-      {/* Logo */}
-      <div className="px-5 py-6 flex items-center gap-3 border-b border-cyan-400/10">
-        <div className="w-10 h-10 rounded-2xl brand-gradient brand-glow flex items-center justify-center text-white font-extrabold text-lg">
-          M
-        </div>
-        <div>
-          <div className="text-lg font-bold text-white tracking-wide leading-none">Matara</div>
-          <div className="text-xs brand-gradient-text font-medium mt-1">Publisher</div>
-        </div>
+    <aside className="w-64 min-h-screen bg-[#12122a] text-white flex flex-col flex-shrink-0" dir="rtl">
+      {/* Logo - סמל משולש/play בגרדיאנט המותג, כמו סימן "פרסום/שידור" */}
+      <div className="px-6 py-7 flex items-center gap-2">
+        <span className="text-2xl font-extrabold tracking-tight">Matara</span>
+        <span className="w-6 h-6 rounded-lg brand-gradient flex items-center justify-center text-white text-xs">▶</span>
+        <span className="text-2xl font-extrabold tracking-tight text-white/70">post</span>
       </div>
 
       {/* Profile selector - אדמין בלבד */}
@@ -77,7 +73,7 @@ export default function Sidebar() {
             <button
               onClick={() => handleFilterChange("all")}
               className={`w-full text-right px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                filter === "all" ? "brand-gradient text-white shadow-md shadow-cyan-500/20" : "text-white/50 hover:text-white hover:bg-white/10"
+                filter === "all" ? "bg-[var(--brand-solid)] text-white" : "text-white/50 hover:text-white hover:bg-white/10"
               }`}
             >
               כל הפרופילים
@@ -87,7 +83,7 @@ export default function Sidebar() {
                 key={p.id}
                 onClick={() => handleFilterChange(p.userId || p.id)}
                 className={`w-full text-right px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                  filter === (p.userId || p.id) ? "brand-gradient text-white shadow-md shadow-cyan-500/20" : "text-white/50 hover:text-white hover:bg-white/10"
+                  filter === (p.userId || p.id) ? "bg-[var(--brand-solid)] text-white" : "text-white/50 hover:text-white hover:bg-white/10"
                 }`}
               >
                 {p.name}
@@ -98,42 +94,47 @@ export default function Sidebar() {
       )}
 
       {/* Nav */}
-      <nav className="flex-1 py-3 space-y-1 px-3">
+      <nav className="flex-1 py-4 space-y-1.5 px-4">
         {NAV.map((item) => {
           const active = path === item.href || path.startsWith(item.href + "/");
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                active ? "brand-gradient text-white shadow-md shadow-cyan-500/20" : "text-white/50 hover:text-white hover:bg-white/10"
+              className={`flex items-center justify-between px-4 py-3 rounded-full text-sm font-medium transition-colors ${
+                active ? "bg-blue-600 text-white" : "text-white/60 hover:text-white hover:bg-white/5"
               }`}
             >
-              <span className="text-base w-5 text-center">{item.icon}</span>
               <span>{item.label}</span>
+              <span className="text-base w-5 text-center">{item.icon}</span>
             </Link>
           );
         })}
       </nav>
 
       {/* New campaign button */}
-      <div className="px-3 pb-3">
+      <div className="px-4 pb-4">
         <Link
           href="/campaigns/new"
           className="flex items-center justify-center gap-2 w-full brand-gradient hover:opacity-90 text-white rounded-full px-4 py-3 text-sm font-semibold transition-opacity shadow-lg shadow-cyan-500/20"
         >
-          <span>+</span>
           <span>קמפיין חדש</span>
+          <span>+</span>
         </Link>
       </div>
 
       {/* User */}
-      <div className="px-4 py-4 border-t border-white/10">
-        <div className="text-sm font-medium text-white">{session?.user?.name || "..."}</div>
-        <div className="text-xs text-white/40 mt-0.5">{session?.user?.email}</div>
+      <div className="px-4 py-4 border-t border-white/10 flex items-center gap-3">
+        <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold flex-shrink-0">
+          {(session?.user?.name || "?").slice(0, 2)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-white truncate">{session?.user?.name || "..."}</div>
+          <div className="text-xs text-white/40 truncate">{session?.user?.email}</div>
+        </div>
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
-          className="mt-2 text-xs text-white/40 hover:text-white transition-colors"
+          className="text-xs text-white/40 hover:text-white transition-colors flex-shrink-0"
         >
           יציאה
         </button>
