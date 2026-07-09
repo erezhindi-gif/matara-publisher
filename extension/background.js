@@ -132,6 +132,30 @@ async function tick() {
   }
 }
 
+// מגן משותף נגד דיאלוג "האם לעזוב את האתר?" (beforeunload) שפייסבוק לפעמים
+// מציגה כש-JS מנווט/סוגר טאב - בלי לדחות אותו מיד, הדיאלוג נשאר תקוע וממתין
+// לקלט אנושי, מה שתופס את הטאב פתוח לצמיתות. במקור תוקן רק ב-publishPost()
+// (v2.4x) - ולא הופץ ל-syncGroups()/mergeDuplicateGroups(), שגם הן פותחות
+// טאב פייסבוק וסוגרות אותו בעצמן. דווח בפועל 2026-07-09: טאבים לא נסגרים
+// אחרי סנכרון/ניקוי כפילויות. אוחד לפונקציה משותפת - כל זרימה שפותחת טאב
+// פייסבוק חייבת להשתמש בזה, לא להעתיק את ההגנה מקומית.
+// דורש chrome.debugger מחובר לטאב לפני הקריאה (רק ה-CDP יכול לדחות דיאלוג נטיבי).
+async function attachDialogAutoAccept(tabId) {
+  const listener = (source, method) => {
+    if (source.tabId !== tabId) return;
+    if (method === "Page.javascriptDialogOpening") {
+      chrome.debugger.sendCommand({ tabId }, "Page.handleJavaScriptDialog", { accept: true });
+    }
+  };
+  chrome.debugger.onEvent.addListener(listener);
+  await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Page.enable", {}, resolve));
+  return listener;
+}
+
+function detachDialogAutoAccept(listener) {
+  if (listener) { try { chrome.debugger.onEvent.removeListener(listener); } catch {} }
+}
+
 async function publishPost(post, token, expectedUser) {
   const url = `https://www.facebook.com/groups/${post.fbGroupId}`;
   let tabId = null;
@@ -153,17 +177,7 @@ async function publishPost(post, token, expectedUser) {
     await new Promise((resolve) => chrome.debugger.attach({ tabId }, "1.3", resolve));
     await updatePostNote(post.id, "v2.56.0 - debugger attached", token);
 
-    // דוחה אוטומטית כל דיאלוג "האם לעזוב את האתר?" (beforeunload) לפני שהוא נתקע.
-    // חייבים להאזין ל-Page.javascriptDialogOpening ולהגיב לפני שמנווטים/סוגרים,
-    // לא אחרי - אחרת הדיאלוג כבר תפוס ומחכה לקלט אנושי.
-    dialogListener = (source, method) => {
-      if (source.tabId !== tabId) return;
-      if (method === "Page.javascriptDialogOpening") {
-        chrome.debugger.sendCommand({ tabId }, "Page.handleJavaScriptDialog", { accept: true });
-      }
-    };
-    chrome.debugger.onEvent.addListener(dialogListener);
-    await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Page.enable", {}, resolve));
+    dialogListener = await attachDialogAutoAccept(tabId);
 
     // בדיקה מוקדמת: קבוצה מושהית ע"י מנהל (לא באג - החלטה של מנהלי הקבוצה,
     // כמו שאלון חברות). מוצג כבאנר בראש דף הקבוצה, עוד לפני פתיחת תיבת
@@ -480,7 +494,7 @@ async function publishPost(post, token, expectedUser) {
       await sleep(2000);
     }
     // מסירים את המאזין רק אחרי הניווט - זה השלב היחיד שעלול להפעיל beforeunload
-    if (dialogListener) { try { chrome.debugger.onEvent.removeListener(dialogListener); } catch {} }
+    detachDialogAutoAccept(dialogListener);
     try { await new Promise((resolve) => chrome.debugger.detach({ tabId }, resolve)); } catch {}
     if (tabId) chrome.tabs.remove(tabId);
   }
@@ -489,6 +503,7 @@ async function publishPost(post, token, expectedUser) {
 // סנכרון קבוצות ברמת רשת - לא תלוי במבנה ה-DOM של פייסבוק, עובד זהה על כל פרופיל
 async function syncGroups(job, token, deviceId, expectedUser) {
   let tabId = null;
+  let dialogListener = null;
   // Keepalive - ראה הסבר מפורט ב-publishPost(). סנכרון על חשבון גדול
   // (2026-07-10: הועלה ל-500 גלילות) יכול לקחת עד ~20 דקות - בלי keepalive
   // ה-service worker עלול להיהרג באמצע בלי אף שגיאה, בדיוק כמו שקרה ל-publishPost.
@@ -527,6 +542,9 @@ async function syncGroups(job, token, deviceId, expectedUser) {
       }
     };
     chrome.debugger.onEvent.addListener(onEvent);
+    // מגן נגד דיאלוג beforeunload תקוע - ראה attachDialogAutoAccept() לפירוט מלא
+    // (חסר עד 2026-07-09, גרם לטאבי סנכרון שלא נסגרים)
+    dialogListener = await attachDialogAutoAccept(tabId);
 
     await sleep(4000);
 
@@ -633,7 +651,9 @@ async function syncGroups(job, token, deviceId, expectedUser) {
     }
 
     chrome.debugger.onEvent.removeListener(onEvent);
-    await new Promise((resolve) => chrome.debugger.detach({ tabId }, resolve));
+    // debugger.detach() לא נקרא כאן בכוונה - dialogListener (ראה attachDialogAutoAccept)
+    // חייב את ה-debugger מחובר עד אחרי ניווט about:blank ב-finally, אחרת דיאלוג
+    // beforeunload שנפתח באותו ניווט לא יידחה ויתקע את הטאב.
 
     // דה-דופ לפי שם הוסר לגמרי ב-2026-07-10 (לא רק צומצם) - הכלל "בדיוק 2
     // רשומות, אחת מספרית אחת slug" נבדק מול נתונים אמיתיים ומחק בטעות ~88
@@ -663,6 +683,13 @@ async function syncGroups(job, token, deviceId, expectedUser) {
     });
   } finally {
     clearInterval(keepAlive);
+    if (tabId) {
+      // נווט ל-about:blank לפני שסוגרים - dialogListener עדיין פעיל, אז כל
+      // beforeunload שנפתח כתוצאה מהניווט נדחה אוטומטית מיד (ראה publishPost)
+      try { await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Page.navigate", { url: "about:blank" }, resolve)); } catch {}
+      await sleep(2000);
+    }
+    detachDialogAutoAccept(dialogListener);
     try { await new Promise((resolve) => chrome.debugger.detach({ tabId }, resolve)); } catch {}
     if (tabId) chrome.tabs.remove(tabId);
   }
@@ -687,6 +714,7 @@ function extractMemberCountText() {
 // את שתי הרשומות כמו שהן (ברירת מחדל בטוחה, לא מנחשים).
 async function mergeDuplicateGroups(job, token, deviceId, expectedUser) {
   let tabId = null;
+  let dialogListener = null;
   const keepAlive = setInterval(() => { chrome.storage.local.get("deviceId", () => {}); }, 20000);
   try {
     const res = await fetch(`${API_BASE}/api/extension/groups/dedup-suspects?token=${token}&deviceId=${deviceId || ""}&businessId=${job.businessId}`);
@@ -696,6 +724,12 @@ async function mergeDuplicateGroups(job, token, deviceId, expectedUser) {
     const tab = await new Promise((resolve) => chrome.tabs.create({ url: "https://www.facebook.com/", active: false }, resolve));
     tabId = tab.id;
     await sleep(3000);
+
+    // מגן נגד דיאלוג beforeunload תקוע - חסר במקור, גרם לטאבי ניקוי-כפילויות
+    // שלא נסגרים (2026-07-09). כל ניווט כאן הוא location.href בתוך עמוד -
+    // בדיוק הטריגר הקלאסי ל-beforeunload, ולכן חייב את אותה הגנה כמו publishPost.
+    await new Promise((resolve) => chrome.debugger.attach({ tabId }, "1.3", resolve));
+    dialogListener = await attachDialogAutoAccept(tabId);
 
     if (expectedUser?.name) {
       const identityCheck = await chrome.scripting.executeScript({
@@ -772,6 +806,14 @@ async function mergeDuplicateGroups(job, token, deviceId, expectedUser) {
     });
   } finally {
     clearInterval(keepAlive);
+    if (tabId) {
+      // נווט ל-about:blank לפני שסוגרים - dialogListener עדיין פעיל, אז כל
+      // beforeunload שנפתח כתוצאה מהניווט נדחה אוטומטית מיד (ראה publishPost)
+      try { await new Promise((resolve) => chrome.debugger.sendCommand({ tabId }, "Page.navigate", { url: "about:blank" }, resolve)); } catch {}
+      await sleep(2000);
+    }
+    detachDialogAutoAccept(dialogListener);
+    try { await new Promise((resolve) => chrome.debugger.detach({ tabId }, resolve)); } catch {}
     if (tabId) chrome.tabs.remove(tabId);
   }
 }

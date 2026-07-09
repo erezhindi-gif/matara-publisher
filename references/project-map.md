@@ -102,6 +102,20 @@
 מ-`eilat.il` (התאמה הצליחה: `55.3K`). **טרם אומת בריצה חיה** - ממתין
 לריצה חוזרת אצל ארז אחרי שירענן ל-v2.57.1.
 
+**v2.57.2 - באג נפרד: טאב לא נסגר אחרי סנכרון/ניקוי כפילויות - תוקן.**
+דווח ע"י המשתמש (2026-07-09) מיד אחרי הריצה הראשונה. זיהוי שורש: מגן
+דיאלוג `beforeunload` (`Page.javascriptDialogOpening` → `Page.handleJavaScriptDialog`)
+היה קיים **רק** ב-`publishPost()` ([extension/background.js](../extension/background.js))
+- מעולם לא הופץ ל-`syncGroups()` וגם לא ל-`mergeDuplicateGroups()` החדשה
+(שלא השתמשה ב-`chrome.debugger` בכלל). **בדיוק דפוס "תיקון שלא הופץ ללוגיקה
+המשותפת"** שהסקיל `multi-profile-isolation` קיים כדי לתפוס. תוקן: חולץ
+ל-2 פונקציות משותפות - `attachDialogAutoAccept(tabId)` / `detachDialogAutoAccept(listener)`
+- ושלושת הזרימות (`publishPost`, `syncGroups`, `mergeDuplicateGroups`)
+משתמשות באותו מנגנון בדיוק, לא בעותקים מקומיים. `mergeDuplicateGroups()`
+קיבלה גם `chrome.debugger.attach()` שלא היה לה בכלל (הניווטים שלה
+דרך `location.href` הם בדיוק הטריגר הקלאסי ל-beforeunload). **טרם אומת
+בריצה חיה.**
+
 ### חוסר (נועה) - הלולאה נעצרה מוקדם מדי על רשימה ענקית
 `for (let i = 0; i < 200; i++)` + `if (noNewCount >= 6) break` (15 שניות
 סבלנות) - סף הדוק מדי לרשימה של ~2500 קבוצות ברשימה וירטואלית של פייסבוק,
