@@ -12,6 +12,19 @@ export async function GET(req: NextRequest) {
   if ("error" in auth) return auth.error;
   const user = auth.user;
 
+  // התאוששות מ-SyncJob תקוע - אותה עקרון כמו Post.claimedAt (project-map.md).
+  // syncGroups() יכול לקחת עד ~20 דקות על חשבון גדול; אם ה-service worker
+  // נהרג באמצע, updatedAt (שמתעדכן בכל דיווח התקדמות) פשוט מפסיק לזוז.
+  const STALE_SYNC_THRESHOLD_MS = 20 * 60 * 1000;
+  await prisma.syncJob.updateMany({
+    where: {
+      userId: user.id,
+      status: "running",
+      updatedAt: { lt: new Date(Date.now() - STALE_SYNC_THRESHOLD_MS) },
+    },
+    data: { status: "failed", error: "תקוע יותר מ-20 דקות - התאושש אוטומטית" },
+  });
+
   // תפוס משימה אטומית
   const job = await prisma.$transaction(async (tx) => {
     const pending = await tx.syncJob.findFirst({

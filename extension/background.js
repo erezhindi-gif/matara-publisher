@@ -150,7 +150,7 @@ async function publishPost(post, token, expectedUser) {
     await sleep(7000);
 
     await new Promise((resolve) => chrome.debugger.attach({ tabId }, "1.3", resolve));
-    await updatePostNote(post.id, "v2.54.0 - debugger attached", token);
+    await updatePostNote(post.id, "v2.55.0 - debugger attached", token);
 
     // דוחה אוטומטית כל דיאלוג "האם לעזוב את האתר?" (beforeunload) לפני שהוא נתקע.
     // חייבים להאזין ל-Page.javascriptDialogOpening ולהגיב לפני שמנווטים/סוגרים,
@@ -488,6 +488,10 @@ async function publishPost(post, token, expectedUser) {
 // סנכרון קבוצות ברמת רשת - לא תלוי במבנה ה-DOM של פייסבוק, עובד זהה על כל פרופיל
 async function syncGroups(job, token, deviceId, expectedUser) {
   let tabId = null;
+  // Keepalive - ראה הסבר מפורט ב-publishPost(). סנכרון על חשבון גדול
+  // (2026-07-10: הועלה ל-500 גלילות) יכול לקחת עד ~20 דקות - בלי keepalive
+  // ה-service worker עלול להיהרג באמצע בלי אף שגיאה, בדיוק כמו שקרה ל-publishPost.
+  const keepAlive = setInterval(() => { chrome.storage.local.get("deviceId", () => {}); }, 20000);
   try {
     // נווט בדיוק כמו גלישה רגילה: בית → קבוצות → הקבוצות שלך → כל הקבוצות שהצטרפת אליהן
     const tab = await new Promise((resolve) =>
@@ -590,14 +594,27 @@ async function syncGroups(job, token, deviceId, expectedUser) {
     await sleep(6000);
 
     // גלול את הדף כדי לטעון עוד תוצאות (infinite scroll)
+    // ממצא 2026-07-10: על רשימות ענקיות (~2500 קבוצות) 200 גלילות / 6 גלילות
+    // "בלי חדש" (15 שניות) עצרו מוקדם מדי - הועלו ל-500/15 (37.5 שניות
+    // סבלנות) כדי לתת לרשימה הוירטואלית של פייסבוק זמן לטעון על חשבונות גדולים.
+    // dedupByName: מיפוי שם→fbGroupId ראשון שנראה - פייסבוק לפעמים מציג את
+    // אותה קבוצה פיזית עם href שונה (ID מספרי מול slug) בין רינדורים שונים
+    // באותה גלילה - בלי זה, אותה קבוצה נספרת פעמיים תחת שני fbGroupId.
     let noNewCount = 0;
-    for (let i = 0; i < 200; i++) {
+    const dedupByName = new Map(); // name מנורמל -> fbGroupId שכבר נשמר
+    for (let i = 0; i < 500; i++) {
       // סרוק כרטיסים גלויים לפני הגלילה הבאה
       const domResult = await chrome.scripting.executeScript({
         target: { tabId },
         func: scrapeJoinedGroupCards,
       });
-      for (const g of (domResult?.[0]?.result || [])) found.set(g.fbGroupId, g);
+      for (const g of (domResult?.[0]?.result || [])) {
+        const nameKey = g.name.trim().toLowerCase();
+        const existingId = dedupByName.get(nameKey);
+        if (existingId && existingId !== g.fbGroupId) continue; // אותו שם, ID אחר - כנראה אותה קבוצה, מדלגים
+        dedupByName.set(nameKey, g.fbGroupId);
+        found.set(g.fbGroupId, g);
+      }
 
       await chrome.scripting.executeScript({
         target: { tabId },
@@ -618,7 +635,7 @@ async function syncGroups(job, token, deviceId, expectedUser) {
         });
       } else {
         noNewCount++;
-        if (noNewCount >= 6) break;
+        if (noNewCount >= 15) break;
       }
     }
 
@@ -644,6 +661,7 @@ async function syncGroups(job, token, deviceId, expectedUser) {
       body: JSON.stringify({ status: "failed", error: err.message }),
     });
   } finally {
+    clearInterval(keepAlive);
     try { await new Promise((resolve) => chrome.debugger.detach({ tabId }, resolve)); } catch {}
     if (tabId) chrome.tabs.remove(tabId);
   }
