@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     return pending;
   });
 
-  return NextResponse.json({ job });
+  return NextResponse.json({ job, user: { name: user.name, email: user.email } });
 }
 
 export async function POST(req: NextRequest) {

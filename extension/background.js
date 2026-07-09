@@ -120,8 +120,8 @@ async function tick() {
       // בדוק סנכרון
       const syncRes = await fetch(`${API_BASE}/api/extension/sync?token=${apiToken}&deviceId=${deviceId || ""}`);
       if (syncRes.ok) {
-        const { job } = await syncRes.json();
-        if (job) await syncGroups(job, apiToken, deviceId);
+        const { job, user: syncUser } = await syncRes.json();
+        if (job) await syncGroups(job, apiToken, deviceId, syncUser);
       }
     } catch (err) {
       console.error("שגיאה:", err);
@@ -150,7 +150,7 @@ async function publishPost(post, token, expectedUser) {
     await sleep(7000);
 
     await new Promise((resolve) => chrome.debugger.attach({ tabId }, "1.3", resolve));
-    await updatePostNote(post.id, "v2.53.0 - debugger attached", token);
+    await updatePostNote(post.id, "v2.54.0 - debugger attached", token);
 
     // דוחה אוטומטית כל דיאלוג "האם לעזוב את האתר?" (beforeunload) לפני שהוא נתקע.
     // חייבים להאזין ל-Page.javascriptDialogOpening ולהגיב לפני שמנווטים/סוגרים,
@@ -486,7 +486,7 @@ async function publishPost(post, token, expectedUser) {
 }
 
 // סנכרון קבוצות ברמת רשת - לא תלוי במבנה ה-DOM של פייסבוק, עובד זהה על כל פרופיל
-async function syncGroups(job, token, deviceId) {
+async function syncGroups(job, token, deviceId, expectedUser) {
   let tabId = null;
   try {
     // נווט בדיוק כמו גלישה רגילה: בית → קבוצות → הקבוצות שלך → כל הקבוצות שהצטרפת אליהן
@@ -524,6 +524,37 @@ async function syncGroups(job, token, deviceId) {
     chrome.debugger.onEvent.addListener(onEvent);
 
     await sleep(4000);
+
+    // בדיקת זהות - חסימה קשיחה (לא warning) לפי החלטה מפורשת ב-2026-07-09:
+    // בשונה מ-publishPost, כישלון-שקט כאן לא רק מפרסם פוסט למקום הלא נכון -
+    // הוא כותב בפועל את הקבוצות של פרופיל א' לתוך GroupTemplate של פרופיל ב'
+    // (זיהום נתונים קשה לביטול). המשתמש תפס את זה ידנית פעמיים ברצף -
+    // warning-only לא מספיק אם הוא לא רואה את המסך באותו רגע.
+    // אותה שיטת זיהוי (img[alt] + GENERIC_ALTS) כמו publishPost, אך על עמוד
+    // facebook.com הראשי (אין דיאלוג כתיבה כאן) - סורקים את סרגל הניווט
+    // העליון בלבד (לא כל הדף) כדי לצמצם false positives.
+    if (expectedUser?.name) {
+      const identityCheck = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => {
+          const nav = document.querySelector('[role="banner"]') || document.querySelector('nav') || document;
+          const GENERIC_ALTS = ["תמונת פרופיל", "profile picture", "profile photo", "avatar", "קבוצה ציבורית", "קבוצה פרטית", "public group", "private group", "facebook"];
+          const imgs = Array.from(nav.querySelectorAll('img[alt]'));
+          const candidate = imgs.map(img => img.getAttribute('alt')?.trim()).find(alt => {
+            if (!alt) return false;
+            if (GENERIC_ALTS.some(g => alt.toLowerCase().includes(g.toLowerCase()))) return false;
+            const words = alt.split(/\s+/);
+            return words.length >= 2 && words.length <= 4 && /^[֐-׿a-zA-Z\s'’-]+$/.test(alt);
+          });
+          return candidate || null;
+        },
+      });
+      const detectedIdentity = identityCheck?.[0]?.result;
+      const nameMatches = detectedIdentity && detectedIdentity.includes(expectedUser.name.split(' ')[0]);
+      if (detectedIdentity && !nameMatches) {
+        throw new Error(`חסימת זהות בסנכרון: צפוי "${expectedUser.name}" אך זוהה "${detectedIdentity}" - הסנכרון נעצר לפני שנכתב שום נתון`);
+      }
+    }
 
     // לחץ על "קבוצות" בניווט הראשי
     await chrome.scripting.executeScript({
