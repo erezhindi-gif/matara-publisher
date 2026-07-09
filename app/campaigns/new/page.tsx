@@ -49,6 +49,31 @@ const BG_GRADIENTS: Record<number, string> = {
   15: "linear-gradient(135deg,#c8c8f0,#d8d8ff)",
 };
 
+// מסגרת אייפון סביב התצוגה המקדימה - כדי שזה ייראה כמו שהפוסט באמת יופיע
+// במסך טלפון, לא רק כרטיס פייסבוק שטוח בתוך הדף.
+function IPhoneFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mx-auto w-[300px]">
+      <div className="relative rounded-[2.5rem] bg-[#181225] p-2.5 shadow-2xl shadow-purple-900/30">
+        {/* פס שעון עליון */}
+        <div className="relative rounded-[2rem] bg-[#f7f7fb] overflow-hidden">
+          <div className="absolute top-0 inset-x-0 h-8 flex items-center justify-between px-6 text-[10px] font-semibold text-gray-900 z-10">
+            <span>9:41</span>
+            <span>🔋 📶</span>
+          </div>
+          {/* המחריץ (notch) */}
+          <div className="absolute top-0 inset-x-0 flex justify-center z-10">
+            <div className="w-28 h-6 bg-[#181225] rounded-b-2xl" />
+          </div>
+          <div className="pt-9 pb-3 px-2 max-h-[560px] overflow-y-auto">
+            {children}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FacebookPreview({ content, whatsappLink, whatsappMessage, imagePreviews, backgroundIndex }: { content: string; whatsappLink: string; whatsappMessage?: string; imagePreviews: string[]; backgroundIndex?: number | null }) {
   const bg = backgroundIndex && !imagePreviews.length ? BG_GRADIENTS[backgroundIndex] : null;
   const isDark = backgroundIndex && [1, 8, 11, 12].includes(backgroundIndex);
@@ -56,7 +81,7 @@ function FacebookPreview({ content, whatsappLink, whatsappMessage, imagePreviews
     <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
       <div className="p-4 border-b border-gray-100">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm">M</div>
+          <div className="w-10 h-10 rounded-full brand-gradient flex items-center justify-center text-white font-bold text-sm">M</div>
           <div>
             <div className="font-semibold text-sm text-gray-900">Matara Publisher</div>
             <div className="text-xs text-gray-500">עכשיו · 🌍</div>
@@ -397,11 +422,11 @@ function ScheduleStep({
         </div>
 
         <div className="flex gap-3">
-          <button onClick={onBack} className="flex-1 bg-gray-200 hover:bg-gray-300 rounded-xl p-3 transition-colors">חזרה</button>
+          <button onClick={onBack} className="flex-1 bg-gray-200 hover:bg-gray-300 rounded-full p-3 transition-colors">חזרה</button>
           <button
             onClick={onSave}
             disabled={loading || (scheduleDays.length > 0 && !scheduleStartDate) || scheduleDays.some(d => { const nd = new Date(scheduleStartDate || new Date()); nd.setDate(nd.getDate() + (d - nd.getDay() + 7) % 7); return isDayFull(nd); })}
-            className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-xl p-3 font-semibold transition-colors"
+            className="flex-1 brand-gradient hover:opacity-90 disabled:opacity-40 disabled:bg-gray-300 text-white rounded-full p-3 font-semibold transition-opacity shadow-md shadow-purple-900/20"
           >
             {loading ? "שומר..." : "✓ שמור קמפיין"}
           </button>
@@ -409,8 +434,10 @@ function ScheduleStep({
       </div>
 
       <div className="lg:sticky lg:top-8 lg:self-start">
-        <div className="text-sm text-gray-500 mb-3 font-medium">תצוגה מקדימה</div>
-        <FacebookPreview content={form.content} whatsappLink={form.whatsappLink} whatsappMessage={form.whatsappMessage} imagePreviews={imagePreviews} backgroundIndex={backgroundIndex} />
+        <div className="text-sm text-gray-500 mb-3 font-medium text-center">תצוגה מקדימה</div>
+        <IPhoneFrame>
+          <FacebookPreview content={form.content} whatsappLink={form.whatsappLink} whatsappMessage={form.whatsappMessage} imagePreviews={imagePreviews} backgroundIndex={backgroundIndex} />
+        </IPhoneFrame>
         {busyRanges.length > 0 && (
           <div className="mt-4 bg-white border border-gray-200 rounded-2xl p-4">
             <div className="text-xs font-medium text-gray-500 mb-2">קמפיינים מתוזמנים ביום זה:</div>
@@ -772,7 +799,7 @@ export default function NewCampaignPage() {
               <button
                 onClick={() => setStep("templates")}
                 disabled={!form.jobTitle || !form.content}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-400 text-white rounded-xl p-4 font-semibold transition-colors"
+                className="w-full brand-gradient hover:opacity-90 disabled:opacity-40 disabled:bg-gray-300 text-white rounded-full p-4 font-semibold transition-opacity shadow-md shadow-purple-900/20"
               >
                 המשך לתבניות →
               </button>
@@ -780,8 +807,10 @@ export default function NewCampaignPage() {
 
             {/* Preview */}
             <div className="lg:sticky lg:top-8 lg:self-start">
-              <div className="text-sm text-gray-500 mb-3 font-medium">תצוגה מקדימה</div>
-              <FacebookPreview content={form.content} whatsappLink={form.whatsappLink} whatsappMessage={form.whatsappMessage} imagePreviews={imagePreviews} backgroundIndex={backgroundIndex} />
+              <div className="text-sm text-gray-500 mb-3 font-medium text-center">תצוגה מקדימה</div>
+              <IPhoneFrame>
+                <FacebookPreview content={form.content} whatsappLink={form.whatsappLink} whatsappMessage={form.whatsappMessage} imagePreviews={imagePreviews} backgroundIndex={backgroundIndex} />
+              </IPhoneFrame>
             </div>
           </div>
         )}
@@ -873,11 +902,11 @@ export default function NewCampaignPage() {
             )}
 
             <div className="flex gap-3">
-              <button onClick={() => setStep("form")} className="flex-1 bg-gray-200 hover:bg-gray-300 rounded-xl p-3 transition-colors">חזרה</button>
+              <button onClick={() => setStep("form")} className="flex-1 bg-gray-200 hover:bg-gray-300 rounded-full p-3 transition-colors">חזרה</button>
               <button
                 onClick={() => setStep("schedule")}
                 disabled={templateMode === "template" ? selectedTemplates.length === 0 : selectedGroupIds.length === 0}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-400 text-white rounded-xl p-3 font-semibold transition-colors"
+                className="flex-1 brand-gradient hover:opacity-90 disabled:opacity-40 disabled:bg-gray-300 text-white rounded-full p-3 font-semibold transition-opacity shadow-md shadow-purple-900/20"
               >
                 המשך לתזמון →
               </button>

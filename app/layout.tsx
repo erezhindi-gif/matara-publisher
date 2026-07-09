@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Rubik } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import SessionProvider from "@/components/SessionProvider";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+// Rubik - תומך עברית באופן מלא, מראה מעוגל ומודרני יותר מ-Geist/Arial
+const rubik = Rubik({
+  variable: "--font-brand",
+  subsets: ["latin", "hebrew"],
 });
 
 export const metadata: Metadata = {
@@ -20,8 +21,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="he" className={`${geistSans.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-row bg-gray-50" dir="rtl">
+    <html lang="he" className={`${rubik.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-row bg-[var(--background)]" dir="rtl">
         <SessionProvider>
           <Sidebar />
           <main className="flex-1 min-h-screen overflow-y-auto" dir="rtl">
