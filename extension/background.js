@@ -707,6 +707,24 @@ function extractMemberCountText() {
   return m ? m[1].replace(/\s/g, "") : null;
 }
 
+// 2026-07-09 (ריצה שנייה, אחרי תיקון ה-regex): עדיין 0/20 מיזוגים אצל ארז,
+// זהה שתי פעמים ברציפות - כישלון דטרמיניסטי, לא רנדומלי. אימות ידני (בדפדפן
+// רגיל, טאב גלוי) הראה שהחילוץ עצמו תקין - ההבדל הוא ש-mergeDuplicateGroups
+// פותחת טאב עם active:false (ברקע), ו-Chrome מדחה/מאט טעינת תוכן בטאבים
+// לא-גלויים (בדיוק כמו שדווח קודם ב-syncGroups - שם זה נסבל כי הלולאה שם
+// סבלנית וממשיכה לנסות). כאן היה ניסיון בודד עם המתנה קבועה. תוקן: polling
+// עד 6 שניות במקום ניסיון-יחיד, כדי לתת לטאב-הרקע זמן אמיתי להיטען.
+async function waitForMemberCount(tabId, maxWaitMs = 6000, intervalMs = 800) {
+  const deadline = Date.now() + maxWaitMs;
+  while (Date.now() < deadline) {
+    const r = await chrome.scripting.executeScript({ target: { tabId }, func: extractMemberCountText });
+    const count = r?.[0]?.result;
+    if (count) return count;
+    await sleep(intervalMs);
+  }
+  return null;
+}
+
 // מיזוג כפילויות חד-פעמי (backfill) - מוחק כפילות רק אחרי אימות חי בדפדפן
 // (לא ניחוש לפי שם, בדיוק כמו הלקח מ-2026-07-10 project-map.md): לכל זוג
 // חשוד פותחים את שני עמודי הקבוצה בפועל ומשווים מספר חברים. תואם בדיוק ->
@@ -757,22 +775,22 @@ async function mergeDuplicateGroups(job, token, deviceId, expectedUser) {
     let mergedCount = 0, skippedCount = 0, processed = 0;
     for (const s of suspects) {
       await chrome.scripting.executeScript({ target: { tabId }, func: (id) => { location.href = `https://www.facebook.com/groups/${id}`; }, args: [s.numericFbGroupId] });
-      await sleep(4000 + Math.random() * 1500);
-      const rA = await chrome.scripting.executeScript({ target: { tabId }, func: extractMemberCountText });
-      const countA = rA?.[0]?.result;
+      const countA = await waitForMemberCount(tabId);
 
       await chrome.scripting.executeScript({ target: { tabId }, func: (id) => { location.href = `https://www.facebook.com/groups/${id}`; }, args: [s.slugFbGroupId] });
-      await sleep(4000 + Math.random() * 1500);
-      const rB = await chrome.scripting.executeScript({ target: { tabId }, func: extractMemberCountText });
-      const countB = rB?.[0]?.result;
+      const countB = await waitForMemberCount(tabId);
 
       const verified = !!countA && !!countB && countA === countB;
+      // "timeout" - כנראה כן כפול, טאב-הרקע פשוט לא הספיק להיטען; לעומת
+      // "mismatch" - שני הצדדים נטענו והמספרים שונים בפועל, כנראה לא כפול.
+      // מבדילים כדי שבדיקה ידנית תדע על מה להתמקד קודם.
+      const reason = verified ? null : (!countA || !countB ? "timeout - טעינה לא הושלמה תוך 6 שניות" : "מספר חברים לא תואם");
       if (verified) mergedCount++; else skippedCount++;
 
       await fetch(`${API_BASE}/api/extension/groups/dedup-resolve?token=${token}&deviceId=${deviceId || ""}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ templateId: s.templateId, keepFbGroupId: s.numericFbGroupId, removeFbGroupId: s.slugFbGroupId, verified }),
+        body: JSON.stringify({ templateId: s.templateId, keepFbGroupId: s.numericFbGroupId, removeFbGroupId: s.slugFbGroupId, verified, reason }),
       }).catch(() => {});
 
       processed++;

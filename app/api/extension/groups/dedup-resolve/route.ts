@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   if ("error" in auth) return auth.error;
   const user = auth.user;
 
-  const { templateId, keepFbGroupId, removeFbGroupId, verified } = await req.json();
+  const { templateId, keepFbGroupId, removeFbGroupId, verified, reason } = await req.json();
   if (!templateId || !keepFbGroupId || !removeFbGroupId) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
@@ -24,6 +24,13 @@ export async function POST(req: NextRequest) {
   }
 
   if (!verified) {
+    // שומרים את הסיבה על שתי הרשומות - "timeout" (כנראה כן כפול, טאב-רקע לא
+    // הספיק להיטען) לעומת "mismatch" (מספר חברים שונה בפועל, כנראה לא כפול)
+    // כדי שבדיקה ידנית תדע להבדיל בלי לפתוח כל זוג מחדש.
+    await prisma.group.updateMany({
+      where: { templateId, fbGroupId: { in: [keepFbGroupId, removeFbGroupId] } },
+      data: { dedupSkipReason: reason || "לא אומת" },
+    });
     return NextResponse.json({ ok: true, merged: false });
   }
 
@@ -36,7 +43,7 @@ export async function POST(req: NextRequest) {
   if (!keep || !remove) return NextResponse.json({ ok: true, merged: false });
 
   await prisma.group.delete({ where: { id: remove.id } });
-  await prisma.group.update({ where: { id: keep.id }, data: { lastSeenAt: new Date() } });
+  await prisma.group.update({ where: { id: keep.id }, data: { lastSeenAt: new Date(), dedupSkipReason: null } });
 
   return NextResponse.json({ ok: true, merged: true });
 }
