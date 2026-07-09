@@ -670,8 +670,12 @@ async function syncGroups(job, token, deviceId, expectedUser) {
 
 // חילוץ מספר חברים מעמוד קבוצה בודד (לא מרשימת "הקבוצות שלי") - אימות שנייה
 // למיזוג כפילויות. תואם "‏55.3K‏‏ חברים בקבוצה" ו-"41.5K members" כאחד.
+// 2026-07-09: הרצה בפועל אצל ארז החזירה 0/20 מיזוגים - innerText כולל תווי
+// כיווניות בלתי-נראים (RLM/LRM, U+200E-200F, U+202A-202E, U+2066-2069) בין
+// המספר למילה "חברים" ש-\s לא תופס ב-JS regex - הרגקס נכשל תמיד. תוקן: מנקים
+// את התווים האלה לפני ההתאמה (אומת מול טקסט אמיתי שנתפס מ-eilat.il).
 function extractMemberCountText() {
-  const text = document.body.innerText || "";
+  const text = (document.body.innerText || "").replace(/[‎‏‪-‮⁦-⁩]/g, "");
   const m = text.match(/([\d.,]+\s*[KMkm]?)\s*(?:חברים בקבוצה|members)/);
   return m ? m[1].replace(/\s/g, "") : null;
 }

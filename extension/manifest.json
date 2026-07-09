@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Matara Publisher",
-  "version": "2.57.0",
+  "version": "2.57.1",
   "description": "פרסום אוטומטי לקבוצות פייסבוק",
   "permissions": ["tabs", "storage", "alarms", "scripting", "notifications", "debugger", "downloads"],
   "host_permissions": [
