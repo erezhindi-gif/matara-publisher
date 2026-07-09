@@ -42,7 +42,7 @@ export default function Home() {
         </div>
         <Link
           href="/campaigns/new"
-          className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors"
+          className="brand-gradient hover:opacity-90 text-white rounded-full px-5 py-2.5 text-sm font-semibold transition-opacity"
         >
           + יצירת קמפיין חדש
         </Link>

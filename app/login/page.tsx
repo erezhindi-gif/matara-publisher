@@ -68,7 +68,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors"
+            className="w-full brand-gradient hover:opacity-90 disabled:opacity-50 text-white rounded-full py-2.5 text-sm font-semibold transition-opacity"
           >
             {loading ? "מתחבר..." : "כניסה"}
           </button>

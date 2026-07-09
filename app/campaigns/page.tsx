@@ -68,7 +68,7 @@ export default function CampaignsPage() {
             <Link href="/" className="text-gray-500 hover:text-gray-900 text-sm">← ראשי</Link>
             <h1 className="text-xl font-bold">קמפיינים</h1>
           </div>
-          <Link href="/campaigns/new" className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors">
+          <Link href="/campaigns/new" className="brand-gradient hover:opacity-90 text-white rounded-full px-5 py-2.5 text-sm font-semibold transition-opacity">
             + קמפיין חדש
           </Link>
         </div>

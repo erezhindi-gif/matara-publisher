@@ -292,7 +292,7 @@ export default function SchedulePage() {
                             />
                             <div className="flex gap-2">
                               <button onClick={() => setEditingId(null)} className="flex-1 bg-gray-100 hover:bg-gray-200 rounded-xl p-2 text-sm">ביטול</button>
-                              <button onClick={() => saveEdit(c.id)} disabled={saving} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl p-2 text-sm font-semibold">
+                              <button onClick={() => saveEdit(c.id)} disabled={saving} className="flex-1 brand-gradient hover:opacity-90 text-white rounded-full p-2 text-sm font-semibold transition-opacity">
                                 {saving ? "שומר..." : "שמור"}
                               </button>
                             </div>
@@ -352,7 +352,7 @@ export default function SchedulePage() {
                             <input type="datetime-local" className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2 text-sm text-gray-900" value={editDate} onChange={(e) => setEditDate(e.target.value)} />
                             <div className="flex gap-2">
                               <button onClick={() => setEditingId(null)} className="flex-1 bg-gray-100 rounded-xl p-2 text-sm">ביטול</button>
-                              <button onClick={() => saveEdit(c.id)} disabled={saving} className="flex-1 bg-blue-600 text-white rounded-xl p-2 text-sm font-semibold">{saving ? "..." : "שמור"}</button>
+                              <button onClick={() => saveEdit(c.id)} disabled={saving} className="flex-1 brand-gradient hover:opacity-90 text-white rounded-full p-2 text-sm font-semibold transition-opacity">{saving ? "..." : "שמור"}</button>
                             </div>
                           </div>
                         )}

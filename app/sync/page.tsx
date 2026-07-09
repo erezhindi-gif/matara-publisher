@@ -117,7 +117,7 @@ export default function SyncPage() {
         <button
           onClick={() => startSync("sync")}
           disabled={isRunning || !selectedProfileId}
-          className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:from-gray-400 disabled:to-gray-400 rounded-2xl p-4 font-semibold text-lg text-white transition-all shadow-lg shadow-blue-500/20"
+          className="w-full brand-gradient hover:opacity-90 disabled:opacity-40 rounded-full p-4 font-semibold text-lg text-white transition-opacity shadow-lg shadow-cyan-500/20"
         >
           {isRunning && jobType === "sync" ? "מסנכרן..." : "סנכרן קבוצות עכשיו"}
         </button>

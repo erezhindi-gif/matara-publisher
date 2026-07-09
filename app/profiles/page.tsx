@@ -114,7 +114,7 @@ export default function ProfilesPage() {
             <Link href="/" className="text-gray-400 hover:text-gray-700 text-sm">← ראשי</Link>
             <h1 className="text-xl font-bold">פרופילי פייסבוק</h1>
           </div>
-          <button onClick={() => setShowNew(true)} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors">
+          <button onClick={() => setShowNew(true)} className="brand-gradient hover:opacity-90 text-white rounded-full px-5 py-2.5 text-sm font-semibold transition-opacity">
             + הוסף פרופיל
           </button>
         </div>
@@ -215,7 +215,7 @@ export default function ProfilesPage() {
               </div>
               <div className="flex gap-3 pt-1">
                 <button onClick={() => setShowNew(false)} className="flex-1 bg-gray-100 hover:bg-gray-200 rounded-xl p-3 text-sm transition-colors">ביטול</button>
-                <button onClick={createProfile} disabled={!form.name.trim() || !form.fbUsername.trim() || saving} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-xl p-3 text-sm font-semibold transition-colors">
+                <button onClick={createProfile} disabled={!form.name.trim() || !form.fbUsername.trim() || saving} className="flex-1 brand-gradient hover:opacity-90 disabled:opacity-40 text-white rounded-full p-3 text-sm font-semibold transition-opacity">
                   {saving ? "שומר..." : "הוסף פרופיל"}
                 </button>
               </div>
@@ -265,7 +265,7 @@ export default function ProfilesPage() {
                   </div>
                   <div className="flex gap-2 pt-1">
                     <button onClick={() => setEditingId(null)} className="flex-1 bg-gray-100 hover:bg-gray-200 rounded-xl p-2.5 text-sm">ביטול</button>
-                    <button onClick={saveEdit} disabled={saving} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-xl p-2.5 text-sm font-semibold">{saving ? "שומר..." : "שמור"}</button>
+                    <button onClick={saveEdit} disabled={saving} className="flex-1 brand-gradient hover:opacity-90 disabled:opacity-40 text-white rounded-full p-2.5 text-sm font-semibold transition-opacity">{saving ? "שומר..." : "שמור"}</button>
                   </div>
                 </div>
               ) : (

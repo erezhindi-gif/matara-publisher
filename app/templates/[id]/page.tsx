@@ -158,7 +158,7 @@ export default function TemplateDetailPage() {
             )}
             <button
               onClick={openPicker}
-              className="bg-blue-600 hover:bg-blue-700 rounded-xl px-4 py-2 text-sm font-semibold transition-colors"
+              className="brand-gradient hover:opacity-90 rounded-full px-4 py-2 text-sm font-semibold transition-opacity"
             >
               + הוסף קבוצות
             </button>
@@ -197,7 +197,7 @@ export default function TemplateDetailPage() {
                 {showPickerScrollTop && (
                   <button
                     onClick={() => pickerListRef.current?.scrollTo({ top: 0, behavior: "smooth" })}
-                    className="sticky top-2 right-2 float-left bg-blue-600 hover:bg-blue-700 text-white rounded-full w-9 h-9 flex items-center justify-center shadow-lg z-10"
+                    className="sticky top-2 right-2 float-left brand-gradient hover:opacity-90 text-white rounded-full w-9 h-9 flex items-center justify-center shadow-lg transition-opacity z-10"
                     title="חזור למעלה"
                   >
                     ↑
@@ -237,7 +237,7 @@ export default function TemplateDetailPage() {
                 <button
                   onClick={addSelected}
                   disabled={selected.size === 0 || saving}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 rounded-xl p-3 text-sm font-semibold transition-colors"
+                  className="flex-1 brand-gradient hover:opacity-90 disabled:opacity-40 rounded-full p-3 text-sm font-semibold transition-opacity"
                 >
                   {saving ? "מוסיף..." : `הוסף ${selected.size > 0 ? selected.size : ""} קבוצות`}
                 </button>
@@ -276,7 +276,7 @@ export default function TemplateDetailPage() {
       {showScrollTop && (
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          className="fixed bottom-6 left-6 bg-blue-600 hover:bg-blue-700 text-white rounded-full w-12 h-12 flex items-center justify-center shadow-lg shadow-blue-500/30 z-40 text-xl"
+          className="fixed bottom-6 left-6 brand-gradient hover:opacity-90 text-white rounded-full w-12 h-12 flex items-center justify-center shadow-lg shadow-cyan-500/20 transition-opacity z-40 text-xl"
           title="חזור למעלה"
         >
           ↑

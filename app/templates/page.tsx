@@ -77,7 +77,7 @@ export default function TemplatesPage() {
             <Link href="/" className="text-gray-700 hover:text-gray-900">← ראשי</Link>
             <h1 className="text-2xl font-bold">תבניות קבוצות</h1>
           </div>
-          <button onClick={() => setShowNew(true)} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-2.5 font-semibold transition-colors">
+          <button onClick={() => setShowNew(true)} className="brand-gradient hover:opacity-90 text-white rounded-full px-5 py-2.5 font-semibold transition-opacity">
             + תבנית חדשה
           </button>
         </div>
@@ -109,7 +109,7 @@ export default function TemplatesPage() {
                 <button onClick={() => setShowNew(false)} className="flex-1 bg-gray-200 hover:bg-gray-300 rounded-xl p-3 transition-colors">
                   ביטול
                 </button>
-                <button onClick={createTemplate} disabled={!newName.trim() || saving} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-300 rounded-xl p-3 font-semibold transition-colors">
+                <button onClick={createTemplate} disabled={!newName.trim() || saving} className="flex-1 brand-gradient hover:opacity-90 text-white disabled:opacity-40 rounded-full p-3 font-semibold transition-opacity">
                   {saving ? "שומר..." : "צור תבנית"}
                 </button>
               </div>

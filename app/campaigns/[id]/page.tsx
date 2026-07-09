@@ -376,7 +376,7 @@ export default function CampaignDetailPage() {
                   });
                   setSaving(false);
                   fetchCampaign();
-                }} disabled={saving} className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl p-4 font-semibold transition-colors">
+                }} disabled={saving} className="w-full brand-gradient hover:opacity-90 text-white rounded-full p-4 font-semibold transition-opacity">
                   {saving ? "שומר..." : "▶ המשך פרסום"}
                 </button>
               </div>
@@ -571,7 +571,7 @@ export default function CampaignDetailPage() {
 
             <div className="flex gap-3">
               <button onClick={() => setMode("view")} className="flex-1 bg-gray-100 hover:bg-gray-200 rounded-xl p-3 transition-colors">ביטול</button>
-              <button onClick={saveEdit} disabled={saving} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl p-3 font-semibold transition-colors">
+              <button onClick={saveEdit} disabled={saving} className="flex-1 brand-gradient hover:opacity-90 text-white rounded-full p-3 font-semibold transition-opacity">
                 {saving ? "שומר..." : "שמור שינויים"}
               </button>
             </div>
@@ -667,7 +667,7 @@ export default function CampaignDetailPage() {
               <button
                 onClick={duplicateCampaign}
                 disabled={saving || (dupMode === "template" ? dupTemplates.length === 0 : dupGroupIds.length === 0)}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-xl p-3 font-semibold transition-colors"
+                className="flex-1 brand-gradient hover:opacity-90 disabled:opacity-40 text-white rounded-full p-3 font-semibold transition-opacity"
               >
                 {saving ? "משכפל..." : "שכפל קמפיין"}
               </button>
