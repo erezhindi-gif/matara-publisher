@@ -790,7 +790,20 @@ export default function NewCampaignPage() {
 
               {/* Image Upload */}
               <div>
-                <label className="block text-sm text-gray-700 mb-2">תמונות (אופציונלי)</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm text-gray-700">תמונות (אופציונלי)</label>
+                  <a
+                    href="https://www.canva.com/create/facebook-posts/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-white brand-gradient hover:opacity-90 rounded-full px-3 py-1.5 transition-opacity"
+                  >
+                    🎨 עצב ב-Canva
+                  </a>
+                </div>
+                <p className="text-xs text-gray-400 mb-2 -mt-1">
+                  נפתח בטאב חדש - עצב תמונה, הורד אותה, ואז העלה אותה כאן למטה.
+                </p>
                 <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
                   <span className="text-2xl mb-1">🖼️</span>
                   <span className="text-sm text-gray-500">לחץ להעלאת תמונות</span>
