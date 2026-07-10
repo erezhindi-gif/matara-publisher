@@ -793,7 +793,7 @@ export default function NewCampaignPage() {
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-sm text-gray-700">תמונות (אופציונלי)</label>
                   <a
-                    href="https://www.canva.com/create/facebook-posts/"
+                    href="https://www.canva.com/facebook-posts/templates/"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 text-xs font-semibold text-white brand-gradient hover:opacity-90 rounded-full px-3 py-1.5 transition-opacity"
