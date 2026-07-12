@@ -774,17 +774,30 @@ async function mergeDuplicateGroups(job, token, deviceId, expectedUser) {
 
     let mergedCount = 0, skippedCount = 0, processed = 0;
     for (const s of suspects) {
-      await chrome.scripting.executeScript({ target: { tabId }, func: (id) => { location.href = `https://www.facebook.com/groups/${id}`; }, args: [s.numericFbGroupId] });
-      const countA = await waitForMemberCount(tabId);
+      // 2026-07-10: הרצות אצל נועה (141/23 זוגות) נפלו כולן ב-"Frame with ID 0
+      // was removed" - שגיאת CDP חולפת (race מול ניווט) שקטלה את כל הריצה
+      // (מאות זוגות) בגלל זוג בודד אחד. תוקן: כל זוג מבודד ב-try/catch משלו -
+      // שגיאה חולפת מדלגת רק על הזוג הזה (כמו timeout), לא מפילה את כל הג'וב.
+      let verified = false, reason = null;
+      try {
+        await chrome.scripting.executeScript({ target: { tabId }, func: (id) => { location.href = `https://www.facebook.com/groups/${id}`; }, args: [s.numericFbGroupId] });
+        const countA = await waitForMemberCount(tabId);
 
-      await chrome.scripting.executeScript({ target: { tabId }, func: (id) => { location.href = `https://www.facebook.com/groups/${id}`; }, args: [s.slugFbGroupId] });
-      const countB = await waitForMemberCount(tabId);
+        await chrome.scripting.executeScript({ target: { tabId }, func: (id) => { location.href = `https://www.facebook.com/groups/${id}`; }, args: [s.slugFbGroupId] });
+        const countB = await waitForMemberCount(tabId);
 
-      const verified = !!countA && !!countB && countA === countB;
-      // "timeout" - כנראה כן כפול, טאב-הרקע פשוט לא הספיק להיטען; לעומת
-      // "mismatch" - שני הצדדים נטענו והמספרים שונים בפועל, כנראה לא כפול.
-      // מבדילים כדי שבדיקה ידנית תדע על מה להתמקד קודם.
-      const reason = verified ? null : (!countA || !countB ? "timeout - טעינה לא הושלמה תוך 6 שניות" : "מספר חברים לא תואם");
+        verified = !!countA && !!countB && countA === countB;
+        // "timeout" - כנראה כן כפול, טאב-הרקע פשוט לא הספיק להיטען; לעומת
+        // "mismatch" - שני הצדדים נטענו והמספרים שונים בפועל, כנראה לא כפול.
+        // מבדילים כדי שבדיקה ידנית תדע על מה להתמקד קודם.
+        reason = verified ? null : (!countA || !countB ? "timeout - טעינה לא הושלמה תוך 6 שניות" : "מספר חברים לא תואם");
+      } catch (err) {
+        verified = false;
+        reason = `שגיאת חיבור חולפת - ${err.message}`;
+        // ניסיון התאוששות: לנווט מחדש לפייסבוק לפני שממשיכים לזוג הבא,
+        // למקרה שהטאב/הפריים נשארו במצב שבור אחרי השגיאה
+        try { await chrome.scripting.executeScript({ target: { tabId }, func: () => { location.href = "https://www.facebook.com/"; } }); await sleep(3000); } catch {}
+      }
       if (verified) mergedCount++; else skippedCount++;
 
       await fetch(`${API_BASE}/api/extension/groups/dedup-resolve?token=${token}&deviceId=${deviceId || ""}`, {
