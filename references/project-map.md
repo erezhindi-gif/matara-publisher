@@ -787,3 +787,26 @@ Google (יכול לקחת עד כמה שבועות בגלל הרשאות `debugg
 חיבור חולפת מדלגת רק על הזוג הנוכחי (`dedupSkipReason` = "שגיאת חיבור
 חולפת - ...") וממשיכה לזוג הבא, בלי להפיל את שאר הריצה. גם מנסה לנווט
 מחדש ל-facebook.com כניסיון התאוששות לפני שממשיך. **טרם אומת בריצה חיה.**
+
+## 📬 pending_approval + מייל אישור - בוטל בברירת המחדל (2026-09)
+
+`sendApprovalEmail()` (`lib/email.ts`) ו-status `pending_approval` נבנו
+במקור לתרחיש עתידי: **סוכן AI כותב קמפיין לבד, בן אדם מאשר לפני שהוא
+יוצא**. בפועל היום אין סוכן - מי שיוצר קמפיין כותב את התוכן בעצמו, אז
+אישור-עצמי היה חסם מיותר (המשתמש: "עשינו את זה כי חשבנו שסוכן יפרסם
+עצמאית... אז כרגע אנחנו בלי סוכן, אין צורך באישור").
+
+**מה השתנה:** `POST /api/campaigns` (`app/api/campaigns/route.ts`) יוצר
+קמפיין עם `status: "approved"` ישירות במקום `"pending_approval"`, ולא
+קורא ל-`sendApprovalEmail`. לוגיקת יצירת ה-`Post` (שהייתה חיה רק בתוך
+ה-PATCH handler, מותנית ב-`status === "approved"`) חולצה ל-
+`lib/campaignPosts.ts` (`createPostsForCampaign`) - **קריאה משותפת**
+מ-`POST /api/campaigns` (ליצירה) ומ-`PATCH /api/campaigns/[id]` (לזרימת
+האישור הישנה) - לא כפילות קוד.
+
+**לא נמחק כלום** - `sendApprovalEmail`, ה-UI של "אשר/דחה קמפיין"
+ב-`app/campaigns/[id]/page.tsx`, ו-status `pending_approval` עדיין
+קיימים ועובדים במלואם, פשוט לא מופעלים בברירת המחדל. אם/כשיבנו סוכן
+כותב-תוכן אמיתי (ראה שיחה על סוכני AI, ספטמבר 2026) - צריך רק להחזיר
+`status: "pending_approval"` + הקריאה ל-`sendApprovalEmail` ב-`POST`,
+בלי לבנות מחדש שום דבר.

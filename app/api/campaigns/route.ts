@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { sendApprovalEmail } from "@/lib/email";
+import { createPostsForCampaign } from "@/lib/campaignPosts";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -56,22 +56,18 @@ export async function POST(req: NextRequest) {
       groupIds: JSON.stringify(body.groupIds || []),
       backgroundIndex: body.backgroundIndex ?? null,
       scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
-      status: "pending_approval",
+      // 2026-09: דילוג על pending_approval + מייל אישור - זה נבנה במקור
+      // בשביל תרחיש "סוכן כותב לבד, בן אדם מאשר לפני שיוצא". כרגע אין
+      // סוכן - מי שיוצר את הקמפיין כתב את התוכן בעצמו, אין טעם שיאשר
+      // לעצמו. הלוגיקה של pending_approval/sendApprovalEmail לא נמחקה
+      // (lib/email.ts, campaigns/[id]/page.tsx) - רק לא מופעלת בברירת
+      // המחדל, כדי שיהיה קל להחזיר כשיהיה סוכן אמיתי.
+      status: "approved",
       userId: userId || null,
     },
   });
 
-  try {
-    await sendApprovalEmail({
-      id: campaign.id,
-      title: campaign.title,
-      content: campaign.content,
-      business: { id: business.id, name: business.name, type: business.type },
-      scheduledAt: campaign.scheduledAt,
-    });
-  } catch (e) {
-    console.error("Failed to send email:", e);
-  }
+  await createPostsForCampaign(campaign.id);
 
   return NextResponse.json(campaign);
 }

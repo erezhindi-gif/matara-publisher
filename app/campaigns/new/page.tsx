@@ -253,7 +253,7 @@ function ScheduleStep({
         >
           <div className="font-medium text-orange-800 mb-1">⚡ פרסם עכשיו</div>
           <p className="text-sm text-orange-700">
-            {scheduleDays.length === 0 ? "✓ מצב פרסום מיידי פעיל - יפורסם מיד לאחר אישור" : "לחץ כאן לביטול הימים ופרסום מיידי"}
+            {scheduleDays.length === 0 ? "✓ מצב פרסום מיידי פעיל - יפורסם מיד" : "לחץ כאן לביטול הימים ופרסום מיידי"}
           </p>
         </div>
 
@@ -433,10 +433,6 @@ function ScheduleStep({
             יווצרו {scheduleDays.length} קמפיינים - אחד לכל יום שנבחר, כל אחד בשעה שלו
           </div>
         )}
-
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-sm text-yellow-700">
-          הקמפיין ייצא לאישור לפני פרסום. תקבל הודעה במייל ובוואטסאפ.
-        </div>
 
         <div className="flex gap-3">
           <button onClick={onBack} className="flex-1 bg-gray-200 hover:bg-gray-300 rounded-full p-3 transition-colors">חזרה</button>

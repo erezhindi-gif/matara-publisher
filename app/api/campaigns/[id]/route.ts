@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { createPostsForCampaign } from "@/lib/campaignPosts";
 
 // אימות + בעלות - זהה בעקרון לתיקון שכבר נעשה ב-app/api/campaigns/route.ts:
 // דחייה כברירת מחדל (401) כשאין session, ובנוסף כאן - וידוא ש-userId תואם
@@ -57,40 +58,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   // כשמאשרים קמפיין - צור Post לכל קבוצה אם עדיין אין
   if (body.status === "approved" && campaign.posts.length === 0) {
-    const groupIds: string[] = (() => {
-      try { return JSON.parse(campaign.groupIds || "[]"); } catch { return []; }
-    })();
-    const templateIds: string[] = (() => {
-      try { return JSON.parse(campaign.templateIds || "[]"); } catch { return []; }
-    })();
-
-    const groupsFromTemplates = templateIds.length > 0
-      ? await prisma.group.findMany({ where: { templateId: { in: templateIds } } })
-      : [];
-
-    const directGroups = groupIds.length > 0
-      ? await prisma.group.findMany({ where: { fbGroupId: { in: groupIds } } })
-      : [];
-
-    const allGroups = [...groupsFromTemplates, ...directGroups];
-    const seen = new Set<string>();
-    const unique = allGroups.filter((g) => {
-      if (seen.has(g.fbGroupId)) return false;
-      seen.add(g.fbGroupId);
-      return true;
-    });
-
-    if (unique.length > 0) {
-      await prisma.post.createMany({
-        data: unique.map((g) => ({
-          campaignId: id,
-          fbGroupId: g.fbGroupId,
-          groupName: g.name,
-          status: "pending",
-        })),
-        skipDuplicates: true,
-      });
-    }
+    await createPostsForCampaign(id);
   }
 
   return NextResponse.json(campaign);
