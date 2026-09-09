@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
       groupIds: JSON.stringify(body.groupIds || []),
       backgroundIndex: body.backgroundIndex ?? null,
       scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
+      recurring: !!body.recurring,
       // 2026-09: דילוג על pending_approval + מייל אישור - זה נבנה במקור
       // בשביל תרחיש "סוכן כותב לבד, בן אדם מאשר לפני שיוצא". כרגע אין
       // סוכן - מי שיוצר את הקמפיין כתב את התוכן בעצמו, אין טעם שיאשר

@@ -431,7 +431,7 @@ function ScheduleStep({
 
         {scheduleDays.length > 0 && (
           <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-700">
-            יווצרו {scheduleDays.length} קמפיינים - אחד לכל יום שנבחר, כל אחד בשעה שלו
+            יווצרו {scheduleDays.length} קמפיינים - אחד לכל יום שנבחר, כל אחד בשעה שלו. כל קמפיין יחזור על עצמו כל שבוע באותו יום, עד שתבטל אותו ידנית.
           </div>
         )}
 
@@ -663,6 +663,10 @@ export default function NewCampaignPage() {
             groupIds: templateMode === "groups" ? selectedGroupIds : [],
             backgroundIndex,
             ownerUserId,
+            // 2026-09: בחירת ימים = "כל שלישי ורביעי עד שאבטל" - לא רק פעם
+            // אחת. הקמפיין חוזר על עצמו כל שבוע (cron מקדם את scheduledAt
+            // ומאפס את הפוסטים) עד שמישהו יבטל דרך הכפתור בעמוד הקמפיין.
+            recurring: scheduleDays.length > 0,
           }),
         });
       }

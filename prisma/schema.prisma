@@ -70,6 +70,7 @@ model Campaign {
   groupIds         String    @default("[]")
   backgroundIndex  Int?
   scheduledAt      DateTime?
+  recurring        Boolean           @default(false)
   userId           String?
   createdAt    DateTime          @default(now())
   posts        Post[]

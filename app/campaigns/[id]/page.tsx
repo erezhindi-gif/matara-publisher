@@ -12,6 +12,7 @@ type Campaign = {
   whatsappLink: string | null;
   emailLink: string | null;
   scheduledAt: string | null;
+  recurring: boolean;
   createdAt: string;
   business: { id: string; name: string; type: string };
   imageUrls: string[];
@@ -268,6 +269,17 @@ export default function CampaignDetailPage() {
     setRejectNote("");
   }
 
+  async function cancelRecurrence() {
+    setSaving(true);
+    await fetch(`/api/campaigns/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recurring: false }),
+    });
+    setSaving(false);
+    fetchCampaign();
+  }
+
   if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center">טוען...</div>;
   if (!campaign) return <div className="min-h-screen bg-gray-50 flex items-center justify-center">לא נמצא</div>;
 
@@ -312,9 +324,17 @@ export default function CampaignDetailPage() {
             </div>
 
             {campaign.scheduledAt && (
-              <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-5 text-sm">
-                <span className="text-gray-500">מתוזמן ל: </span>
-                <span>{new Date(campaign.scheduledAt).toLocaleString("he-IL")}</span>
+              <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-5 text-sm flex items-center justify-between">
+                <div>
+                  <span className="text-gray-500">מתוזמן ל: </span>
+                  <span>{new Date(campaign.scheduledAt).toLocaleString("he-IL")}</span>
+                  {campaign.recurring && <span className="mr-2 text-xs bg-purple-100 text-purple-700 rounded-full px-2 py-0.5">🔁 חוזר כל שבוע</span>}
+                </div>
+                {campaign.recurring && (
+                  <button onClick={cancelRecurrence} disabled={saving} className="text-xs text-red-600 hover:text-red-700 underline">
+                    בטל חזרתיות
+                  </button>
+                )}
               </div>
             )}
 
