@@ -25,6 +25,14 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [apiToken, setApiToken] = useState<string | null>(null);
   const [tokenCopied, setTokenCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const EXTENSION_URL = "https://chromewebstore.google.com/detail/matara-publisher/hbflgpkmnnpjgiaeenabdchdiomdiipl";
+
+  async function copyExtensionLink() {
+    await navigator.clipboard.writeText(EXTENSION_URL);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  }
 
   useEffect(() => {
     const handler = () => setBusinessFilterState(getBusinessFilter());
@@ -229,10 +237,37 @@ export default function SettingsPage() {
           )}
         </div>
 
-        {/* Extension Token */}
+        {/* Extension install link */}
         <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-2">תוסף Chrome - קוד אישי</h2>
-          <p className="text-sm text-gray-500 mb-4">העתק את הקוד הזה והדבק בתוסף Matara Publisher בדפדפן שלך.</p>
+          <h2 className="text-lg font-semibold mb-2">התקנת תוסף Chrome</h2>
+          <p className="text-sm text-gray-500 mb-4">קישור ישיר להתקנה על מחשב חדש (Unlisted - לא מופיע בחיפוש בחנות, רק למי שיש לו את הקישור). אחרי ההתקנה, פשוט תיכנס לדשבורד עם המשתמש שלך - התוסף מתחבר אוטומטית, אין קוד להדביק.</p>
+          <div className="bg-white border border-gray-200 rounded-2xl p-5">
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 font-mono text-xs text-gray-700 break-all mb-3" dir="ltr">
+              {EXTENSION_URL}
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={copyExtensionLink}
+                className="flex-1 brand-gradient hover:opacity-90 text-white rounded-full p-3 font-semibold text-sm transition-opacity"
+              >
+                {linkCopied ? "✓ הועתק!" : "העתק קישור"}
+              </button>
+              <a
+                href={EXTENSION_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl p-3 text-sm text-center transition-colors"
+              >
+                פתח בחנות
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* Extension Token - מתקדם, לא נדרש בשימוש רגיל (התוסף מתחבר אוטומטית דרך session) */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-2">קוד API מתקדם</h2>
+          <p className="text-sm text-gray-500 mb-4">לא נדרש בשימוש רגיל - התוסף מזהה אותך אוטומטית כשאתה מחובר לדשבורד. השתמש ב"צור קוד חדש" רק אם אתה חושד שהקוד דלף.</p>
           <div className="bg-white border border-gray-200 rounded-2xl p-5">
             {apiToken ? (
               <div className="space-y-3">
@@ -242,7 +277,7 @@ export default function SettingsPage() {
                 <div className="flex gap-3">
                   <button
                     onClick={copyToken}
-                    className="flex-1 brand-gradient hover:opacity-90 text-white rounded-full p-3 font-semibold text-sm transition-opacity"
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl p-3 text-sm transition-colors"
                   >
                     {tokenCopied ? "✓ הועתק!" : "העתק קוד"}
                   </button>
