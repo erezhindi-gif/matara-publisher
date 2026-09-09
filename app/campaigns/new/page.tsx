@@ -29,6 +29,7 @@ type ProfileOption = {
   name: string;
   businessId: string;
   userId: string | null;
+  whatsappPhone: string | null;
 };
 
 const BG_GRADIENTS: Record<number, string> = {
@@ -530,13 +531,25 @@ export default function NewCampaignPage() {
     content: "",
   });
 
-  // עדכן whatsappLink אוטומטי כשמשתנה businessId או contactLinks
+  // עדכן whatsappLink אוטומטי כשמשתנה הפרופיל/עסק שנבחר.
+  // 2026-09: תוקן באג דליפה בין פרופילים - הקוד הקודם נפל חזרה על "כל קישור
+  // וואטסאפ שנמצא" (contactLinks.find(l => l.type==="whatsapp") בלי סינון
+  // עסק) כשלא היה ContactLink מדויק לעסק הנבחר. זה קרה בפועל לאפרת (עסק
+  // "מטרה" חדש, בלי ContactLink משלו) - היא קיבלה את המספר של נועה
+  // (הקישור הראשון ברשימה). המקור הנכון הוא whatsappPhone של הפרופיל עצמו
+  // (יש לכל פרופיל אחד משלו), לא טבלת ContactLink המשותפת לפי עסק.
   useEffect(() => {
-    if (!contactLinks.length) return;
-    const waLink = contactLinks.find((l) => l.type === "whatsapp" && l.businessId === form.businessId)
-      || contactLinks.find((l) => l.type === "whatsapp");
-    if (waLink) setForm((f) => ({ ...f, whatsappLink: waLink.value }));
-  }, [form.businessId, contactLinks]);
+    const profile = profileOptions.find((p) => p.businessId === form.businessId) || profileOptions[0];
+    if (profile?.whatsappPhone) {
+      const digits = profile.whatsappPhone.replace(/\D/g, "");
+      const intl = digits.startsWith("0") ? `972${digits.slice(1)}` : digits;
+      setForm((f) => ({ ...f, whatsappLink: `https://wa.me/${intl}` }));
+      return;
+    }
+    // גיבוי: ContactLink לפי עסק מדויק בלבד - לעולם לא "כל קישור שנמצא"
+    const waLink = contactLinks.find((l) => l.type === "whatsapp" && l.businessId === form.businessId);
+    setForm((f) => ({ ...f, whatsappLink: waLink?.value || "" }));
+  }, [form.businessId, profileOptions, contactLinks]);
 
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);

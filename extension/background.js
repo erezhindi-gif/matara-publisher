@@ -333,7 +333,15 @@ async function publishPost(post, token, expectedUser) {
     // כחול לחיץ. לא מנסים ליצור/להסיר כרטיס תצוגה מקדימה - זה גרם לבעיות
     // (קליק על אלמנט לא נכון, טעינה חלקית) בלי תועלת אמיתית.
     let fullText = post.campaign.content;
-    if (post.campaign.whatsappLink) fullText += `\n\n📱 ליצירת קשר בוואטסאפ: ${post.campaign.whatsappLink}`;
+    if (post.campaign.whatsappLink) {
+      // 2026-09: whatsappMessage נכתב בטופס אבל מעולם לא הגיע לפוסט בפועל -
+      // ה-API (jobs/route.ts) לא בחר את השדה מה-DB, וגם כאן הוא לא נבנה
+      // לתוך ה-URL. wa.me תומך בהודעה מוכנה מראש דרך ?text=<מקודד>.
+      const waLink = post.campaign.whatsappMessage
+        ? `${post.campaign.whatsappLink}?text=${encodeURIComponent(post.campaign.whatsappMessage)}`
+        : post.campaign.whatsappLink;
+      fullText += `\n\n📱 ליצירת קשר בוואטסאפ: ${waLink}`;
+    }
     if (post.campaign.emailLink)    fullText += `\n✉️ שלח קו"ח: ${post.campaign.emailLink}`;
 
     // ממצא 2026-07-05: בריצות מרובות ברצף, הטקסט לפעמים לא נכנס בפועל -

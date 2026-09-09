@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
       },
       include: {
         campaign: {
-          select: { title: true, content: true, imageUrls: true, whatsappLink: true, emailLink: true },
+          select: { title: true, content: true, imageUrls: true, whatsappLink: true, whatsappMessage: true, emailLink: true },
         },
       },
       take: Math.min(3, remaining),
