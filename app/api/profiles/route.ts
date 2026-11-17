@@ -1,18 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireUser } from "@/lib/session";
 import bcrypt from "bcryptjs";
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  const isAdmin = (session?.user as { role?: string })?.role === "admin";
-  const userId = (session?.user as { id?: string })?.id;
-
-  const where = (!session || isAdmin) ? {} : { userId };
+  const auth = await requireUser();
+  if ("error" in auth) return auth.error;
+  const { user } = auth;
 
   const profiles = await prisma.profile.findMany({
-    where,
+    where: user.isAdmin ? {} : { userId: user.id },
     include: { business: true },
     orderBy: { name: "asc" },
   });
@@ -20,8 +17,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  const isAdmin = (session?.user as { role?: string })?.role === "admin";
+  const auth = await requireUser();
+  if ("error" in auth) return auth.error;
+  const isAdmin = auth.user.isAdmin;
   const body = await req.json();
 
   // מצא או צור עסק לפי שם חופשי

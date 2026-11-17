@@ -135,5 +135,7 @@ model Post {
   error       String?
   createdAt   DateTime  @default(now())
 
-  @@unique([campaignId, groupName])
+  // לפי מזהה ולא לפי שם: הרבה קבוצות דרושים שונות נקראות באותו שם, וייחודיות
+  // לפי groupName בלעה בשקט את כולן חוץ מאחת באותו קמפיין
+  @@unique([campaignId, fbGroupId])
 }

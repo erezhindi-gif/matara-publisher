@@ -28,10 +28,13 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  const sessionUserId = (session?.user as { id?: string })?.id;
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const sessionUserId = (session.user as { id?: string })?.id;
+  const isAdmin = (session.user as { role?: string })?.role === "admin";
   const body = await req.json();
-  // אם אדמין שלח ownerUserId (פרופיל נבחר בסרגל), השתמש בו
-  const userId = body.ownerUserId || sessionUserId;
+  // ownerUserId (פרופיל שנבחר בסרגל) מכובד רק מאדמין - משתמש רגיל תמיד יוצר לעצמו,
+  // אחרת אפשר לגרום לפוסט לצאת מחשבון פייסבוק של משתמש אחר
+  const userId = (isAdmin && body.ownerUserId) || sessionUserId;
 
   let business = await prisma.business.findFirst({
     where: { id: body.businessId },

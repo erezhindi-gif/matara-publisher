@@ -1,17 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireUser } from "@/lib/session";
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  const isAdmin = (session?.user as { role?: string })?.role === "admin";
-  const userId = (session?.user as { id?: string })?.id;
-
-  const where = (!session || isAdmin) ? {} : { userId };
+  const auth = await requireUser();
+  if ("error" in auth) return auth.error;
+  const { user } = auth;
 
   const templates = await prisma.groupTemplate.findMany({
-    where,
+    where: user.isAdmin ? {} : { userId: user.id },
     include: { business: true, groups: true },
     orderBy: { name: "asc" },
   });
@@ -19,8 +16,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  const userId = (session?.user as { id?: string })?.id;
+  const auth = await requireUser();
+  if ("error" in auth) return auth.error;
+  const userId = auth.user.id;
   const body = await req.json();
 
   let business = await prisma.business.findFirst({ where: { id: body.businessId } });

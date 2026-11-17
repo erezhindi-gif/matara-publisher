@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
     await prisma.$transaction([
       prisma.campaign.update({ where: { id: campaign.id }, data: { scheduledAt: next } }),
       // מאפסים את אותם Post-ים למחזור החדש - לא יוצרים חדשים, כי
-      // Post.@@unique([campaignId, groupName]) לא מאפשר שורה שנייה לאותה
+      // Post.@@unique([campaignId, fbGroupId]) לא מאפשר שורה שנייה לאותה
       // קבוצה באותו קמפיין. ההיסטוריה של המחזור הקודם (publishedAt/error)
       // נדרסת - אין טבלת היסטוריה נפרדת כרגע.
       prisma.post.updateMany({
