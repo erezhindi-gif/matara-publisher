@@ -41,6 +41,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ posts: [], user: { name: user.name, email: user.email }, profile: profileInfo });
   }
 
+  // פיזור לאורך היום: פוסט אחד בכל פעם, ומרווח אקראי 3-6 דקות בין פוסטים
+  // לאותו פרופיל (משותף לכל הקמפיינים שלו - אין התנגשות בין קמפיינים).
+  // ~13 פוסטים בשעה => 200 פוסטים מתפרסים על ~15 שעות, בלי פרצים.
+  const MIN_GAP_MS = 3 * 60 * 1000;
+  const MAX_GAP_MS = 6 * 60 * 1000;
+  if (profile?.nextPostAt && profile.nextPostAt > now) {
+    return NextResponse.json({ posts: [], user: { name: user.name, email: user.email }, profile: profileInfo });
+  }
+
   // מצא פוסט ממתין ותפוס אותו אטומית - לא יותר מהמכסה שנותרה היום
   const posts = await prisma.$transaction(async (tx) => {
     const pending = await tx.post.findMany({
@@ -56,10 +65,21 @@ export async function GET(req: NextRequest) {
           select: { title: true, content: true, imageUrls: true, whatsappLink: true, whatsappMessage: true, emailLink: true },
         },
       },
-      take: Math.min(3, remaining),
+      orderBy: { createdAt: "asc" },
+      take: 1,
     });
 
     if (pending.length === 0) return [];
+
+    // שריון חלון הזמן אטומית - שתי בקשות במקביל לא יקבלו שתיהן פוסט
+    if (profile) {
+      const gap = MIN_GAP_MS + Math.random() * (MAX_GAP_MS - MIN_GAP_MS);
+      const reserved = await tx.profile.updateMany({
+        where: { id: profile.id, OR: [{ nextPostAt: null }, { nextPostAt: { lte: now } }] },
+        data: { nextPostAt: new Date(now.getTime() + gap) },
+      });
+      if (reserved.count === 0) return [];
+    }
 
     // תפוס רק אם עדיין pending (מניעת כפל)
     const claimed = [];

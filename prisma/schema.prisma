@@ -28,6 +28,7 @@ model Profile {
   dailyLimit    Int               @default(150)
   postsToday    Int               @default(0)
   lastReset     DateTime          @default(now())
+  nextPostAt    DateTime?         // הפוסט הבא מותר רק מהזמן הזה - פיזור לאורך היום (3-6 דק' בין פוסטים)
   whatsappPhone String?
   userId        String?
   campaigns     CampaignProfile[]

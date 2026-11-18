@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       fbUsername: body.fbUsername,
       edgeProfile: body.edgeProfile || "Default",
       businessId: businessId,
-      dailyLimit: body.dailyLimit || 150,
+      dailyLimit: Math.min(200, Math.max(1, parseInt(body.dailyLimit) || 150)),
       whatsappPhone: body.whatsappPhone || null,
       userId: profileUserId,
     },

@@ -38,6 +38,7 @@ export default function ProfilesPage() {
   const [businessFilter, setBusinessFilterState] = useState(() => getBusinessFilter());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ name: "", fbUsername: "", edgeProfile: "Default", dailyLimit: 150, whatsappPhone: "" });
+  const [newPassword, setNewPassword] = useState("");
 
   useEffect(() => {
     setBusinessFilterState(getBusinessFilter());
@@ -86,18 +87,23 @@ export default function ProfilesPage() {
 
   function startEdit(p: Profile) {
     setEditingId(p.id);
+    setNewPassword("");
     setEditForm({ name: p.name, fbUsername: p.fbUsername, edgeProfile: p.edgeProfile, dailyLimit: p.dailyLimit, whatsappPhone: p.whatsappPhone || "" });
   }
 
   async function saveEdit() {
     if (!editingId) return;
+    if (newPassword && newPassword.length < 8) { alert("סיסמה חייבת להיות לפחות 8 תווים"); return; }
     setSaving(true);
-    await fetch(`/api/profiles/${editingId}`, {
+    const res = await fetch(`/api/profiles/${editingId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editForm),
+      body: JSON.stringify(newPassword ? { ...editForm, newPassword } : editForm),
     });
     setSaving(false);
+    if (!res.ok) { const d = await res.json().catch(() => ({})); alert(d.error || "השמירה נכשלה"); return; }
+    if (newPassword) alert("הסיסמה עודכנה");
+    setNewPassword("");
     setEditingId(null);
     fetchProfiles();
   }
@@ -177,7 +183,7 @@ export default function ProfilesPage() {
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">מגבלה יומית (קבוצות)</label>
-                <input className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900" type="number" max={300} value={form.dailyLimit} onChange={(e) => setForm({ ...form, dailyLimit: parseInt(e.target.value) || 150 })} />
+                <input className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900" type="number" max={200} value={form.dailyLimit} onChange={(e) => setForm({ ...form, dailyLimit: parseInt(e.target.value) || 150 })} />
                 <p className="text-xs text-gray-400 mt-1">מקסימום 300 ביום לפי מגבלת פייסבוק</p>
               </div>
               <div>
@@ -256,13 +262,19 @@ export default function ProfilesPage() {
                     </div>
                     <div>
                       <label className="block text-xs text-gray-500 mb-1">מגבלה יומית</label>
-                      <input type="number" className="w-full border border-gray-300 rounded-xl p-2.5 text-sm" value={editForm.dailyLimit} onChange={e => setEditForm({...editForm, dailyLimit: parseInt(e.target.value)||150})} />
+                      <input type="number" className="w-full border border-gray-300 rounded-xl p-2.5 text-sm" max={200} value={editForm.dailyLimit} onChange={e => setEditForm({...editForm, dailyLimit: parseInt(e.target.value)||150})} />
                     </div>
                   </div>
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">📱 מספר וואטסאפ (לקישור בפוסטים)</label>
                     <input className="w-full border border-gray-300 rounded-xl p-2.5 text-sm" placeholder="0500000000" dir="ltr" value={editForm.whatsappPhone} onChange={e => setEditForm({...editForm, whatsappPhone: e.target.value})} />
                   </div>
+                  {isAdmin && (
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">🔑 סיסמה חדשה לכניסה לדשבורד (ריק = ללא שינוי, לפחות 8 תווים)</label>
+                      <input type="password" autoComplete="new-password" className="w-full border border-gray-300 rounded-xl p-2.5 text-sm" dir="ltr" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+                    </div>
+                  )}
                   <div className="flex gap-2 pt-1">
                     <button onClick={() => setEditingId(null)} className="flex-1 bg-gray-100 hover:bg-gray-200 rounded-xl p-2.5 text-sm">ביטול</button>
                     <button onClick={saveEdit} disabled={saving} className="flex-1 brand-gradient hover:opacity-90 disabled:opacity-40 text-white rounded-full p-2.5 text-sm font-semibold transition-opacity">{saving ? "שומר..." : "שמור"}</button>
