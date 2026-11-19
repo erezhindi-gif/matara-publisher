@@ -25,12 +25,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     data: {
       status,
       error: error || null,
-      publishedAt: status === "published" ? new Date() : undefined,
+      publishedAt: status === "published" || status === "pending_admin" ? new Date() : undefined,
     },
   });
 
   // עדכן מכסה יומית רק על פרסום שהצליח בפועל - לא על failed/group_suspended/וכו'
-  if (status === "published") await incrementPostsToday(user.id);
+  // pending_admin = נשלח לקבוצה (ממתין לאישור מנהל) - נספר במכסה כמו פרסום
+  if (status === "published" || status === "pending_admin") await incrementPostsToday(user.id);
 
   return NextResponse.json({ ok: true, post });
 }

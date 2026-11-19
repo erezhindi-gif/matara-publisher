@@ -485,12 +485,40 @@ async function publishPost(post, token, expectedUser) {
       await sleep(500);
     }
     if (!success && !publishError) publishError = `לא נמצא כפתור פרסום | כפתורים: ${lastButtonDebug}`;
-    if (success) await sleep(3000); // הדיאלוג כבר נסגר בפועל - שיירי המתנה קצרה בלבד
+    // 2026-11-19: בקבוצות עם אישור מנהל, הדיאלוג נסגר כרגיל אבל הפוסט לא מופיע
+    // עד שמנהל מאשר. פייסבוק מציגה הודעה (toast/דיאלוג) - מזהים אותה ומדווחים
+    // pending_admin במקום published. בודקים רק אזורי הודעה (alert/dialog/status),
+    // לא את כל הדף - כדי שטקסט של פוסט אחר בקבוצה לא יזוהה בטעות.
+    let pendingAdmin = false;
+    if (success) {
+      for (let i = 0; i < 4 && !pendingAdmin; i++) {
+        await sleep(i === 0 ? 1000 : 1500);
+        const pa = await chrome.scripting.executeScript({
+          target: { tabId },
+          func: () => {
+            const HINTS = [
+              "ממתין לאישור", "ממתינים לאישור", "ממתין לבדיקה", "ממתין לאישור מנהל",
+              "לאחר שמנהל", "אחרי שמנהל", "ברגע שמנהל", "יאשר את הפוסט", "יאשרו את הפוסט",
+              "pending approval", "awaiting approval", "pending admin", "is pending",
+              "once an admin", "after an admin", "when an admin", "admin approves", "admins approve",
+              "submitted for approval", "submitted for review",
+            ];
+            const zones = Array.from(document.querySelectorAll('[role="alert"], [role="dialog"], [role="status"], [aria-live], [aria-modal="true"]'));
+            const text = zones.map((z) => z.textContent || "").join(" | ").toLowerCase();
+            const hit = HINTS.find((h) => text.includes(h.toLowerCase()));
+            return hit || null;
+          },
+        });
+        const hit = pa?.[0]?.result;
+        if (hit) { pendingAdmin = true; imageDiagnostics = `ממתין לאישור מנהל (זוהה: "${hit}") | ${imageDiagnostics || ""}`; }
+      }
+    }
+    if (success) await sleep(1500); // הדיאלוג כבר נסגר בפועל - שיירי המתנה קצרה בלבד
     // גם בהצלחה שומרים את דיאגנוסטיקת התמונה בשדה error - אחרת updatePostStatus מוחק אותה
     const finalNote = success
       ? (imageDiagnostics ? `הצליח | תמונה: ${imageDiagnostics}` : null)
       : `${publishError} | תמונה: ${imageDiagnostics}`;
-    await updatePostStatus(post.id, success ? "published" : "failed", finalNote, token);
+    await updatePostStatus(post.id, success ? (pendingAdmin ? "pending_admin" : "published") : "failed", finalNote, token);
   } catch (err) {
     await updatePostStatus(post.id, "failed", err.message, token);
   } finally {

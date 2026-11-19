@@ -3,7 +3,7 @@ import { requireApiKey } from "@/lib/externalAuth";
 import { parseRepeatDays } from "@/lib/repeat";
 import { NextRequest, NextResponse } from "next/server";
 
-const STATUSES = ["pending", "running", "published", "failed", "group_suspended", "needs_membership_answer", "cancelled"] as const;
+const STATUSES = ["pending", "running", "published", "failed", "group_suspended", "needs_membership_answer", "pending_admin", "cancelled"] as const;
 
 // {id} = ה-id שחזר מ-POST, או ה-externalId
 async function findOwned(req: NextRequest, id: string) {
