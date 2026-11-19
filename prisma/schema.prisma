@@ -73,6 +73,8 @@ model Campaign {
   scheduledAt      DateTime?
   recurring        Boolean           @default(false)
   userId           String?
+  repeatDays       String?           // ימים קבועים בשבוע לפי שעון ישראל, "1,3" = שני ורביעי (0=ראשון). ריק = לא חוזר (או recurring הישן: שבועי)
+  cancelledAt      DateTime?         // בוטל - לא מפרסמים יותר ולא חוזרים
   externalId       String?           @unique // מזהה מהמערכת החיצונית (שירה AI) - מונע קמפיין כפול בשליחה חוזרת
   createdAt    DateTime          @default(now())
   posts        Post[]

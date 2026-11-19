@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { createPostsForCampaign } from "@/lib/campaignPosts";
 import { requireApiKey, getUserGroups } from "@/lib/externalAuth";
 import { Prisma } from "@prisma/client";
+import { parseRepeatDays } from "@/lib/repeat";
 import { NextRequest, NextResponse } from "next/server";
 
 const MAX_GROUPS = 40;
@@ -59,6 +60,17 @@ export async function POST(req: NextRequest) {
     if (isNaN(when.getTime())) return bad("scheduledAt לא תקין (ISO 8601)");
   }
 
+  // repeatDays: ימים קבועים בשבוע (0=ראשון ... 6=שבת), לפי שעון ישראל, בשעה של scheduledAt
+  let repeatDays: string | null = null;
+  if (body.repeatDays != null) {
+    const arr = body.repeatDays;
+    if (!Array.isArray(arr) || arr.length === 0 || !arr.every((n) => Number.isInteger(n) && n >= 0 && n <= 6)) {
+      return bad("repeatDays: מערך של מספרים 0-6 (0=ראשון)");
+    }
+    if (!when) return bad("repeatDays דורש scheduledAt (קובע את השעה ואת הפעם הראשונה)");
+    repeatDays = Array.from(new Set(arr as number[])).sort().join(",");
+  }
+
   const businessId = (body.businessId as string | undefined) || user.businessId || "מטרה";
   if (!BUSINESSES.includes(businessId)) return bad(`businessId רק ${BUSINESSES.join(" / ")}`);
 
@@ -99,6 +111,7 @@ export async function POST(req: NextRequest) {
         templateIds: "[]",
         groupIds: JSON.stringify(Array.from(finalIds)),
         scheduledAt: when,
+        repeatDays,
         status: "approved",
         userId: user.id,
       },
@@ -116,7 +129,7 @@ export async function POST(req: NextRequest) {
   const totalGroups = await prisma.post.count({ where: { campaignId: campaign.id } });
 
   return NextResponse.json(
-    { id: campaign.id, externalId, status: campaign.status, created: true, totalGroups, scheduledAt: campaign.scheduledAt },
+    { id: campaign.id, externalId, status: campaign.status, created: true, totalGroups, scheduledAt: campaign.scheduledAt, repeatDays: parseRepeatDays(campaign.repeatDays) },
     { status: 201 },
   );
 }

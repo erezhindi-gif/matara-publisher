@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
+import { parseRepeatDays, nextRepeat } from "@/lib/repeat";
 
 // רץ יומית (vercel.json) - מקדם קמפיינים חוזרים (Campaign.recurring) לשבוע
 // הבא ברגע שהמחזור הנוכחי הסתיים. "מחזור הסתיים" = אין אף Post במצב
@@ -19,9 +20,11 @@ export async function GET(req: NextRequest) {
 
   const now = new Date();
 
+  // recurring (הישן, שבועי מהדשבורד) או repeatDays (ימים קבועים, מהחיבור החיצוני)
   const due = await prisma.campaign.findMany({
     where: {
-      recurring: true,
+      OR: [{ recurring: true }, { repeatDays: { not: null } }],
+      cancelledAt: null,
       scheduledAt: { lte: now },
     },
     include: { posts: true },
@@ -34,8 +37,16 @@ export async function GET(req: NextRequest) {
     if (!campaign.scheduledAt) continue;
 
     // קדם שבוע-שבוע עד שהתאריך בעתיד - מכסה מקרה שה-cron לא רץ כמה ימים
-    let next = new Date(campaign.scheduledAt);
-    while (next <= now) next = new Date(next.getTime() + 7 * 24 * 60 * 60 * 1000);
+    let next: Date;
+    const days = parseRepeatDays(campaign.repeatDays);
+    if (days.length > 0) {
+      const n = nextRepeat(campaign.scheduledAt, days, now);
+      if (!n) continue;
+      next = n;
+    } else {
+      next = new Date(campaign.scheduledAt);
+      while (next <= now) next = new Date(next.getTime() + 7 * 24 * 60 * 60 * 1000);
+    }
 
     await prisma.$transaction([
       prisma.campaign.update({ where: { id: campaign.id }, data: { scheduledAt: next } }),
