@@ -519,7 +519,10 @@ async function syncGroups(job, token, deviceId, expectedUser) {
   try {
     // נווט בדיוק כמו גלישה רגילה: בית → קבוצות → הקבוצות שלך → כל הקבוצות שהצטרפת אליהן
     const tab = await new Promise((resolve) =>
-      chrome.tabs.create({ url: "https://www.facebook.com/", active: false }, resolve)
+      // active: true - ממצא 2026-11-19: בלשונית ברקע Edge מקפיא רינדור, הגלילה
+      // האינסופית של פייסבוק לא טוענת עוד כרטיסים, והסנכרון עצר על 58 מתוך 2,109.
+      // אותה לשונית כשהיא מוצגת מצאה את כולן. (publishPost כבר active: true מאותה סיבה)
+      chrome.tabs.create({ url: "https://www.facebook.com/", active: true }, resolve)
     );
     tabId = tab.id;
 

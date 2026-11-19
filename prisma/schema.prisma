@@ -73,6 +73,7 @@ model Campaign {
   scheduledAt      DateTime?
   recurring        Boolean           @default(false)
   userId           String?
+  externalId       String?           @unique // מזהה מהמערכת החיצונית (שירה AI) - מונע קמפיין כפול בשליחה חוזרת
   createdAt    DateTime          @default(now())
   posts        Post[]
   profiles     CampaignProfile[]
@@ -97,6 +98,18 @@ model User {
   apiTokenDeviceId  String?   // נקשר אוטומטית למכשיר הראשון שמשתמש בטוקן (TOFU) - ריק = עדיין לא נתפס
   apiTokenExpiresAt DateTime? // תוקף קבוע מרגע ההנפקה/החידוש - טוקן שהעתיקו למכונה אחרת לא יעבוד לנצח
   createdAt         DateTime  @default(now())
+}
+
+// מפתחות API למערכות חיצוניות (שירה AI). נשמר רק hash (sha256) - המפתח עצמו
+// מוצג פעם אחת ביצירה. כל מפתח קשור למשתמש אחד, וכל מה שנוצר איתו שייך לו.
+model ApiKey {
+  id         String    @id @default(cuid())
+  name       String
+  userId     String
+  keyHash    String    @unique
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
 }
 
 model ContactLink {
