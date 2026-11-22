@@ -24,6 +24,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     select: { groupName: true, fbGroupId: true, status: true, publishedAt: true, error: true },
     orderBy: { groupName: "asc" },
   });
+  // imageAttached: התוסף אימת שהתמונה הופיעה בחלון הפוסט לפני הפרסום
+  const postsOut = posts.map(({ error, ...p }) => ({ ...p, error, imageAttached: (p.status === "published" || p.status === "pending_admin") && !!error?.includes("blob-preview בדיאלוג: כן") }));
   const totals: Record<string, number> = { total: posts.length };
   for (const s of STATUSES) totals[s] = 0;
   for (const p of posts) totals[p.status] = (totals[p.status] || 0) + 1;
@@ -36,7 +38,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     cancelled: !!campaign.cancelledAt,
     totals,
     done: totals.pending === 0 && totals.running === 0,
-    posts,
+    posts: postsOut,
   });
 }
 

@@ -16,7 +16,7 @@ type Campaign = {
   createdAt: string;
   business: { id: string; name: string; type: string };
   imageUrls: string[];
-  posts: { id: string; groupName: string; status: string; publishedAt: string | null }[];
+  posts: { id: string; groupName: string; status: string; publishedAt: string | null; error?: string | null }[];
 };
 
 type Template = {
@@ -430,6 +430,7 @@ export default function CampaignDetailPage() {
                       <span className="text-gray-700">{p.groupName}</span>
                       <span className={p.status === "published" ? "text-green-600" : p.status === "failed" ? "text-red-600" : p.status === "running" ? "text-purple-600" : p.status === "needs_membership_answer" ? "text-orange-600" : p.status === "group_suspended" ? "text-orange-600" : p.status === "pending_admin" ? "text-amber-600" : "text-gray-400"}>
                         {p.status === "published" ? "✓ פורסם" : p.status === "failed" ? "✗ נכשל" : p.status === "running" ? "⏳ מפרסם..." : p.status === "needs_membership_answer" ? "🔒 דורש מענה על שאלות הצטרפות" : p.status === "group_suspended" ? "🛑 הקבוצה מושהית" : p.status === "cancelled" ? "⊘ בוטל" : p.status === "pending_admin" ? "⏸ ממתין לאישור מנהל הקבוצה" : "ממתין"}
+                        {(p.status === "published" || p.status === "pending_admin") && p.error?.includes("blob-preview בדיאלוג: כן") && <span title="פורסם עם תמונה (אומת)" className="mr-1">📷</span>}
                       </span>
                     </div>
                   ))}
