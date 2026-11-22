@@ -245,6 +245,7 @@ async function publishPost(post, token, expectedUser) {
     // חשוב: לא לוחצים על כפתור "העלאה ממחשב" - זה פותח בורר קבצים של מערכת ההפעלה
     // וחוסם את כל התהליך. setFileInputFiles מזריק ישירות ל-input בלי לפתוח כלום.
     let imageDiagnostics = ""; // נשמר גם אם הפרסום מצליח - סטטוס "published" מוחק את שדה error
+    let imageAttached = false;
     if (post.campaign.imageUrls?.length > 0) {
       let tempDownloadId = null;
       try {
@@ -293,6 +294,45 @@ async function publishPost(post, token, expectedUser) {
         } else {
           const setFiles = await sendDebuggerCommand(tabId, "DOM.setFileInputFiles", { files: [filename], nodeId });
           imageDiagnostics += setFiles.err ? `setFileInputFiles שגיאה: ${setFiles.err}` : "setFileInputFiles: OK";
+
+          // 2026-11-22: בהתקנה מהחנות אין לתוסף "גישה לכתובות קבצים" כברירת מחדל,
+          // ו-setFileInputFiles נכשל ב-"Not allowed" (שלושה פוסטים של שני AI יצאו בלי
+          // תמונה). גיבוי בלי קובץ מקומי: מורידים את התמונה כאן (שרת התמונות מחזיר
+          // Access-Control-Allow-Origin: *), ובונים File + DataTransfer בתוך הדף.
+          if (setFiles.err) {
+            try {
+              const resp = await fetch(imageUrl);
+              if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+              const mime = resp.headers.get("content-type") || "image/jpeg";
+              const bytes = new Uint8Array(await resp.arrayBuffer());
+              let bin = "";
+              for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+              const b64 = btoa(bin);
+              const ext = (mime.split("/")[1] || "jpg").replace("jpeg", "jpg").replace(/[^a-z0-9]/g, "");
+              const dt = await chrome.scripting.executeScript({
+                target: { tabId },
+                args: [b64, mime, `image.${ext}`],
+                func: (data, type, name) => {
+                  const dialog = Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"]')).find(d => d.querySelector('[role="textbox"]'));
+                  const input = dialog?.querySelector('input[type="file"]');
+                  if (!input) return "אין file input בדיאלוג";
+                  const raw = atob(data);
+                  const arr = new Uint8Array(raw.length);
+                  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+                  const file = new File([arr], name, { type });
+                  const transfer = new DataTransfer();
+                  transfer.items.add(file);
+                  input.files = transfer.files;
+                  input.dispatchEvent(new Event("input", { bubbles: true }));
+                  input.dispatchEvent(new Event("change", { bubbles: true }));
+                  return "OK";
+                },
+              });
+              imageDiagnostics += ` | DataTransfer: ${dt?.[0]?.result || "אין תשובה"}`;
+            } catch (e) {
+              imageDiagnostics += ` | DataTransfer שגיאה: ${e.message}`;
+            }
+          }
           await sleep(5000); // המתן לפייסבוק לעבד את התמונה
 
           // אימות: img[src^="blob:"] הוא סימן אמין (URL מקומי שנוצר ברגע ההעלאה) -
@@ -304,7 +344,8 @@ async function publishPost(post, token, expectedUser) {
               return !!dialog?.querySelector('img[src^="blob:"]');
             },
           });
-          imageDiagnostics += ` | blob-preview בדיאלוג: ${verify?.[0]?.result ? "כן" : "לא"}`;
+          imageAttached = !!verify?.[0]?.result;
+          imageDiagnostics += ` | blob-preview בדיאלוג: ${imageAttached ? "כן" : "לא"}`;
         }
       } catch (e) {
         imageDiagnostics += `חריגה: ${e.message}`;
@@ -315,6 +356,12 @@ async function publishPost(post, token, expectedUser) {
         }
       }
       await updatePostNote(post.id, `תמונה: ${imageDiagnostics}`, token);
+
+      // בקמפיין עם תמונה - לא מפרסמים בלעדיה. עדיף פוסט שלא יצא מפוסט חסר.
+      if (!imageAttached) {
+        await updatePostStatus(post.id, "failed", `התמונה לא צורפה - הפוסט לא פורסם | ${imageDiagnostics}`, token);
+        return; // finally סוגר את הטאב
+      }
     }
 
     // 3. פוקוס על textbox בדיאלוג (אחרי re-render - תיבה חדשה וריקה)
