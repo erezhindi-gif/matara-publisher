@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { liveInfo } from "@/lib/liveStatus";
 
 type Campaign = {
   id: string;
@@ -26,14 +27,6 @@ type Template = {
   groups: { id: string; fbGroupId: string; name: string; memberCount: number | null }[];
 };
 
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  draft: { label: "טיוטה", color: "text-gray-500" },
-  pending_approval: { label: "ממתין לאישור", color: "text-yellow-600" },
-  approved: { label: "מאושר", color: "text-blue-600" },
-  publishing: { label: "מפרסם...", color: "text-purple-600" },
-  done: { label: "הושלם", color: "text-green-600" },
-  paused: { label: "מושהה", color: "text-red-600" },
-};
 
 const DAY_NAMES = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי"];
 
@@ -283,7 +276,7 @@ export default function CampaignDetailPage() {
   if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center">טוען...</div>;
   if (!campaign) return <div className="min-h-screen bg-gray-50 flex items-center justify-center">לא נמצא</div>;
 
-  const statusInfo = STATUS_LABELS[campaign.status] || { label: campaign.status, color: "text-gray-500" };
+  const statusInfo = liveInfo(campaign);
   const businessTemplates = templates.filter((t) => t.businessId === campaign.business.id);
 
   return (

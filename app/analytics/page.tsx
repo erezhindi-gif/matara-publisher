@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getBusinessFilter } from "@/lib/businessFilter";
+import { liveStatus } from "@/lib/liveStatus";
 
 type Profile = {
   id: string;
@@ -64,10 +65,11 @@ export default function AnalyticsPage() {
   });
 
   const totalCampaigns = filtered.length;
-  const totalPublished = filtered.filter((c) => c.status === "done").length;
+  const live = (s: string) => filtered.filter((c) => liveStatus(c) === s).length;
+  const totalPublished = live("done");
   const totalPosts = filtered.reduce((sum, c) => sum + (c.posts?.filter((p) => p.status === "published").length || 0), 0);
   const pending = filtered.filter((c) => c.status === "pending_approval").length;
-  const approved = filtered.filter((c) => c.status === "approved").length;
+  const approved = live("scheduled") + live("queued");
 
   // Posts per day (last 7 days)
   const last7 = Array.from({ length: 7 }, (_, i) => {
@@ -102,7 +104,8 @@ export default function AnalyticsPage() {
   // Status breakdown
   const statusBreakdown = [
     { label: "הושלמו",         value: totalPublished, color: "bg-green-500"  },
-    { label: "מאושרים",        value: approved,        color: "bg-blue-500"   },
+    { label: "בתהליך / מתוזמנים", value: approved,     color: "bg-blue-500"   },
+    { label: "עם תקלות / נכשלו", value: live("partial") + live("failed"), color: "bg-red-500" },
     { label: "ממתינים לאישור", value: pending,          color: "bg-yellow-400" },
     { label: "טיוטות",         value: filtered.filter((c) => c.status === "draft").length, color: "bg-gray-400" },
   ];

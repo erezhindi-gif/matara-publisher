@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getBusinessFilter } from "@/lib/businessFilter";
+import { liveStatus, liveInfo } from "@/lib/liveStatus";
 
 type Campaign = {
   id: string;
@@ -16,41 +17,6 @@ type Campaign = {
   posts: { status: string }[];
   userId: string | null;
 };
-
-const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  draft:            { label: "טיוטה",          color: "text-gray-600",  bg: "bg-gray-100" },
-  pending_approval: { label: "ממתין לאישור",   color: "text-yellow-700", bg: "bg-yellow-100" },
-  approved:         { label: "מאושר",           color: "text-blue-700",  bg: "bg-blue-100" },
-  publishing:       { label: "מפרסם...",        color: "text-purple-700", bg: "bg-purple-100" },
-  done:             { label: "הושלם",           color: "text-green-700", bg: "bg-green-100" },
-  paused:           { label: "מושהה",           color: "text-red-700",   bg: "bg-red-100" },
-};
-
-// סטטוס תצוגה מחושב מהפוסטים עצמם (Campaign.status נשאר "approved" לאורך כל הדרך)
-const LIVE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  scheduled: { label: "⏰ מתוזמן",          color: "text-blue-700",   bg: "bg-blue-100" },
-  queued:    { label: "⏳ בתהליך פרסום",    color: "text-purple-700", bg: "bg-purple-100" },
-  done:      { label: "✓ הושלם",            color: "text-green-700",  bg: "bg-green-100" },
-  partial:   { label: "⚠ הושלם עם תקלות",   color: "text-orange-700", bg: "bg-orange-100" },
-  failed:    { label: "✗ נכשל",             color: "text-red-700",    bg: "bg-red-100" },
-  cancelled: { label: "⊘ בוטל",             color: "text-gray-600",   bg: "bg-gray-100" },
-};
-
-function liveStatus(c: Campaign): string {
-  if (c.status !== "approved" && c.status !== "publishing" && c.status !== "done") return c.status;
-  const ps = c.posts;
-  if (ps.length === 0) return c.status;
-  const n = (s: string) => ps.filter((p) => p.status === s).length;
-  const active = n("pending") + n("running");
-  if (active > 0) {
-    if (n("running") === 0 && active === ps.length && c.scheduledAt && new Date(c.scheduledAt) > new Date()) return "scheduled";
-    return "queued";
-  }
-  if (n("cancelled") === ps.length) return "cancelled";
-  const ok = n("published") + n("pending_admin");
-  if (ok === 0) return "failed";
-  return ok + n("cancelled") === ps.length ? "done" : "partial";
-}
 
 const DAY_SHORT = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 
@@ -146,8 +112,7 @@ export default function CampaignsPage() {
         {!loading && filtered.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filtered.map((c) => {
-              const ls = liveStatus(c);
-              const statusInfo = LIVE_LABELS[ls] || STATUS_LABELS[ls] || { label: ls, color: "text-gray-600", bg: "bg-gray-100" };
+              const statusInfo = liveInfo(c);
               const cnt = (s: string) => c.posts.filter((p) => p.status === s).length;
               const published = cnt("published");
               const waitingAdmin = cnt("pending_admin");

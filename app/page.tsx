@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { liveStatus } from "@/lib/liveStatus";
 
 type Stats = {
   pending: number;
@@ -20,11 +21,14 @@ export default function Home() {
       .then((campaigns) => {
         if (!Array.isArray(campaigns)) return;
         const today = new Date().toDateString();
-        const totalPosts = campaigns.reduce((sum: number, c: { posts: { status: string }[] }) => sum + (c.posts?.filter((p) => p.status === "published").length || 0), 0);
+        type P = { status: string; publishedAt?: string | null };
+        const totalPosts = campaigns.reduce((sum: number, c: { posts: P[] }) => sum + (c.posts?.filter((p) => p.status === "published").length || 0), 0);
+        // פוסטים שיצאו היום בפועל (לפי publishedAt), ולא קמפיינים
+        const postsToday = campaigns.reduce((sum: number, c: { posts: P[] }) => sum + (c.posts?.filter((p) => p.publishedAt && new Date(p.publishedAt).toDateString() === today).length || 0), 0);
         setStats({
           pending: campaigns.filter((c) => c.status === "pending_approval").length,
-          approved: campaigns.filter((c) => c.status === "approved").length,
-          publishedToday: campaigns.filter((c) => c.status === "done" && new Date(c.createdAt).toDateString() === today).length,
+          approved: campaigns.filter((c) => ["scheduled", "queued"].includes(liveStatus(c))).length,
+          publishedToday: postsToday,
           totalCampaigns: campaigns.length,
           totalPosts,
         });
@@ -52,8 +56,8 @@ export default function Home() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[
           { label: "סה״כ קמפיינים",     value: stats.totalCampaigns, icon: "📋", color: "text-purple-600", bg: "bg-purple-50" },
-          { label: "פורסמו היום",        value: stats.publishedToday, icon: "🚀", color: "text-green-600",  bg: "bg-green-50"  },
-          { label: "מאושרים לפרסום",    value: stats.approved,        icon: "✅", color: "text-blue-600",  bg: "bg-blue-50"   },
+          { label: "פוסטים שיצאו היום",  value: stats.publishedToday, icon: "🚀", color: "text-green-600",  bg: "bg-green-50"  },
+          { label: "בתהליך / מתוזמנים",   value: stats.approved,        icon: "✅", color: "text-blue-600",  bg: "bg-blue-50"   },
           { label: "ממתינים לאישור",    value: stats.pending,         icon: "⏳", color: "text-yellow-600", bg: "bg-yellow-50" },
         ].map((s) => (
           <div key={s.label} className="bg-white border border-gray-200 rounded-2xl p-5">

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getBusinessFilter } from "@/lib/businessFilter";
+import { liveInfo } from "@/lib/liveStatus";
 
 type Campaign = {
   id: string;
@@ -24,14 +25,11 @@ type Template = {
 const DAY_NAMES = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
 const DAY_FULL = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
-const STATUS: Record<string, { label: string; bg: string; text: string; dot: string }> = {
-  pending_approval: { label: "ממתין לאישור", bg: "bg-yellow-50", text: "text-yellow-700", dot: "bg-yellow-400" },
-  approved:         { label: "מאושר",        bg: "bg-blue-50",   text: "text-blue-700",   dot: "bg-blue-500"  },
-  publishing:       { label: "מפרסם",        bg: "bg-purple-50", text: "text-purple-700", dot: "bg-purple-500"},
-  done:             { label: "הושלם",        bg: "bg-green-50",  text: "text-green-700",  dot: "bg-green-500" },
-  paused:           { label: "מושהה",        bg: "bg-red-50",    text: "text-red-700",    dot: "bg-red-400"   },
-  draft:            { label: "טיוטה",        bg: "bg-gray-50",   text: "text-gray-600",   dot: "bg-gray-400"  },
-};
+// סטטוס מחושב ממצב הפוסטים בפועל (lib/liveStatus)
+function statusOf(c: Campaign) {
+  const i = liveInfo(c);
+  return { label: i.label, bg: i.bg, text: i.color, dot: i.dot };
+}
 
 function getWeekStart(date: Date) {
   const d = new Date(date);
@@ -229,7 +227,7 @@ export default function SchedulePage() {
                         <div className="text-xs text-gray-300 text-center pt-4">ריק</div>
                       )}
                       {dayCampaigns.map((c) => {
-                        const s = STATUS[c.status] || STATUS.draft;
+                        const s = statusOf(c);
                         const totalPosts = c.posts?.length || 0;
                         const publishedPosts = c.posts?.filter(p => p.status === "published").length || 0;
                         const groupCountFromTemplate = getGroupCount(c, templates);
@@ -248,7 +246,7 @@ export default function SchedulePage() {
                               <span className={`text-xs ${s.text}`}>{s.label}</span>
                               {totalGroups > 0 && (
                                 <span className="text-xs text-gray-500">
-                                  {c.status === "done" ? `${publishedPosts}/${totalGroups}` : totalGroups} קב׳
+                                  {totalPosts > 0 ? `${publishedPosts}/${totalGroups}` : totalGroups} קב׳
                                 </span>
                               )}
                             </div>
@@ -277,7 +275,7 @@ export default function SchedulePage() {
                 <div className="text-sm font-semibold text-gray-500 mb-3">מתוזמנים</div>
                 <div className="space-y-2">
                   {scheduled.map((c) => {
-                    const s = STATUS[c.status] || STATUS.draft;
+                    const s = statusOf(c);
                     const d = new Date(c.scheduledAt!);
                     return (
                       <div key={c.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
@@ -335,7 +333,7 @@ export default function SchedulePage() {
                 <div className="text-sm font-semibold text-gray-500 mb-3">ללא תזמון</div>
                 <div className="space-y-2">
                   {unscheduled.map((c) => {
-                    const s = STATUS[c.status] || STATUS.draft;
+                    const s = statusOf(c);
                     return (
                       <div key={c.id} className="bg-white border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
                         <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${s.dot}`} />
