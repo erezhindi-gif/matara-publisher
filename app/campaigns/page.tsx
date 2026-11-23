@@ -26,6 +26,32 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }
   paused:           { label: "מושהה",           color: "text-red-700",   bg: "bg-red-100" },
 };
 
+// סטטוס תצוגה מחושב מהפוסטים עצמם (Campaign.status נשאר "approved" לאורך כל הדרך)
+const LIVE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  scheduled: { label: "⏰ מתוזמן",          color: "text-blue-700",   bg: "bg-blue-100" },
+  queued:    { label: "⏳ בתהליך פרסום",    color: "text-purple-700", bg: "bg-purple-100" },
+  done:      { label: "✓ הושלם",            color: "text-green-700",  bg: "bg-green-100" },
+  partial:   { label: "⚠ הושלם עם תקלות",   color: "text-orange-700", bg: "bg-orange-100" },
+  failed:    { label: "✗ נכשל",             color: "text-red-700",    bg: "bg-red-100" },
+  cancelled: { label: "⊘ בוטל",             color: "text-gray-600",   bg: "bg-gray-100" },
+};
+
+function liveStatus(c: Campaign): string {
+  if (c.status !== "approved" && c.status !== "publishing" && c.status !== "done") return c.status;
+  const ps = c.posts;
+  if (ps.length === 0) return c.status;
+  const n = (s: string) => ps.filter((p) => p.status === s).length;
+  const active = n("pending") + n("running");
+  if (active > 0) {
+    if (n("running") === 0 && active === ps.length && c.scheduledAt && new Date(c.scheduledAt) > new Date()) return "scheduled";
+    return "queued";
+  }
+  if (n("cancelled") === ps.length) return "cancelled";
+  const ok = n("published") + n("pending_admin");
+  if (ok === 0) return "failed";
+  return ok + n("cancelled") === ps.length ? "done" : "partial";
+}
+
 const DAY_SHORT = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 
 export default function CampaignsPage() {
@@ -54,7 +80,7 @@ export default function CampaignsPage() {
 
   const filtered = campaigns.filter((c) => {
     const matchSearch = !search || c.title.includes(search) || c.content.includes(search);
-    const matchStatus = filterStatus === "all" || c.status === filterStatus;
+    const matchStatus = filterStatus === "all" || liveStatus(c) === filterStatus;
     const matchBusiness = businessFilter === "all" || c.userId === businessFilter;
     return matchSearch && matchStatus && matchBusiness;
   });
@@ -92,9 +118,12 @@ export default function CampaignsPage() {
             <option value="all">כל הסטטוסים</option>
             <option value="draft">טיוטה</option>
             <option value="pending_approval">ממתין לאישור</option>
-            <option value="approved">מאושר</option>
-            <option value="publishing">מפרסם</option>
+            <option value="scheduled">מתוזמן</option>
+            <option value="queued">בתהליך פרסום</option>
             <option value="done">הושלם</option>
+            <option value="partial">הושלם עם תקלות</option>
+            <option value="failed">נכשל</option>
+            <option value="cancelled">בוטל</option>
             <option value="paused">מושהה</option>
           </select>
         </div>
@@ -117,8 +146,13 @@ export default function CampaignsPage() {
         {!loading && filtered.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filtered.map((c) => {
-              const statusInfo = STATUS_LABELS[c.status] || { label: c.status, color: "text-gray-600", bg: "bg-gray-100" };
-              const published = c.posts.filter((p) => p.status === "published").length;
+              const ls = liveStatus(c);
+              const statusInfo = LIVE_LABELS[ls] || STATUS_LABELS[ls] || { label: ls, color: "text-gray-600", bg: "bg-gray-100" };
+              const cnt = (s: string) => c.posts.filter((p) => p.status === s).length;
+              const published = cnt("published");
+              const waitingAdmin = cnt("pending_admin");
+              const inQueue = cnt("pending") + cnt("running");
+              const bad = cnt("failed") + cnt("group_suspended") + cnt("needs_membership_answer");
               const total = c.posts.length;
               let templateCount = 0;
               try { templateCount = JSON.parse(c.templateIds || "[]").length; } catch { templateCount = 0; }
@@ -168,7 +202,13 @@ export default function CampaignsPage() {
                       )}
                       <div className="text-xs text-gray-400">
                         {total > 0
-                          ? <span>{total} קבוצות · {published} פורסמו</span>
+                          ? <span className="flex flex-wrap gap-x-2">
+                              <span>{total} קבוצות</span>
+                              <span className="text-green-600">✓ {published} פורסמו</span>
+                              {waitingAdmin > 0 && <span className="text-amber-600">⏸ {waitingAdmin} ממתינים למנהל</span>}
+                              {inQueue > 0 && <span className="text-purple-600">⏳ {inQueue} בתור</span>}
+                              {bad > 0 && <span className="text-red-600">✗ {bad} נכשלו</span>}
+                            </span>
                           : templateCount > 0
                             ? <span className="text-gray-500">{templateCount} תבניות</span>
                             : <span className="text-orange-500">טרם הוקצו קבוצות</span>
