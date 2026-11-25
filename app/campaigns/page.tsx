@@ -40,7 +40,7 @@ export default function CampaignsPage() {
         .then((data) => { setCampaigns(Array.isArray(data) ? data : []); setLoading(false); });
     }
     fetchCampaigns();
-    const interval = setInterval(fetchCampaigns, 15000);
+    const interval = setInterval(() => { if (!document.hidden) fetchCampaigns(); }, 60000);
     return () => clearInterval(interval);
   }, []);
 

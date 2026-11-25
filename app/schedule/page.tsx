@@ -98,8 +98,8 @@ export default function SchedulePage() {
   useEffect(() => {
     fetchCampaigns();
     fetch("/api/templates").then((r) => r.json()).then((data) => setTemplates(Array.isArray(data) ? data : []));
-    // רענון אוטומטי כל 15 שניות
-    const interval = setInterval(fetchCampaigns, 15000);
+    // רענון כל דקה, רק כשהלשונית גלויה (חוסך זמן מסד נתונים)
+    const interval = setInterval(() => { if (!document.hidden) fetchCampaigns(); }, 60000);
     return () => clearInterval(interval);
   }, []);
 

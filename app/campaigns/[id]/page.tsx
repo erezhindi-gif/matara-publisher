@@ -113,13 +113,14 @@ export default function CampaignDetailPage() {
     fetchCampaign();
     // רענון אוטומטי כשמפרסם
     const interval = setInterval(() => {
+      if (document.hidden) return;
       setCampaign(prev => {
         if (prev && (prev.status === "publishing" || prev.status === "approved")) {
           fetchCampaign();
         }
         return prev;
       });
-    }, 10000);
+    }, 30000);
     fetch("/api/templates").then((r) => r.json()).then((data) => {
       setTemplates(Array.isArray(data) ? data : []);
       const groups = (Array.isArray(data) ? data : []).flatMap((t: Template & { groups: { id: string; fbGroupId: string; name: string; memberCount: number | null }[] }) => t.groups);
